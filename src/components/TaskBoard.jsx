@@ -1,0 +1,104 @@
+import InlineText from './InlineText'
+
+const priorityTone = { High: 'high', Medium: 'medium', Low: 'low' }
+
+export default function TaskBoard({
+  columns,
+  tasks,
+  teamMembers,
+  updateTask,
+  toggleComplete,
+  deleteTask,
+  shiftTask,
+  setEditingTask,
+  draggingId,
+  setDraggingId,
+  moveTask,
+}) {
+  return (
+    <section className="board-grid">
+      {columns.map((column) => {
+        const columnTasks = tasks.filter((task) => task.status === column.id)
+        return (
+          <div
+            key={column.id}
+            className="column"
+            onDragOver={(event) => event.preventDefault()}
+            onDrop={() => {
+              if (draggingId) moveTask(draggingId, column.id)
+              setDraggingId(null)
+            }}
+          >
+            <div className="column-header">
+              <h3>{column.label}</h3>
+              <span>{columnTasks.length}</span>
+            </div>
+            <div className="column-cards">
+              {columnTasks.map((task, index) => (
+                <article
+                  key={task.id}
+                  className={task.completed ? 'task-card completed' : 'task-card'}
+                  draggable
+                  onDragStart={() => setDraggingId(task.id)}
+                  onDragEnd={() => setDraggingId(null)}
+                >
+                  <div className="card-topline">
+                    <span className={`priority-badge ${priorityTone[task.priority]}`}>{task.priority}</span>
+                    <div className="label-row">
+                      {task.labels?.map((label) => <span key={label} className="task-label">{label}</span>)}
+                    </div>
+                  </div>
+                  <InlineText className="task-title-inline" value={task.title} onSave={(value) => updateTask(task.id, { title: value })} />
+                  <InlineText className="task-body-inline" multiline value={task.description} onSave={(value) => updateTask(task.id, { description: value })} />
+                  <dl className="meta-grid">
+                    <div>
+                      <dt>Assignee</dt>
+                      <dd>
+                        <select className="inline-select" value={task.assignee} onChange={(e) => updateTask(task.id, { assignee: e.target.value })}>
+                          {teamMembers.map((member) => <option key={member}>{member}</option>)}
+                        </select>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Discipline</dt>
+                      <dd>{task.discipline}</dd>
+                    </div>
+                    <div>
+                      <dt>Estimate</dt>
+                      <dd><InlineText value={task.estimate} onSave={(value) => updateTask(task.id, { estimate: value })} /></dd>
+                    </div>
+                    <div>
+                      <dt>Due</dt>
+                      <dd><InlineText value={task.due} onSave={(value) => updateTask(task.id, { due: value })} /></dd>
+                    </div>
+                  </dl>
+                  <div className="subtask-list">
+                    {task.subtasks?.map((subtask) => (
+                      <label key={subtask.id} className="subtask-item">
+                        <input
+                          type="checkbox"
+                          checked={subtask.done}
+                          onChange={() => updateTask(task.id, {
+                            subtasks: task.subtasks.map((item) => item.id === subtask.id ? { ...item, done: !item.done } : item),
+                          })}
+                        />
+                        <span>{subtask.title}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="manipulation-row">
+                    <button type="button" className="secondary-btn" disabled={index === 0} onClick={() => shiftTask(task.id, -1)}>↑</button>
+                    <button type="button" className="secondary-btn" disabled={index === columnTasks.length - 1} onClick={() => shiftTask(task.id, 1)}>↓</button>
+                    <button type="button" className="secondary-btn" onClick={() => setEditingTask({ ...task })}>Details</button>
+                    <button type="button" className="primary-btn" onClick={() => toggleComplete(task)}>{task.completed ? 'Reopen' : 'Complete'}</button>
+                    <button type="button" className="danger-btn" onClick={() => deleteTask(task.id)}>Delete</button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </section>
+  )
+}
