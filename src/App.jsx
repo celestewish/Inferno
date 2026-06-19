@@ -307,6 +307,7 @@ const seedDefaults = async (userId) => {
   const createProject = async (event) => {
     event.preventDefault()
     if (!newProject.name.trim()) return
+    if (newProject.name.length > 100) return
     const project = {
       id: crypto.randomUUID(),
       name: newProject.name.trim(),
@@ -399,6 +400,8 @@ const seedDefaults = async (userId) => {
   const handleCreateTask = async (event) => {
     event.preventDefault()
     if (!newTask.title.trim()) return
+  if (newTask.title.length > 200) return
+  if (newTask.description.length > 2000) return
     const task = {
       id: crypto.randomUUID(),
       projectId: currentProject.id,
