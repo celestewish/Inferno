@@ -17,6 +17,7 @@ export default function ProjectSidebar({
   gameCategories,
   deleteProject,
 }) {
+  if (!project) return null
   return (
     <aside className="sidebar">
       <div>
@@ -102,6 +103,14 @@ export default function ProjectSidebar({
           ))}
         </div>
       </div>
+
+      <button
+        type="button"
+        className="danger-btn"
+        onClick={() => supabase.auth.signOut()}
+      >
+        Sign out
+      </button>
 
       <div className="panel theme-panel">
         <div className="section-heading">

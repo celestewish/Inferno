@@ -7,6 +7,7 @@ export default function ProjectHeader({
   gameCategories,
   deleteProject,
 }) {
+  if (!project) return null
   return (
     <section className="hero-panel panel">
       <div className="hero-copy">
