@@ -20,10 +20,10 @@ export default function ProjectSidebar({
   return (
     <aside className="sidebar">
       <div>
-        <p className="eyebrow">Studio board</p>
-        <h1>Game Production HQ</h1>
+        <p className="eyebrow"></p>
+        <h1>Inferno</h1>
         <p className="sidebar-copy">
-          Use this game design production board to help manage your projects!
+          The game design task board.
         </p>
       </div>
 
