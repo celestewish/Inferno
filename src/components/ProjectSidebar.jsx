@@ -1,3 +1,5 @@
+import InfernoLogo from './InfernoLogo'
+
 export default function ProjectSidebar({
   stats,
   project,
@@ -16,17 +18,18 @@ export default function ProjectSidebar({
   methodologies,
   gameCategories,
   deleteProject,
+  onSignOut,
 }) {
   if (!project) return null
   return (
     <aside className="sidebar">
-      <div>
-        <p className="eyebrow"></p>
-        <h1>Inferno</h1>
-        <p className="sidebar-copy">
-          The game design task board.
-        </p>
-      </div>
+      <div className="brand">
+  <InfernoLogo size={30} />
+  <div>
+    <h2>Inferno</h2>
+    <p className="muted-copy">The game design task board</p>
+  </div>
+</div>
 
       <div className="panel stats-panel">
         <div>
@@ -107,7 +110,7 @@ export default function ProjectSidebar({
       <button
         type="button"
         className="danger-btn"
-        onClick={() => supabase.auth.signOut()}
+        onClick={onSignOut}
       >
         Sign out
       </button>

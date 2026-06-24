@@ -64,7 +64,6 @@ export default function ProjectHeader({
             onChange={(e) => updateProjectField('phase', e.target.value)}
           />
         </label>
-
         <button
           type="button"
           className="danger-btn project-delete-btn"

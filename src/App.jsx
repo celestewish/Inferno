@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { supabase } from './lib/supabase'
-import AuthGate from './components/AuthGate'
 import ProjectSidebar from './components/ProjectSidebar'
 import ProjectHeader from './components/ProjectHeader'
 import TaskBoard from './components/TaskBoard'
@@ -42,6 +41,168 @@ const emptyProjectForm = {
 const clampAssignee = (assignee, teamMembers) =>
   teamMembers.includes(assignee) ? assignee : 'Unassigned'
 
+function MarketingHome({ openLogin, openSignup }) {
+  return (
+    <main className="marketing-shell">
+      <section className="marketing-hero panel">
+        <div className="marketing-logo-wrap" aria-hidden="true">
+          <div className="marketing-logo-glow" />
+          <div className="marketing-logo-mark">🔥</div>
+        </div>
+
+        <p className="eyebrow">Game production, organized</p>
+        <h1>Inferno</h1>
+        <p className="marketing-subcopy">
+          A free game design task board for planning features, assigning work, tracking production, and
+          keeping your team aligned from backlog to final polish.
+        </p>
+
+        <div className="marketing-cta-row">
+          <button type="button" className="primary-btn" onClick={onSignup}>
+            Sign up free
+          </button>
+          <button type="button" className="secondary-btn" onClick={onLogin}>
+            Log in
+          </button>
+        </div>
+
+        <div className="marketing-proof">
+          <span>Free to use</span>
+          <span>Built for game projects</span>
+          <span>Kanban + task details + team planning</span>
+        </div>
+      </section>
+
+      <section className="marketing-features">
+        <article className="panel marketing-feature-card">
+          <h2>Plan your pipeline</h2>
+          <p className="muted-copy">
+            Move tasks across backlog, active production, review, and done with a board designed for game workflows.
+          </p>
+        </article>
+
+        <article className="panel marketing-feature-card">
+          <h2>Track real task details</h2>
+          <p className="muted-copy">
+            Capture assignees, discipline, estimate, due dates, subtasks, and production notes without leaving the board.
+          </p>
+        </article>
+
+        <article className="panel marketing-feature-card">
+          <h2>Keep the team aligned</h2>
+          <p className="muted-copy">
+            Organize teammates, project labels, and project-level activity in one place so progress stays visible.
+          </p>
+        </article>
+      </section>
+
+      <section className="marketing-banner panel">
+        <div>
+          <p className="eyebrow">Why Inferno</p>
+          <h2>Built for indie teams, student projects, and fast-moving prototypes</h2>
+          <p className="muted-copy">
+            Inferno gives you a lightweight production board without the clutter of a giant studio toolchain.
+          </p>
+        </div>
+
+        <div className="marketing-cta-row">
+          <button type="button" className="primary-btn" onClick={onSignup}>
+            Create free account
+          </button>
+          <button type="button" className="secondary-btn" onClick={onLogin}>
+            I already have an account
+          </button>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function AuthModal({
+  mode,
+  form,
+  setForm,
+  error,
+  loading,
+  onClose,
+  onSubmit,
+  onSwitchMode,
+}) {
+  if (!mode) return null
+
+  return (
+    <div className="auth-overlay" onClick={onClose} role="presentation">
+      <div
+        className="auth-modal panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="auth-title"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button type="button" className="auth-close-btn" onClick={onClose} aria-label="Close auth form">
+          ×
+        </button>
+
+        <p className="eyebrow">{mode === 'login' ? 'Welcome back' : 'Create your account'}</p>
+        <h2 id="auth-title">{mode === 'login' ? 'Log in to Inferno' : 'Sign up for Inferno'}</h2>
+
+        <form className="auth-form" onSubmit={onSubmit}>
+          <label htmlFor="auth-email">Email</label>
+          <input
+            id="auth-email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={(e) => setForm((c) => ({ ...c, email: e.target.value }))}
+            placeholder="you@example.com"
+          />
+
+          <label htmlFor="auth-password">Password</label>
+          <input
+            id="auth-password"
+            type="password"
+            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            value={form.password}
+            onChange={(e) => setForm((c) => ({ ...c, password: e.target.value }))}
+            placeholder="Enter your password"
+          />
+
+          {mode === 'signup' && (
+            <>
+              <label htmlFor="auth-confirm-password">Confirm password</label>
+              <input
+                id="auth-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={form.confirmPassword}
+                onChange={(e) => setForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+                placeholder="Re-enter your password"
+              />
+            </>
+          )}
+
+          {error ? <p className="auth-error">{error}</p> : null}
+
+          <button type="submit" className="primary-btn" disabled={loading}>
+            {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
+          </button>
+        </form>
+
+        <p className="auth-switch-copy">
+          {mode === 'login' ? 'Need an account?' : 'Already have an account?'}{' '}
+          <button
+            type="button"
+            className="auth-switch-btn"
+            onClick={() => onSwitchMode(mode === 'login' ? 'signup' : 'login')}
+          >
+            {mode === 'login' ? 'Sign up' : 'Log in'}
+          </button>
+        </p>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -58,6 +219,29 @@ function App() {
   const [editingTask, setEditingTask] = useState(null)
   const [newMember, setNewMember] = useState('')
   const [newProject, setNewProject] = useState(emptyProjectForm)
+  const quickCreateInputRef = useRef(null)
+  const [boards, setBoards] = useState([])
+  const [currentBoardId, setCurrentBoardId] = useState(null)
+  const [boardMembers, setBoardMembers] = useState([])
+  const currentBoard = boards.find((board) => board.id === currentBoardId) || boards[0]
+  const [onlineUsers, setOnlineUsers] = useState([])
+  const [typingUsers, setTypingUsers] = useState([])
+  const presenceChannelRef = useRef(null)
+  const [messages, setMessages] = useState([])
+  const [newMessage, setNewMessage] = useState('')
+  const [sendingMessage, setSendingMessage] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('member')
+  const [invites, setInvites] = useState([])
+  const [sendingInvite, setSendingInvite] = useState(false)
+  const [authMode, setAuthMode] = useState(null) // null | 'login' | 'signup'
+  const [authForm, setAuthForm] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+  })
+  const [authError, setAuthError] = useState('')
+  const [authLoading, setAuthLoading] = useState(false)
 
   // ── Auth listener ──
 useEffect(() => {
@@ -81,7 +265,15 @@ useEffect(() => {
       setTasks([])
       setTeamMembers(defaultTeamMembers)
       setCurrentProjectId(null)
-      setLoading(false) // ← this is the critical line that was missing
+      setLoading(false)
+      setBoards([])
+      setBoardMembers([])
+      setCurrentBoardId(null)
+      setOnlineUsers([])
+      setTypingUsers([])
+      setMessages([])
+      setNewMessage('')
+      setSendingMessage(false)
     }
   })
 
@@ -98,49 +290,362 @@ useEffect(() => {
     }).forEach(([key, value]) => document.documentElement.style.setProperty(key, value))
   }, [theme])
 
+useEffect(() => {
+  if (!session?.user || !currentBoardId) return
+
+  const channel = supabase.channel(`presence:board:${currentBoardId}`, {
+    config: {
+      presence: { key: session.user.id },
+    },
+  })
+
+  presenceChannelRef.current = channel
+
+  channel
+    .on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState()
+
+      const users = Object.entries(state).flatMap(([key, presences]) =>
+        (presences || []).map((presence) => ({
+          key,
+          userId: presence.userId ?? key,
+          email: presence.email ?? 'Unknown user',
+          projectId: presence.projectId ?? null,
+          onlineAt: presence.onlineAt ?? null,
+        }))
+      )
+
+      setOnlineUsers(users)
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          userId: session.user.id,
+          email: session.user.email,
+          projectId: currentProjectId ?? null,
+          onlineAt: new Date().toISOString(),
+        })
+      }
+    })
+
+  return () => {
+    presenceChannelRef.current = null
+    lastTrackedProjectId.current = null
+    channel.untrack()
+    supabase.removeChannel(channel)
+    setOnlineUsers([])
+  }
+}, [session?.user?.id, session?.user?.email, currentBoardId])
+
+const lastTrackedProjectId = useRef(null)
+
+useEffect(() => {
+  const channel = presenceChannelRef.current
+  if (!channel || !session?.user || !currentBoardId) return
+  if (lastTrackedProjectId.current === currentProjectId) return
+
+  lastTrackedProjectId.current = currentProjectId ?? null
+
+  channel.track({
+    userId: session.user.id,
+    email: session.user.email,
+    projectId: currentProjectId ?? null,
+    onlineAt: new Date().toISOString(),
+  })
+}, [session?.user?.id, session?.user?.email, currentBoardId, currentProjectId])
+
   // ── Load everything from Supabase ──
-  const loadAllData = async (userId) => {
-    setLoading(true)
+  const loadAllData = async (userId, preferredBoardId = null) => {
+  setLoading(true)
 
-    const [{ data: projectData }, { data: taskData }, { data: memberData }] = await Promise.all([
-      supabase.from('projects').select('*').eq('user_id', userId).order('created_at'),
-      supabase.from('tasks').select('*').eq('user_id', userId).order('sort_order'),
-      supabase.from('team_members').select('*').eq('user_id', userId),
-    ])
+  let { data: membershipRows } = await supabase
+    .from('board_members')
+    .select('board_id, role, boards(*)')
+    .eq('user_id', userId)
 
-    const loadedProjects = projectData?.length ? projectData.map(dbToProject) : []
-    const loadedTasks = taskData?.length ? taskData.map(dbToTask) : []
-    const loadedMembers = memberData?.length
-      ? memberData.map((m) => m.name)
-      : defaultTeamMembers
+  if (!membershipRows?.length) {
+    const { data: createdBoard, error: boardError } = await supabase
+      .from('boards')
+      .insert([{
+        owner_id: userId,
+        name: 'My Studio Board',
+        description: 'Shared production workspace',
+      }])
+      .select()
+      .single()
 
-    // Seed defaults for new users
-    if (!projectData?.length) {
-      await seedDefaults(userId)
-      const [{ data: p }, { data: t }, { data: m }] = await Promise.all([
-        supabase.from('projects').select('*').eq('user_id', userId).order('created_at'),
-        supabase.from('tasks').select('*').eq('user_id', userId).order('sort_order'),
-        supabase.from('team_members').select('*').eq('user_id', userId),
-      ])
-      setProjects(p?.map(dbToProject) ?? [])
-      setTasks(t?.map(dbToTask) ?? [])
-      setTeamMembers(m?.map((item) => item.name) ?? defaultTeamMembers)
-      setCurrentProjectId(p?.[0]?.id ?? null)
-    } else {
-      setProjects(loadedProjects)
-      setTasks(loadedTasks)
-      setTeamMembers(loadedMembers)
-      setCurrentProjectId(loadedProjects[0]?.id ?? null)
+    if (boardError) {
+      console.error('Board creation error:', boardError)
+      setLoading(false)
+      return
     }
 
-    setLoading(false)
+    await supabase.from('board_members').insert([{
+      board_id: createdBoard.id,
+      user_id: userId,
+      role: 'owner',
+    }])
+
+    membershipRows = [{
+      board_id: createdBoard.id,
+      role: 'owner',
+      boards: createdBoard,
+    }]
   }
 
+  const loadedBoards = membershipRows.map((row) => row.boards).filter(Boolean)
+
+  const activeBoardId =
+    loadedBoards.find((board) => board.id === preferredBoardId)?.id ??
+    loadedBoards.find((board) => board.id === currentBoardId)?.id ??
+    loadedBoards[0]?.id ??
+    null
+
+setBoards(loadedBoards)
+setCurrentBoardId(activeBoardId)
+
+    if (!activeBoardId) {
+        setProjects([])
+        setTasks([])
+        setBoardMembers([])
+        setLoading(false)
+        setMessages([])
+  return
+}
+
+  const [
+  { data: projectData },
+  { data: taskData },
+  { data: memberData },
+  { data: boardMemberRows },
+  { data: messageData },
+  { data: inviteData },
+] = await Promise.all([
+  supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
+  supabase
+    .from('tasks')
+    .select('*, projects!inner(board_id)')
+    .eq('projects.board_id', activeBoardId)
+    .order('sort_order'),
+  supabase.from('team_members').select('*').eq('board_id', activeBoardId),
+  supabase.from('board_members').select('*').eq('board_id', activeBoardId),
+  supabase
+    .from('board_messages')
+    .select('*')
+    .eq('board_id', activeBoardId)
+    .order('created_at', { ascending: true })
+    .limit(100),
+  supabase
+    .from('board_invites')
+    .select('*')
+    .eq('board_id', activeBoardId)
+    .is('accepted_at', null)
+    .order('created_at', { ascending: false }),
+])
+
+
+  const loadedProjects = projectData?.length ? projectData.map(dbToProject) : []
+  const loadedTasks = taskData?.length ? taskData.map(dbToTask) : []
+  const loadedMembers = memberData?.length ? memberData.map((m) => m.name) : defaultTeamMembers
+  const loadedMessages = messageData?.length ? messageData.map(dbToMessage) : []
+  const loadedInvites = inviteData?.length ? inviteData.map(dbToInvite) : []
+  setInvites(loadedInvites)
+
+  let nextProjects = []
+  let nextTasks = []
+
+  if (!projectData?.length) {
+    await seedDefaults(userId, activeBoardId)
+
+    const [{ data: p }, { data: t }] = await Promise.all([
+      supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
+      supabase
+        .from('tasks')
+        .select('*, projects!inner(board_id)')
+        .eq('projects.board_id', activeBoardId)
+        .order('sort_order'),
+    ])
+
+    nextProjects = p?.map(dbToProject) ?? []
+    nextTasks = t?.map(dbToTask) ?? []
+  } else {
+    nextProjects = loadedProjects
+    nextTasks = loadedTasks
+  }
+
+setProjects(nextProjects)
+setTasks(nextTasks)
+setCurrentProjectId((currentId) =>
+  nextProjects.some((project) => project.id === currentId)
+    ? currentId
+    : (nextProjects[0]?.id ?? null)
+)
+
+  setTeamMembers(loadedMembers)
+  setBoardMembers(boardMemberRows ?? [])
+  setLoading(false)
+  setMessages(loadedMessages)
+}
+
+useEffect(() => {
+  if (!session?.user?.id || !currentBoardId) return
+
+  const refresh = () => loadAllData(session.user.id)
+
+  const projectsChannel = supabase
+    .channel(`projects-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'projects',
+        filter: `board_id=eq.${currentBoardId}`,
+      },
+      refresh
+    )
+    .subscribe()
+
+  const teamMembersChannel = supabase
+    .channel(`team-members-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'team_members',
+        filter: `board_id=eq.${currentBoardId}`,
+      },
+      refresh
+    )
+    .subscribe()
+
+  const boardMembersChannel = supabase
+    .channel(`board-members-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'board_members',
+        filter: `board_id=eq.${currentBoardId}`,
+      },
+      refresh
+    )
+    .subscribe()
+
+  const tasksChannel = supabase
+    .channel(`tasks-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'tasks',
+      },
+      refresh
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(projectsChannel)
+    supabase.removeChannel(teamMembersChannel)
+    supabase.removeChannel(boardMembersChannel)
+    supabase.removeChannel(tasksChannel)
+  }
+}, [session?.user?.id, currentBoardId])
+
+useEffect(() => {
+  if (!currentBoardId) return
+
+  const channel = supabase
+    .channel(`board-messages-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'board_messages',
+        filter: `board_id=eq.${currentBoardId}`,
+      },
+      (payload) => {
+        const nextMessage = dbToMessage(payload.new)
+
+        setMessages((current) => {
+          if (current.some((message) => message.id === nextMessage.id)) return current
+          return [...current, nextMessage]
+        })
+      }
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [currentBoardId])
+
+useEffect(() => {
+  const acceptInviteFromUrl = async () => {
+    if (!session?.user) return
+
+    const url = new URL(window.location.href)
+    const token = url.searchParams.get('invite')
+    if (!token) return
+
+    const { data: invite, error } = await supabase
+      .from('board_invites')
+      .select('*')
+      .eq('token', token)
+      .is('accepted_at', null)
+      .single()
+
+    if (error || !invite) return
+
+    const inviteEmail = invite.email.trim().toLowerCase()
+    const userEmail = session.user.email?.trim().toLowerCase()
+
+    if (!userEmail || inviteEmail !== userEmail) {
+      window.alert('This invite was sent to a different email address.')
+      return
+    }
+
+    if (new Date(invite.expires_at).getTime() < Date.now()) {
+      window.alert('This invite has expired.')
+      return
+    }
+
+    const { error: memberError } = await supabase
+      .from('board_members')
+      .insert([{
+        board_id: invite.board_id,
+        user_id: session.user.id,
+        role: invite.role,
+      }])
+
+    if (memberError && !memberError.message.toLowerCase().includes('duplicate')) {
+      console.error('Accept invite membership error:', memberError)
+      return
+    }
+
+    await supabase
+      .from('board_invites')
+      .update({ accepted_at: new Date().toISOString() })
+      .eq('id', invite.id)
+
+    url.searchParams.delete('invite')
+    window.history.replaceState({}, '', url.toString())
+
+    loadAllData(session.user.id, invite.board_id)
+  }
+
+  acceptInviteFromUrl()
+}, [session?.user?.id])
+
   // ── Seed default data for new accounts ──
-const seedDefaults = async (userId) => {
-  // Insert projects first, let Supabase generate the IDs
+const seedDefaults = async (userId, boardId) => {
   const projectInserts = defaultProjects.map((p) => ({
     user_id: userId,
+    board_id: boardId,
     name: p.name,
     tagline: p.tagline,
     category: p.category,
@@ -191,14 +696,19 @@ const seedDefaults = async (userId) => {
   const { error: taskError } = await supabase.from('tasks').insert(taskInserts)
   if (taskError) console.error('Task seed error:', taskError)
 
-  const memberInserts = defaultTeamMembers.map((name) => ({ user_id: userId, name }))
+  const memberInserts = defaultTeamMembers.map((name) => ({
+  board_id: boardId,
+  name,
+}))
   const { error: memberError } = await supabase.from('team_members').insert(memberInserts)
   if (memberError) console.error('Member seed error:', memberError)
 }
 
   // ── Shape converters ──
-  const dbToProject = (row) => ({
+function dbToProject(row) {
+  return {
     id: row.id,
+    boardId: row.board_id,
     name: row.name,
     tagline: row.tagline,
     category: row.category,
@@ -208,9 +718,11 @@ const seedDefaults = async (userId) => {
     pillars: row.pillars ?? [],
     labels: row.labels ?? [],
     activity: row.activity ?? [],
-  })
+  }
+}
 
-  const dbToTask = (row) => ({
+function dbToTask(row) {
+  return {
     id: row.id,
     projectId: row.project_id,
     title: row.title,
@@ -226,21 +738,23 @@ const seedDefaults = async (userId) => {
     labels: row.labels ?? [],
     subtasks: row.subtasks ?? [],
     activity: row.activity ?? [],
-  })
+  }
+}
 
   const projectToDb = (p, userId) => ({
-    id: p.id,
-    user_id: userId,
-    name: p.name,
-    tagline: p.tagline,
-    category: p.category,
-    methodology: p.methodology,
-    target_platform: p.targetPlatform,
-    phase: p.phase,
-    pillars: p.pillars ?? [],
-    labels: p.labels ?? [],
-    activity: p.activity ?? [],
-  })
+  id: p.id,
+  user_id: userId,
+  board_id: p.boardId,
+  name: p.name,
+  tagline: p.tagline,
+  category: p.category,
+  methodology: p.methodology,
+  target_platform: p.targetPlatform,
+  phase: p.phase,
+  pillars: p.pillars ?? [],
+  labels: p.labels ?? [],
+  activity: p.activity ?? [],
+})
 
   const taskToDb = (t, userId, order = 0) => ({
     id: t.id,
@@ -262,6 +776,29 @@ const seedDefaults = async (userId) => {
     sort_order: order,
   })
 
+  function dbToMessage(row) {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    userId: row.user_id,
+    body: row.body,
+    createdAt: row.created_at,
+  }
+}
+
+function dbToInvite(row) {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    email: row.email,
+    role: row.role,
+    token: row.token,
+    invitedBy: row.invited_by,
+    createdAt: row.created_at,
+    expiresAt: row.expires_at,
+    acceptedAt: row.accepted_at,
+  }
+}
   const currentProject = projects.find((p) => p.id === currentProjectId) || projects[0]
   const userId = session?.user?.id
 
@@ -310,6 +847,7 @@ const seedDefaults = async (userId) => {
     if (newProject.name.length > 100) return
     const project = {
       id: crypto.randomUUID(),
+      boardId: currentBoardId,
       name: newProject.name.trim(),
       tagline: newProject.tagline.trim() || 'New game project ready for planning.',
       category: newProject.category,
@@ -461,21 +999,171 @@ const seedDefaults = async (userId) => {
     if (!member || teamMembers.includes(member)) return
     setTeamMembers((current) => [...current.filter((m) => m !== 'Unassigned'), member, 'Unassigned'])
     setNewMember('')
-    await supabase.from('team_members').insert([{ user_id: userId, name: member }])
+    await supabase.from('team_members').insert([{
+      board_id: currentBoardId,
+      name: member,
+    }])
   }
 
   const removeTeamMember = async (member) => {
     if (member === 'Unassigned') return
     setTeamMembers((current) => current.filter((m) => m !== member))
     setTasks((current) => current.map((t) => ({ ...t, assignee: t.assignee === member ? 'Unassigned' : t.assignee })))
-    await supabase.from('team_members').delete().eq('user_id', userId).eq('name', member)
+    await supabase
+    .from('team_members')
+    .delete()
+    .eq('board_id', currentBoardId)
+    .eq('name', member)
   }
+
+  const focusQuickCreate = () => {
+  quickCreateInputRef.current?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+
+  window.setTimeout(() => {
+    quickCreateInputRef.current?.focus()
+  }, 150)
+}
+
+const openLogin = () => {
+  setAuthError('')
+  setAuthForm({ email: '', password: '', confirmPassword: '' })
+  setAuthMode('login')
+}
+
+const openSignup = () => {
+  setAuthError('')
+  setAuthForm({ email: '', password: '', confirmPassword: '' })
+  setAuthMode('signup')
+}
+
+const closeAuthModal = () => {
+  if (authLoading) return
+  setAuthMode(null)
+  setAuthError('')
+}
+
+const handleAuthSubmit = async (event) => {
+  event.preventDefault()
+  setAuthError('')
+
+  const email = authForm.email.trim()
+  const password = authForm.password.trim()
+
+  if (!email) return setAuthError('Enter your email.')
+  if (!password) return setAuthError('Enter your password.')
+
+  if (authMode === 'signup') {
+    if (password.length < 6) {
+      return setAuthError('Password must be at least 6 characters.')
+    }
+    if (password !== authForm.confirmPassword.trim()) {
+      return setAuthError('Passwords do not match.')
+    }
+  }
+
+  setAuthLoading(true)
+
+  try {
+    if (authMode === 'login') {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      setAuthMode(null)
+    } else {
+      const { error } = await supabase.auth.signUp({ email, password })
+      if (error) throw error
+      setAuthError('Account created. Check your email if confirmation is enabled.')
+    }
+  } catch (error) {
+    setAuthError(error.message || 'Something went wrong.')
+  } finally {
+    setAuthLoading(false)
+  }
+}
+
+const sendMessage = async (event) => {
+  event.preventDefault()
+
+  const body = newMessage.trim()
+  if (!body || !currentBoardId || !userId || sendingMessage) return
+  if (body.length > 2000) return
+
+  setSendingMessage(true)
+
+  const { error } = await supabase.from('board_messages').insert([{
+    board_id: currentBoardId,
+    user_id: userId,
+    body,
+  }])
+
+  if (!error) {
+    setNewMessage('')
+  } else {
+    console.error('Send message error:', error)
+  }
+
+  setSendingMessage(false)
+}
+
+const getMessageAuthorLabel = (message) => {
+  if (message.userId === userId) return 'You'
+
+  const member = boardMembers.find((member) => member.user_id === message.userId)
+  if (member?.email) return member.email
+
+  return `${message.userId.slice(0, 8)}...`
+}
+
+const createInvite = async (event) => {
+  event.preventDefault()
+
+  const email = inviteEmail.trim().toLowerCase()
+  if (!email || !currentBoardId || !userId || sendingInvite) return
+
+  setSendingInvite(true)
+
+  const { data, error } = await supabase
+    .from('board_invites')
+    .insert([{
+      board_id: currentBoardId,
+      email,
+      role: inviteRole,
+      invited_by: userId,
+    }])
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Invite error:', error)
+  } else if (data) {
+    const invite = dbToInvite(data)
+    setInvites((current) => [invite, ...current])
+    setInviteEmail('')
+    setInviteRole('member')
+
+    const acceptUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.token}`
+    await navigator.clipboard?.writeText(acceptUrl)
+  }
+
+  setSendingInvite(false)
+}
 
 if (loading) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
       Loading your board…
     </div>
+  )
+}
+
+if (!loading && !session) {
+  return (
+    <MarketingHome
+      onLogin={handleLogin}
+      onSignup={handleSignup}
+    />
   )
 }
 
@@ -488,84 +1176,244 @@ if (!loading && session && !currentProject) {
   )
 }
 
-  return (
-    <AuthGate session={session}>
-      <>
-        <div className="app-shell">
-          <ProjectSidebar
-            stats={stats}
-            project={currentProject}
-            projects={projects}
-            setCurrentProjectId={setCurrentProjectId}
-            newProject={newProject}
-            setNewProject={setNewProject}
-            createProject={createProject}
-            teamMembers={teamMembers}
-            newMember={newMember}
-            setNewMember={setNewMember}
-            addTeamMember={addTeamMember}
-            removeTeamMember={removeTeamMember}
-            theme={theme}
-            setTheme={setTheme}
-            methodologies={methodologies}
-            gameCategories={gameCategories}
-            deleteProject={deleteProject}
-          />
-          <main className="board-area">
-            <ProjectHeader
-              project={currentProject}
-              updateProjectField={updateProjectField}
-              methodologies={methodologies}
-              gameCategories={gameCategories}
-              deleteProject={deleteProject}
-            />
-            <section className="toolbar panel">
-              <form className="toolbar-group" onSubmit={handleCreateTask}>
-                <input className="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search tasks or assignees" />
-                <div className="filter-chips">
-                  {['All', ...disciplines].map((item) => (
-                    <button key={item} className={filter === item ? 'chip active' : 'chip'} onClick={() => setFilter(item)} type="button">{item}</button>
-                  ))}
-                </div>
-                <div className="quick-create-grid">
-                  <input value={newTask.title} onChange={(e) => setNewTask((c) => ({ ...c, title: e.target.value }))} placeholder="Add a new feature or task" />
-                  <select value={newTask.assignee} onChange={(e) => setNewTask((c) => ({ ...c, assignee: e.target.value }))}>{teamMembers.map((m) => <option key={m}>{m}</option>)}</select>
-                  <select value={newTask.discipline} onChange={(e) => setNewTask((c) => ({ ...c, discipline: e.target.value }))}>{disciplines.map((item) => <option key={item}>{item}</option>)}</select>
-                  <button type="submit" className="primary-btn">Create task</button>
-                </div>
-              </form>
-            </section>
-            <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
-            <TaskBoard
-              columns={columns}
-              tasks={filteredTasks}
-              teamMembers={teamMembers}
-              updateTask={updateTask}
-              toggleComplete={toggleComplete}
-              deleteTask={deleteTask}
-              shiftTask={shiftTask}
-              setEditingTask={setEditingTask}
-              draggingId={draggingId}
-              setDraggingId={setDraggingId}
-              moveTask={moveTask}
-            />
-          </main>
-        </div>
-        <TaskModal
-          editingTask={editingTask}
-          setEditingTask={setEditingTask}
-          handleEditSave={handleEditSave}
-          teamMembers={teamMembers}
-          columns={columns}
-          disciplines={disciplines}
-          priorities={priorities}
-          labelPool={labelPool}
-          deleteTask={deleteTask}
-          addSubtaskToEditing={addSubtaskToEditing}
+{!loading && !session ? (
+  <>
+    <MarketingHome onLogin={openLogin} onSignup={openSignup} />
+    <AuthModal
+      mode={authMode}
+      form={authForm}
+      setForm={setAuthForm}
+      error={authError}
+      loading={authLoading}
+      onClose={closeAuthModal}
+      onSubmit={handleAuthSubmit}
+      onSwitchMode={setAuthMode}
+    />
+  </>
+) : null}
+
+return (
+  <>
+    <div className="app-shell">
+      <ProjectSidebar
+        stats={stats}
+        project={currentProject}
+        projects={projects}
+        setCurrentProjectId={setCurrentProjectId}
+        newProject={newProject}
+        setNewProject={setNewProject}
+        createProject={createProject}
+        teamMembers={teamMembers}
+        newMember={newMember}
+        setNewMember={setNewMember}
+        addTeamMember={addTeamMember}
+        removeTeamMember={removeTeamMember}
+        theme={theme}
+        setTheme={setTheme}
+        methodologies={methodologies}
+        gameCategories={gameCategories}
+        deleteProject={deleteProject}
+        onSignOut={() => supabase.auth.signOut()}
+      />
+      <main className="board-area">
+        <ProjectHeader
+          project={currentProject}
+          updateProjectField={updateProjectField}
+          methodologies={methodologies}
+          gameCategories={gameCategories}
+          deleteProject={deleteProject}
         />
-      </>
-    </AuthGate>
-  )
+        <section className="toolbar panel">
+          <form className="toolbar-group" onSubmit={handleCreateTask}>
+            <input
+              className="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search tasks or assignees"
+            />
+            <div className="filter-chips">
+              {['All', ...disciplines].map((item) => (
+                <button
+                  key={item}
+                  className={filter === item ? 'chip active' : 'chip'}
+                  onClick={() => setFilter(item)}
+                  type="button"
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+            <div className="quick-create-grid">
+              <input
+                ref={quickCreateInputRef}
+                value={newTask.title}
+                onChange={(e) => setNewTask((c) => ({ ...c, title: e.target.value }))}
+                placeholder="Add a new feature or task"
+              />
+              <select
+                value={newTask.assignee}
+                onChange={(e) => setNewTask((c) => ({ ...c, assignee: e.target.value }))}
+              >
+                {teamMembers.map((m) => <option key={m}>{m}</option>)}
+              </select>
+              <select
+                value={newTask.discipline}
+                onChange={(e) => setNewTask((c) => ({ ...c, discipline: e.target.value }))}
+              >
+                {disciplines.map((item) => <option key={item}>{item}</option>)}
+              </select>
+              <button type="submit" className="primary-btn">Create task</button>
+            </div>
+            <div className="presence-strip">
+            <span className="presence-label">
+              Online now ({onlineUsers.length})
+            </span>
+
+            <div className="presence-list">
+              {onlineUsers.map((user) => {
+                const activeProject = projects.find((p) => p.id === user.projectId)
+
+                return (
+                  <div
+                    key={`${user.userId}-${user.onlineAt ?? 'now'}`}
+                    className="presence-pill"
+                    title={
+                      activeProject
+                        ? `${user.email} · Viewing ${activeProject.name}`
+                        : user.email
+                    }
+                  >
+                    <span className="presence-dot" />
+                    <span className="presence-name">
+                      {user.email === session?.user?.email ? 'You' : user.email}
+                    </span>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+          </form>
+        </section>
+        <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
+        <section className="chat-panel panel">
+  <div className="chat-panel-header">
+    <div>
+      <p className="eyebrow">Board chat</p>
+      <h3>Team messages</h3>
+    </div>
+    <span className="chat-count">{messages.length} messages</span>
+  </div>
+
+  <div className="chat-messages">
+    {messages.length ? (
+      messages.map((message) => {
+        const isSelf = message.userId === userId
+
+        return (
+          <article
+            key={message.id}
+            className={isSelf ? 'chat-message self' : 'chat-message'}
+          >
+            <div className="chat-message-meta">
+              <span>{getMessageAuthorLabel(message)}</span>
+              <time dateTime={message.createdAt}>
+                {new Date(message.createdAt).toLocaleTimeString([], {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                })}
+              </time>
+            </div>
+            <p>{message.body}</p>
+          </article>
+        )
+      })
+    ) : (
+      <div className="chat-empty">
+        No messages yet. Start the board conversation.
+      </div>
+    )}
+  </div>
+
+  <section className="panel invite-panel">
+  <div className="invite-panel-header">
+    <p className="eyebrow">Invites</p>
+    <h3>Invite collaborators</h3>
+  </div>
+
+  <form className="invite-form" onSubmit={createInvite}>
+    <input
+      type="email"
+      value={inviteEmail}
+      onChange={(e) => setInviteEmail(e.target.value)}
+      placeholder="teammate@example.com"
+    />
+    <select
+      value={inviteRole}
+      onChange={(e) => setInviteRole(e.target.value)}
+    >
+      <option value="member">Member</option>
+      <option value="admin">Admin</option>
+    </select>
+    <button type="submit" className="primary-btn" disabled={sendingInvite}>
+      {sendingInvite ? 'Sending...' : 'Create invite'}
+    </button>
+  </form>
+
+  <div className="invite-list">
+    {invites.map((invite) => (
+      <article key={invite.id} className="invite-row">
+        <div>
+          <strong>{invite.email}</strong>
+          <p>{invite.role} · pending</p>
+        </div>
+      </article>
+    ))}
+  </div>
+</section>
+
+  <form className="chat-form" onSubmit={sendMessage}>
+    <input
+      value={newMessage}
+      onChange={(e) => setNewMessage(e.target.value)}
+      placeholder="Send a message to the board"
+      maxLength={2000}
+    />
+    <button type="submit" className="primary-btn" disabled={sendingMessage}>
+      {sendingMessage ? 'Sending...' : 'Send'}
+    </button>
+  </form>
+</section>
+        <TaskBoard
+          columns={columns}
+          tasks={filteredTasks}
+          teamMembers={teamMembers}
+          updateTask={updateTask}
+          toggleComplete={toggleComplete}
+          deleteTask={deleteTask}
+          shiftTask={shiftTask}
+          setEditingTask={setEditingTask}
+          draggingId={draggingId}
+          setDraggingId={setDraggingId}
+          moveTask={moveTask}
+          onCreateFirstTask={focusQuickCreate}
+        />
+      </main>
+    </div>
+
+    <TaskModal
+      editingTask={editingTask}
+      setEditingTask={setEditingTask}
+      handleEditSave={handleEditSave}
+      teamMembers={teamMembers}
+      columns={columns}
+      disciplines={disciplines}
+      priorities={priorities}
+      labelPool={labelPool}
+      deleteTask={deleteTask}
+      addSubtaskToEditing={addSubtaskToEditing}
+    />
+  </>
+)
 }
 
 export default App

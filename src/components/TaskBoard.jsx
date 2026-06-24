@@ -1,4 +1,5 @@
 import InlineText from './InlineText'
+import InfernoLogo from './InfernoLogo'
 
 const priorityTone = { High: 'high', Medium: 'medium', Low: 'low' }
 
@@ -14,7 +15,54 @@ export default function TaskBoard({
   draggingId,
   setDraggingId,
   moveTask,
+  onCreateFirstTask,
 }) {
+  const isEmpty = tasks.length === 0
+
+  if (isEmpty) {
+    return (
+      <section className="board-empty panel" aria-live="polite">
+        <div className="board-empty-icon">
+          <InfernoLogo size={54} />
+        </div>
+
+        <div className="board-empty-copy">
+          <p className="eyebrow">Start here</p>
+          <h2>Build your first production board</h2>
+          <p className="muted-copy">
+            Tasks for design, UI, combat, audio, and polish will appear here once you add your first item.
+            Start with one clear task, then drag it across the pipeline as work moves forward.
+          </p>
+        </div>
+
+        <div className="board-empty-actions">
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={onCreateFirstTask}
+          >
+            Create your first task
+          </button>
+        </div>
+
+        <div className="board-empty-steps">
+          <div className="board-empty-step">
+            <span>1</span>
+            <p>Create your first task from the quick-create bar above.</p>
+          </div>
+          <div className="board-empty-step">
+            <span>2</span>
+            <p>Assign it to a teammate and pick a discipline.</p>
+          </div>
+          <div className="board-empty-step">
+            <span>3</span>
+            <p>Move it from Backlog to Done as the feature progresses.</p>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="board-grid">
       {columns.map((column) => {
@@ -33,6 +81,7 @@ export default function TaskBoard({
               <h3>{column.label}</h3>
               <span>{columnTasks.length}</span>
             </div>
+
             <div className="column-cards">
               {columnTasks.map((task, index) => (
                 <article
@@ -45,53 +94,126 @@ export default function TaskBoard({
                   <div className="card-topline">
                     <span className={`priority-badge ${priorityTone[task.priority]}`}>{task.priority}</span>
                     <div className="label-row">
-                      {task.labels?.map((label) => <span key={label} className="task-label">{label}</span>)}
+                      {task.labels?.map((label) => (
+                        <span key={label} className="task-label">{label}</span>
+                      ))}
                     </div>
                   </div>
-                  <InlineText className="task-title-inline" value={task.title} onSave={(value) => updateTask(task.id, { title: value })} />
-                  <InlineText className="task-body-inline" multiline value={task.description} onSave={(value) => updateTask(task.id, { description: value })} />
+
+                  <InlineText
+                    className="task-title-inline"
+                    value={task.title}
+                    onSave={(value) => updateTask(task.id, { title: value })}
+                  />
+
+                  <InlineText
+                    className="task-body-inline"
+                    multiline
+                    value={task.description}
+                    onSave={(value) => updateTask(task.id, { description: value })}
+                  />
+
                   <dl className="meta-grid">
                     <div>
                       <dt>Assignee</dt>
                       <dd>
-                        <select className="inline-select" value={task.assignee} onChange={(e) => updateTask(task.id, { assignee: e.target.value })}>
+                        <select
+                          className="inline-select"
+                          value={task.assignee}
+                          onChange={(e) => updateTask(task.id, { assignee: e.target.value })}
+                        >
                           {teamMembers.map((member) => <option key={member}>{member}</option>)}
                         </select>
                       </dd>
                     </div>
+
                     <div>
                       <dt>Discipline</dt>
                       <dd>{task.discipline}</dd>
                     </div>
+
                     <div>
                       <dt>Estimate</dt>
-                      <dd><InlineText value={task.estimate} onSave={(value) => updateTask(task.id, { estimate: value })} /></dd>
+                      <dd>
+                        <InlineText
+                          value={task.estimate}
+                          onSave={(value) => updateTask(task.id, { estimate: value })}
+                        />
+                      </dd>
                     </div>
+
                     <div>
                       <dt>Due</dt>
-                      <dd><InlineText value={task.due} onSave={(value) => updateTask(task.id, { due: value })} /></dd>
+                      <dd>
+                        <InlineText
+                          value={task.due}
+                          onSave={(value) => updateTask(task.id, { due: value })}
+                        />
+                      </dd>
                     </div>
                   </dl>
+
                   <div className="subtask-list">
                     {task.subtasks?.map((subtask) => (
                       <label key={subtask.id} className="subtask-item">
                         <input
                           type="checkbox"
                           checked={subtask.done}
-                          onChange={() => updateTask(task.id, {
-                            subtasks: task.subtasks.map((item) => item.id === subtask.id ? { ...item, done: !item.done } : item),
-                          })}
+                          onChange={() =>
+                            updateTask(task.id, {
+                              subtasks: task.subtasks.map((item) =>
+                                item.id === subtask.id ? { ...item, done: !item.done } : item
+                              ),
+                            })
+                          }
                         />
                         <span>{subtask.title}</span>
                       </label>
                     ))}
                   </div>
+
                   <div className="manipulation-row">
-                    <button type="button" className="secondary-btn" disabled={index === 0} onClick={() => shiftTask(task.id, -1)}>↑</button>
-                    <button type="button" className="secondary-btn" disabled={index === columnTasks.length - 1} onClick={() => shiftTask(task.id, 1)}>↓</button>
-                    <button type="button" className="secondary-btn" onClick={() => setEditingTask({ ...task })}>Details</button>
-                    <button type="button" className="primary-btn" onClick={() => toggleComplete(task)}>{task.completed ? 'Reopen' : 'Complete'}</button>
-                    <button type="button" className="danger-btn" onClick={() => deleteTask(task.id)}>Delete</button>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={index === 0}
+                      onClick={() => shiftTask(task.id, -1)}
+                    >
+                      ↑
+                    </button>
+
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      disabled={index === columnTasks.length - 1}
+                      onClick={() => shiftTask(task.id, 1)}
+                    >
+                      ↓
+                    </button>
+
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => setEditingTask({ ...task })}
+                    >
+                      Details
+                    </button>
+
+                    <button
+                      type="button"
+                      className="primary-btn"
+                      onClick={() => toggleComplete(task)}
+                    >
+                      {task.completed ? 'Reopen' : 'Complete'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </article>
               ))}
