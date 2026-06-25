@@ -58,10 +58,10 @@ function MarketingHome({ openLogin, openSignup }) {
         </p>
 
         <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" onClick={onSignup}>
+          <button type="button" className="primary-btn" onClick={openSignup}>
             Sign up free
           </button>
-          <button type="button" className="secondary-btn" onClick={onLogin}>
+          <button type="button" className="secondary-btn" onClick={openLogin}>
             Log in
           </button>
         </div>
@@ -106,10 +106,10 @@ function MarketingHome({ openLogin, openSignup }) {
         </div>
 
         <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" onClick={onSignup}>
+          <button type="button" className="primary-btn" onClick={openSignup}>
             Create free account
           </button>
-          <button type="button" className="secondary-btn" onClick={onLogin}>
+          <button type="button" className="secondary-btn" onClick={openLogin}>
             I already have an account
           </button>
         </div>
@@ -123,11 +123,19 @@ function AuthModal({
   form,
   setForm,
   error,
+  message,
   loading,
   onClose,
   onSubmit,
   onSwitchMode,
 }) {
+  const emailInputRef = useRef(null)
+
+  useEffect(() => {
+    if (!mode) return
+    emailInputRef.current?.focus()
+  }, [mode])
+
   if (!mode) return null
 
   return (
@@ -139,16 +147,27 @@ function AuthModal({
         aria-labelledby="auth-title"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" className="auth-close-btn" onClick={onClose} aria-label="Close auth form">
+        <button
+          type="button"
+          className="auth-close-btn"
+          onClick={onClose}
+          aria-label="Close auth form"
+        >
           ×
         </button>
 
-        <p className="eyebrow">{mode === 'login' ? 'Welcome back' : 'Create your account'}</p>
-        <h2 id="auth-title">{mode === 'login' ? 'Log in to Inferno' : 'Sign up for Inferno'}</h2>
+        <p className="eyebrow">
+          {mode === 'login' ? 'Welcome back' : 'Create your account'}
+        </p>
+
+        <h2 id="auth-title">
+          {mode === 'login' ? 'Log in to Inferno' : 'Sign up for Inferno'}
+        </h2>
 
         <form className="auth-form" onSubmit={onSubmit}>
           <label htmlFor="auth-email">Email</label>
           <input
+            ref={emailInputRef}
             id="auth-email"
             type="email"
             autoComplete="email"
@@ -175,13 +194,16 @@ function AuthModal({
                 type="password"
                 autoComplete="new-password"
                 value={form.confirmPassword}
-                onChange={(e) => setForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+                onChange={(e) =>
+                  setForm((c) => ({ ...c, confirmPassword: e.target.value }))
+                }
                 placeholder="Re-enter your password"
               />
             </>
           )}
 
           {error ? <p className="auth-error">{error}</p> : null}
+          {message ? <p className="auth-success">{message}</p> : null}
 
           <button type="submit" className="primary-btn" disabled={loading}>
             {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
@@ -242,6 +264,9 @@ function App() {
   })
   const [authError, setAuthError] = useState('')
   const [authLoading, setAuthLoading] = useState(false)
+  const [authMessage, setAuthMessage] = useState('')
+  const [myInvites, setMyInvites] = useState([])
+  const [acceptingInviteId, setAcceptingInviteId] = useState(null)
 
   // ── Auth listener ──
 useEffect(() => {
@@ -364,15 +389,27 @@ useEffect(() => {
     .eq('user_id', userId)
 
   if (!membershipRows?.length) {
-    const { data: createdBoard, error: boardError } = await supabase
-      .from('boards')
-      .insert([{
-        owner_id: userId,
-        name: 'My Studio Board',
-        description: 'Shared production workspace',
-      }])
-      .select()
-      .single()
+    const { error: boardError } = await supabase
+  .from('boards')
+  .insert({
+    owner_id: userId,
+    name: 'My Studio Board',
+    description: 'Shared production workspace',
+  })
+
+if (boardError) {
+  console.error('Board creation error:', boardError)
+  setLoading(false)
+  return
+}
+
+const { data: createdBoard, error: fetchBoardError } = await supabase
+  .from('boards')
+  .select('*')
+  .eq('owner_id', userId)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single()
 
     if (boardError) {
       console.error('Board creation error:', boardError)
@@ -640,6 +677,87 @@ useEffect(() => {
 
   acceptInviteFromUrl()
 }, [session?.user?.id])
+
+useEffect(() => {
+  const loadMyInvites = async () => {
+    const email = session?.user?.email?.trim().toLowerCase()
+    if (!email) {
+      setMyInvites([])
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('board_invites')
+      .select('*')
+      .eq('email', email)
+      .is('accepted_at', null)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Load my invites error:', error)
+      return
+    }
+
+    setMyInvites((data ?? []).map(dbToInvite))
+  }
+
+  loadMyInvites()
+}, [session?.user?.email])
+
+const acceptInvite = async (invite) => {
+  if (!session?.user) return
+
+  const userEmail = session.user.email?.trim().toLowerCase()
+  const inviteEmail = invite.email?.trim().toLowerCase()
+
+  if (!userEmail || !inviteEmail || userEmail !== inviteEmail) {
+    window.alert('This invite was sent to a different email address.')
+    return
+  }
+
+  if (invite.expiresAt && new Date(invite.expiresAt).getTime() < Date.now()) {
+    window.alert('This invite has expired.')
+    return
+  }
+
+  setAcceptingInviteId(invite.id)
+
+  const { error: memberError } = await supabase
+    .from('board_members')
+    .upsert(
+      [{
+        board_id: invite.boardId,
+        user_id: session.user.id,
+        role: invite.role || 'member',
+      }],
+      { onConflict: 'board_id,user_id' }
+    )
+
+  if (memberError) {
+    console.error('Accept invite membership error:', memberError)
+    setAcceptingInviteId(null)
+    return
+  }
+
+  const { error: inviteError } = await supabase
+    .from('board_invites')
+    .update({
+      accepted_at: new Date().toISOString(),
+      accepted_by: session.user.id,
+    })
+    .eq('id', invite.id)
+    .is('accepted_at', null)
+
+  if (inviteError) {
+    console.error('Accept invite update error:', inviteError)
+    setAcceptingInviteId(null)
+    return
+  }
+
+  setMyInvites((current) => current.filter((item) => item.id !== invite.id))
+  await loadAllData(session.user.id, invite.boardId)
+  setAcceptingInviteId(null)
+}
 
   // ── Seed default data for new accounts ──
 const seedDefaults = async (userId, boardId) => {
@@ -1029,12 +1147,14 @@ function dbToInvite(row) {
 
 const openLogin = () => {
   setAuthError('')
+  setAuthMessage('')
   setAuthForm({ email: '', password: '', confirmPassword: '' })
   setAuthMode('login')
 }
 
 const openSignup = () => {
   setAuthError('')
+  setAuthMessage('')
   setAuthForm({ email: '', password: '', confirmPassword: '' })
   setAuthMode('signup')
 }
@@ -1043,11 +1163,13 @@ const closeAuthModal = () => {
   if (authLoading) return
   setAuthMode(null)
   setAuthError('')
+  setAuthMessage('')
 }
 
 const handleAuthSubmit = async (event) => {
   event.preventDefault()
   setAuthError('')
+  setAuthMessage('')
 
   const email = authForm.email.trim()
   const password = authForm.password.trim()
@@ -1056,9 +1178,7 @@ const handleAuthSubmit = async (event) => {
   if (!password) return setAuthError('Enter your password.')
 
   if (authMode === 'signup') {
-    if (password.length < 6) {
-      return setAuthError('Password must be at least 6 characters.')
-    }
+    if (password.length < 6) return setAuthError('Password must be at least 6 characters.')
     if (password !== authForm.confirmPassword.trim()) {
       return setAuthError('Passwords do not match.')
     }
@@ -1074,7 +1194,7 @@ const handleAuthSubmit = async (event) => {
     } else {
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) throw error
-      setAuthError('Account created. Check your email if confirmation is enabled.')
+      setAuthMessage('Account created. Check your email if confirmation is enabled.')
     }
   } catch (error) {
     setAuthError(error.message || 'Something went wrong.')
@@ -1124,30 +1244,55 @@ const createInvite = async (event) => {
 
   setSendingInvite(true)
 
-  const { data, error } = await supabase
-    .from('board_invites')
-    .insert([{
-      board_id: currentBoardId,
-      email,
-      role: inviteRole,
-      invited_by: userId,
-    }])
-    .select()
-    .single()
+  try {
+    const { data, error } = await supabase
+      .from('board_invites')
+      .insert([{
+        board_id: currentBoardId,
+        email,
+        role: inviteRole,
+        invited_by: userId,
+      }])
+      .select()
+      .single()
 
-  if (error) {
-    console.error('Invite error:', error)
-  } else if (data) {
+    if (error) {
+      console.error('Invite error:', error)
+      return
+    }
+
     const invite = dbToInvite(data)
+    const acceptUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.token}`
+
     setInvites((current) => [invite, ...current])
     setInviteEmail('')
     setInviteRole('member')
 
-    const acceptUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.token}`
-    await navigator.clipboard?.writeText(acceptUrl)
-  }
+    try {
+      await navigator.clipboard.writeText(acceptUrl)
+    } catch (clipboardError) {
+      console.error('Clipboard error:', clipboardError)
+    }
 
-  setSendingInvite(false)
+    try {
+      const { error: emailError } = await supabase.functions.invoke('send-board-invite', {
+        body: {
+          email: invite.email,
+          role: invite.role,
+          acceptUrl,
+          boardId: invite.boardId,
+        },
+      })
+
+      if (emailError) {
+        console.error('Send invite email error:', emailError)
+      }
+    } catch (functionError) {
+      console.error('Function invoke error:', functionError)
+    }
+  } finally {
+    setSendingInvite(false)
+  }
 }
 
 if (loading) {
@@ -1155,15 +1300,6 @@ if (loading) {
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
       Loading your board…
     </div>
-  )
-}
-
-if (!loading && !session) {
-  return (
-    <MarketingHome
-      onLogin={handleLogin}
-      onSignup={handleSignup}
-    />
   )
 }
 
@@ -1176,20 +1312,55 @@ if (!loading && session && !currentProject) {
   )
 }
 
-{!loading && !session ? (
-  <>
-    <MarketingHome onLogin={openLogin} onSignup={openSignup} />
-    <AuthModal
-      mode={authMode}
-      form={authForm}
-      setForm={setAuthForm}
-      error={authError}
-      loading={authLoading}
-      onClose={closeAuthModal}
-      onSubmit={handleAuthSubmit}
-      onSwitchMode={setAuthMode}
-    />
-  </>
+if (!loading && !session) {
+  return (
+    <>
+      <MarketingHome
+        openLogin={openLogin}
+        openSignup={openSignup}
+      />
+      <AuthModal
+        mode={authMode}
+        form={authForm}
+        setForm={setAuthForm}
+        error={authError}
+        message={authMessage}
+        loading={authLoading}
+        onClose={closeAuthModal}
+        onSubmit={handleAuthSubmit}
+        onSwitchMode={setAuthMode}
+      />
+    </>
+  )
+}
+
+{session && myInvites.length > 0 ? (
+  <section className="panel pending-invites-panel">
+    <div className="pending-invites-header">
+      <p className="eyebrow">Invitations</p>
+      <h3>Pending board invites</h3>
+    </div>
+
+    <div className="pending-invites-list">
+      {myInvites.map((invite) => (
+        <article key={invite.id} className="pending-invite-row">
+          <div>
+            <strong>{invite.email}</strong>
+            <p>{invite.role} access</p>
+          </div>
+
+          <button
+            type="button"
+            className="primary-btn"
+            disabled={acceptingInviteId === invite.id}
+            onClick={() => acceptInvite(invite)}
+          >
+            {acceptingInviteId === invite.id ? 'Accepting…' : 'Accept invite'}
+          </button>
+        </article>
+      ))}
+    </div>
+  </section>
 ) : null}
 
 return (

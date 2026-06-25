@@ -16,7 +16,7 @@ export const columns = [
 ]
 
 export const methodologies = ['Agile Sprint', 'Kanban', 'Vertical Slice', 'Milestone Driven', 'Playtest Driven']
-export const gameCategories = ['Educational', 'Horror', 'Strategy', 'Narrative', 'Hyper-Casual', 'Adventure', 'FPS', 'Strategy', 'Action']
+export const gameCategories = ['Educational', 'Horror', 'Strategy', 'Narrative', 'Hyper-Casual', 'Adventure', 'FPS', 'Action']
 export const disciplines = ['Programming', 'Design', 'Art', 'UI / UX', 'Audio', 'QA', 'Narrative']
 export const priorities = ['High', 'Medium', 'Low']
 export const labelPool = ['Combat', 'AI', 'UI', 'Boss', 'Narrative', 'Tutorial', 'Accessibility', 'Playtest']
