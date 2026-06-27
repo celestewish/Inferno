@@ -34,6 +34,7 @@ export default function InlineText({ value, onSave, className = '', multiline = 
         className={`inline-edit ${className}`.trim()}
         value={draft}
         placeholder={placeholder}
+        aria-label={placeholder || 'Edit text'}
         rows="3"
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
@@ -47,6 +48,7 @@ export default function InlineText({ value, onSave, className = '', multiline = 
       className={`inline-edit ${className}`.trim()}
       value={draft}
       placeholder={placeholder}
+      aria-label={placeholder || 'Edit text'}
       onChange={(event) => setDraft(event.target.value)}
       onBlur={commit}
       onKeyDown={handleKeyDown}

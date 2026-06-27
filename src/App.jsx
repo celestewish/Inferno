@@ -20,6 +20,10 @@ import {
   priorities,
 } from './data/defaultData'
 
+// board_invites uses owner/admin/member; board_members uses owner/editor/viewer.
+const inviteRoleToMemberRole = (role) =>
+  ({ owner: 'owner', admin: 'editor', member: 'viewer' })[role] ?? 'viewer'
+
 const emptyTaskForm = {
   title: '',
   description: '',
@@ -51,7 +55,7 @@ function MarketingHome({ openLogin, openSignup }) {
         </div>
 
         <p className="eyebrow">Game production, organized</p>
-        <h1>Inferno</h1>
+        <h1 className="inferno-wordmark">Inferno</h1>
         <p className="marketing-subcopy">
           A free game design task board for planning features, assigning work, tracking production, and
           keeping your team aligned from backlog to final polish.
@@ -245,6 +249,7 @@ function App() {
   const [boards, setBoards] = useState([])
   const [currentBoardId, setCurrentBoardId] = useState(null)
   const [boardMembers, setBoardMembers] = useState([])
+  const [profiles, setProfiles] = useState({})
   const currentBoard = boards.find((board) => board.id === currentBoardId) || boards[0]
   const [onlineUsers, setOnlineUsers] = useState([])
   const [typingUsers, setTypingUsers] = useState([])
@@ -252,6 +257,9 @@ function App() {
   const [messages, setMessages] = useState([])
   const [newMessage, setNewMessage] = useState('')
   const [sendingMessage, setSendingMessage] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState(null)
+  const [editingMessageText, setEditingMessageText] = useState('')
+  const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
   const [invites, setInvites] = useState([])
@@ -293,12 +301,15 @@ useEffect(() => {
       setLoading(false)
       setBoards([])
       setBoardMembers([])
+      setProfiles({})
       setCurrentBoardId(null)
       setOnlineUsers([])
       setTypingUsers([])
       setMessages([])
       setNewMessage('')
       setSendingMessage(false)
+      setEditingMessageId(null)
+      setEditingMessageText('')
     }
   })
 
@@ -383,45 +394,47 @@ useEffect(() => {
   const loadAllData = async (userId, preferredBoardId = null) => {
   setLoading(true)
 
-  let { data: membershipRows } = await supabase
-    .from('board_members')
-    .select('board_id, role, boards(*)')
-    .eq('user_id', userId)
+let { data: membershipRows, error: membershipError } = await supabase
+  .from('board_members')
+  .select('board_id, role, boards(*)')
+  .eq('user_id', userId)
+
+if (membershipError) {
+  console.error('Membership load error:', membershipError)
+  setLoading(false)
+  return
+}
 
   if (!membershipRows?.length) {
-    const { error: boardError } = await supabase
+    const { data: createdBoard, error: boardError } = await supabase
   .from('boards')
   .insert({
     owner_id: userId,
     name: 'My Studio Board',
     description: 'Shared production workspace',
   })
+  .select()
+  .single()
 
-if (boardError) {
+if (boardError || !createdBoard) {
   console.error('Board creation error:', boardError)
   setLoading(false)
   return
 }
 
-const { data: createdBoard, error: fetchBoardError } = await supabase
-  .from('boards')
-  .select('*')
-  .eq('owner_id', userId)
-  .order('created_at', { ascending: false })
-  .limit(1)
-  .single()
+const { error: memberInsertError } = await supabase
+  .from('board_members')
+  .insert([{
+    board_id: createdBoard.id,
+    user_id: userId,
+    role: 'owner',
+  }])
 
-    if (boardError) {
-      console.error('Board creation error:', boardError)
-      setLoading(false)
-      return
-    }
-
-    await supabase.from('board_members').insert([{
-      board_id: createdBoard.id,
-      user_id: userId,
-      role: 'owner',
-    }])
+if (memberInsertError) {
+  console.error('Board member creation error:', memberInsertError)
+  setLoading(false)
+  return
+}
 
     membershipRows = [{
       board_id: createdBoard.id,
@@ -522,6 +535,24 @@ setCurrentProjectId((currentId) =>
   setBoardMembers(boardMemberRows ?? [])
   setLoading(false)
   setMessages(loadedMessages)
+
+  const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
+  if (memberIds.length) {
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', memberIds)
+
+    if (profileError) {
+      console.error('Profiles load error:', profileError)
+    } else {
+      setProfiles(
+        Object.fromEntries((profileRows ?? []).map((row) => [row.id, row.display_name]))
+      )
+    }
+  } else {
+    setProfiles({})
+  }
 }
 
 useEffect(() => {
@@ -600,18 +631,29 @@ useEffect(() => {
     .on(
       'postgres_changes',
       {
-        event: 'INSERT',
+        event: '*',
         schema: 'public',
         table: 'board_messages',
         filter: `board_id=eq.${currentBoardId}`,
       },
       (payload) => {
-        const nextMessage = dbToMessage(payload.new)
-
-        setMessages((current) => {
-          if (current.some((message) => message.id === nextMessage.id)) return current
-          return [...current, nextMessage]
-        })
+        if (payload.eventType === 'INSERT') {
+          const nextMessage = dbToMessage(payload.new)
+          setMessages((current) =>
+            current.some((message) => message.id === nextMessage.id)
+              ? current
+              : [...current, nextMessage]
+          )
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = dbToMessage(payload.new)
+          setMessages((current) =>
+            current.map((message) => (message.id === updated.id ? updated : message))
+          )
+        } else if (payload.eventType === 'DELETE') {
+          const removedId = payload.old?.id
+          if (!removedId) return
+          setMessages((current) => current.filter((message) => message.id !== removedId))
+        }
       }
     )
     .subscribe()
@@ -620,6 +662,10 @@ useEffect(() => {
     supabase.removeChannel(channel)
   }
 }, [currentBoardId])
+
+useEffect(() => {
+  chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+}, [messages.length])
 
 useEffect(() => {
   const acceptInviteFromUrl = async () => {
@@ -656,7 +702,7 @@ useEffect(() => {
       .insert([{
         board_id: invite.board_id,
         user_id: session.user.id,
-        role: invite.role,
+        role: inviteRoleToMemberRole(invite.role),
       }])
 
     if (memberError && !memberError.message.toLowerCase().includes('duplicate')) {
@@ -728,7 +774,7 @@ const acceptInvite = async (invite) => {
       [{
         board_id: invite.boardId,
         user_id: session.user.id,
-        role: invite.role || 'member',
+        role: inviteRoleToMemberRole(invite.role),
       }],
       { onConflict: 'board_id,user_id' }
     )
@@ -899,8 +945,9 @@ function dbToTask(row) {
     id: row.id,
     boardId: row.board_id,
     userId: row.user_id,
-    body: row.body,
+    text: row.message,
     createdAt: row.created_at,
+    editedAt: row.updated_at ?? null,
   }
 }
 
@@ -1212,28 +1259,100 @@ const sendMessage = async (event) => {
 
   setSendingMessage(true)
 
-  const { error } = await supabase.from('board_messages').insert([{
-    board_id: currentBoardId,
-    user_id: userId,
-    body,
-  }])
+  const { data, error } = await supabase
+    .from('board_messages')
+    .insert({
+      board_id: currentBoardId,
+      user_id: userId,
+      message: body, 
+    })
+    .select()
+    .single()
 
-  if (!error) {
-    setNewMessage('')
-  } else {
+  if (error) {
     console.error('Send message error:', error)
+    setSendingMessage(false)
+    return
   }
 
+  if (data) {
+    const nextMessage = dbToMessage(data)
+    setMessages((current) => {
+      if (current.some((message) => message.id === nextMessage.id)) return current
+      return [...current, nextMessage]
+    })
+  }
+
+  setNewMessage('')
   setSendingMessage(false)
 }
 
 const getMessageAuthorLabel = (message) => {
   if (message.userId === userId) return 'You'
 
-  const member = boardMembers.find((member) => member.user_id === message.userId)
-  if (member?.email) return member.email
+  const displayName = profiles[message.userId]
+  if (displayName) return displayName
 
-  return `${message.userId.slice(0, 8)}...`
+  return message.userId ? `${message.userId.slice(0, 8)}…` : 'Unknown user'
+}
+
+const startEditingMessage = (message) => {
+  setEditingMessageId(message.id)
+  setEditingMessageText(message.text)
+}
+
+const cancelEditingMessage = () => {
+  setEditingMessageId(null)
+  setEditingMessageText('')
+}
+
+const saveEditedMessage = async (event) => {
+  event.preventDefault()
+
+  const body = editingMessageText.trim()
+  const target = messages.find((message) => message.id === editingMessageId)
+  if (!target) return cancelEditingMessage()
+  if (!body || body.length > 2000) return
+  if (body === target.text) return cancelEditingMessage()
+
+  const previous = messages
+  setMessages((current) =>
+    current.map((message) =>
+      message.id === target.id ? { ...message, text: body } : message
+    )
+  )
+  cancelEditingMessage()
+
+  const { error } = await supabase
+    .from('board_messages')
+    .update({ message: body })
+    .eq('id', target.id)
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Edit message error:', error)
+    setMessages(previous)
+  }
+}
+
+const deleteMessage = async (message) => {
+  if (message.userId !== userId) return
+  if (!window.confirm('Delete this message?')) return
+
+  const previous = messages
+  setMessages((current) => current.filter((item) => item.id !== message.id))
+  if (editingMessageId === message.id) cancelEditingMessage()
+
+  const { error } = await supabase
+    .from('board_messages')
+    .delete()
+    .eq('id', message.id)
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Delete message error:', error)
+    setMessages(previous)
+  }
 }
 
 const createInvite = async (event) => {
@@ -1334,37 +1453,39 @@ if (!loading && !session) {
   )
 }
 
-{session && myInvites.length > 0 ? (
-  <section className="panel pending-invites-panel">
-    <div className="pending-invites-header">
-      <p className="eyebrow">Invitations</p>
-      <h3>Pending board invites</h3>
-    </div>
+const pendingInvitesPanel =
+  session && myInvites.length > 0 ? (
+    <section className="panel pending-invites-panel">
+      <div className="pending-invites-header">
+        <p className="eyebrow">Invitations</p>
+        <h3>Pending board invites</h3>
+      </div>
 
-    <div className="pending-invites-list">
-      {myInvites.map((invite) => (
-        <article key={invite.id} className="pending-invite-row">
-          <div>
-            <strong>{invite.email}</strong>
-            <p>{invite.role} access</p>
-          </div>
+      <div className="pending-invites-list">
+        {myInvites.map((invite) => (
+          <article key={invite.id} className="pending-invite-row">
+            <div>
+              <strong>{invite.email}</strong>
+              <p>{invite.role} access</p>
+            </div>
 
-          <button
-            type="button"
-            className="primary-btn"
-            disabled={acceptingInviteId === invite.id}
-            onClick={() => acceptInvite(invite)}
-          >
-            {acceptingInviteId === invite.id ? 'Accepting…' : 'Accept invite'}
-          </button>
-        </article>
-      ))}
-    </div>
-  </section>
-) : null}
+            <button
+              type="button"
+              className="primary-btn"
+              disabled={acceptingInviteId === invite.id}
+              onClick={() => acceptInvite(invite)}
+            >
+              {acceptingInviteId === invite.id ? 'Accepting…' : 'Accept invite'}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  ) : null
 
 return (
   <>
+    {pendingInvitesPanel}
     <div className="app-shell">
       <ProjectSidebar
         stats={stats}
@@ -1466,38 +1587,92 @@ return (
           </form>
         </section>
         <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
-        <section className="chat-panel panel">
+        <section className="chat-panel panel" aria-label="Board chat">
   <div className="chat-panel-header">
     <div>
       <p className="eyebrow">Board chat</p>
       <h3>Team messages</h3>
     </div>
-    <span className="chat-count">{messages.length} messages</span>
+    <span className="chat-count">
+      {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+    </span>
   </div>
 
-  <div className="chat-messages">
+  <div className="chat-messages" role="log" aria-live="polite">
     {messages.length ? (
-      messages.map((message) => {
-        const isSelf = message.userId === userId
+      <>
+        {messages.map((message) => {
+          const isSelf = message.userId === userId
+          const isEditing = editingMessageId === message.id
 
-        return (
-          <article
-            key={message.id}
-            className={isSelf ? 'chat-message self' : 'chat-message'}
-          >
-            <div className="chat-message-meta">
-              <span>{getMessageAuthorLabel(message)}</span>
-              <time dateTime={message.createdAt}>
-                {new Date(message.createdAt).toLocaleTimeString([], {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                })}
-              </time>
-            </div>
-            <p>{message.body}</p>
-          </article>
-        )
-      })
+          return (
+            <article
+              key={message.id}
+              className={isSelf ? 'chat-message self' : 'chat-message'}
+            >
+              <div className="chat-message-meta">
+                <span className="chat-message-author">{getMessageAuthorLabel(message)}</span>
+                <span className="chat-message-meta-end">
+                  {message.editedAt && message.editedAt !== message.createdAt ? (
+                    <span className="chat-edited">edited</span>
+                  ) : null}
+                  <time dateTime={message.createdAt}>
+                    {new Date(message.createdAt).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </time>
+                </span>
+              </div>
+
+              {isEditing ? (
+                <form className="chat-edit-form" onSubmit={saveEditedMessage}>
+                  <input
+                    value={editingMessageText}
+                    onChange={(e) => setEditingMessageText(e.target.value)}
+                    maxLength={2000}
+                    aria-label="Edit message"
+                    autoFocus
+                  />
+                  <div className="chat-edit-actions">
+                    <button type="submit" className="secondary-btn chip-action">Save</button>
+                    <button
+                      type="button"
+                      className="secondary-btn chip-action"
+                      onClick={cancelEditingMessage}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <p>{message.text}</p>
+                  {isSelf ? (
+                    <div className="chat-message-actions">
+                      <button
+                        type="button"
+                        className="chat-action-btn"
+                        onClick={() => startEditingMessage(message)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="chat-action-btn danger"
+                        onClick={() => deleteMessage(message)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              )}
+            </article>
+          )
+        })}
+        <div ref={chatMessagesEndRef} />
+      </>
     ) : (
       <div className="chat-empty">
         No messages yet. Start the board conversation.
@@ -1505,7 +1680,25 @@ return (
     )}
   </div>
 
-  <section className="panel invite-panel">
+  <form className="chat-form" onSubmit={sendMessage}>
+    <input
+      value={newMessage}
+      onChange={(e) => setNewMessage(e.target.value)}
+      placeholder="Send a message to the board"
+      aria-label="Message to the board"
+      maxLength={2000}
+    />
+    <button
+      type="submit"
+      className="primary-btn"
+      disabled={sendingMessage || !newMessage.trim()}
+    >
+      {sendingMessage ? 'Sending…' : 'Send'}
+    </button>
+  </form>
+</section>
+
+<section className="panel invite-panel" aria-label="Invite collaborators">
   <div className="invite-panel-header">
     <p className="eyebrow">Invites</p>
     <h3>Invite collaborators</h3>
@@ -1517,42 +1710,39 @@ return (
       value={inviteEmail}
       onChange={(e) => setInviteEmail(e.target.value)}
       placeholder="teammate@example.com"
+      aria-label="Invite email address"
     />
     <select
       value={inviteRole}
       onChange={(e) => setInviteRole(e.target.value)}
+      aria-label="Invite role"
     >
       <option value="member">Member</option>
       <option value="admin">Admin</option>
     </select>
-    <button type="submit" className="primary-btn" disabled={sendingInvite}>
-      {sendingInvite ? 'Sending...' : 'Create invite'}
+    <button
+      type="submit"
+      className="primary-btn"
+      disabled={sendingInvite || !inviteEmail.trim()}
+    >
+      {sendingInvite ? 'Sending…' : 'Create invite'}
     </button>
   </form>
 
   <div className="invite-list">
-    {invites.map((invite) => (
-      <article key={invite.id} className="invite-row">
-        <div>
-          <strong>{invite.email}</strong>
-          <p>{invite.role} · pending</p>
-        </div>
-      </article>
-    ))}
+    {invites.length ? (
+      invites.map((invite) => (
+        <article key={invite.id} className="invite-row">
+          <div>
+            <strong>{invite.email}</strong>
+            <p>{invite.role} · pending</p>
+          </div>
+        </article>
+      ))
+    ) : (
+      <div className="invite-empty">No pending invites yet.</div>
+    )}
   </div>
-</section>
-
-  <form className="chat-form" onSubmit={sendMessage}>
-    <input
-      value={newMessage}
-      onChange={(e) => setNewMessage(e.target.value)}
-      placeholder="Send a message to the board"
-      maxLength={2000}
-    />
-    <button type="submit" className="primary-btn" disabled={sendingMessage}>
-      {sendingMessage ? 'Sending...' : 'Send'}
-    </button>
-  </form>
 </section>
         <TaskBoard
           columns={columns}

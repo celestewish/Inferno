@@ -2,14 +2,20 @@ export default function TaskModal({ editingTask, setEditingTask, handleEditSave,
   if (!editingTask) return null
 
   return (
-    <div className="modal-backdrop" onClick={() => setEditingTask(null)}>
-      <div className="modal-card" onClick={(event) => event.stopPropagation()}>
+    <div className="modal-backdrop" onClick={() => setEditingTask(null)} role="presentation">
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Task details"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="modal-header">
           <div>
             <p className="eyebrow">Task details</p>
             <h2>{editingTask.title}</h2>
           </div>
-          <button type="button" className="icon-btn" onClick={() => setEditingTask(null)}>✕</button>
+          <button type="button" className="icon-btn" aria-label="Close task details" onClick={() => setEditingTask(null)}>✕</button>
         </div>
         <form className="modal-form" onSubmit={handleEditSave}>
           <input value={editingTask.title} onChange={(e) => setEditingTask((c) => ({ ...c, title: e.target.value }))} placeholder="Task title" />

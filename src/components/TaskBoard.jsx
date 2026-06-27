@@ -177,6 +177,8 @@ export default function TaskBoard({
                       type="button"
                       className="secondary-btn"
                       disabled={index === 0}
+                      aria-label="Move task up"
+                      title="Move up"
                       onClick={() => shiftTask(task.id, -1)}
                     >
                       ↑
@@ -186,6 +188,8 @@ export default function TaskBoard({
                       type="button"
                       className="secondary-btn"
                       disabled={index === columnTasks.length - 1}
+                      aria-label="Move task down"
+                      title="Move down"
                       onClick={() => shiftTask(task.id, 1)}
                     >
                       ↓

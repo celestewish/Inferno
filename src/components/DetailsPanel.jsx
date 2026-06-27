@@ -1,9 +1,10 @@
 export default function DetailsPanel({ project, tasks, labelPool }) {
+  if (!project) return null
+
   const projectTasks = tasks.filter((task) => task.projectId === project.id)
   const activity = [...(project.activity || []), ...projectTasks.flatMap((task) => task.activity?.map((item) => ({ ...item, taskTitle: task.title })) || [])]
     .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
     .slice(0, 8)
-if (!project) return null
   return (
     <section className="details-grid">
       <div className="panel detail-panel">
@@ -39,3 +40,4 @@ if (!project) return null
     </section>
   )
 }
+
