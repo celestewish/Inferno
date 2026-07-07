@@ -859,3 +859,150 @@ textarea:hover {
   .column { min-width: 0; max-width: none; }
   .chat-form { grid-template-columns: 1fr; }
 }
+
+/* ── Onboarding guide ── */
+.onboarding-panel {
+  display: grid;
+  gap: 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--card-border));
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%),
+    color-mix(in srgb, var(--surface-custom) 90%, white 3%);
+}
+.onboarding-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.onboarding-header h2 { margin: 0.15rem 0 0.5rem; font-size: clamp(1.3rem, 2.6vw, 1.8rem); }
+.onboarding-header .muted-copy { margin: 0; max-width: 60ch; }
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+}
+.onboarding-step {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.onboarding-badge {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.7rem;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+}
+.onboarding-step-body h3 { margin: 0 0 0.35rem; font-size: 1.02rem; }
+.onboarding-step-body p { margin: 0; color: var(--text-muted); line-height: 1.55; font-size: 0.92rem; }
+.onboarding-step-action { margin-top: 0.75rem; }
+.onboarding-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--card-border);
+}
+.onboarding-footer .muted-copy { margin: 0; max-width: 62ch; }
+.onboarding-reopen-row { display: flex; justify-content: flex-end; }
+.onboarding-reopen { font-size: 0.85rem; }
+
+/* ── Marketing: hierarchy + about ── */
+.marketing-hierarchy { display: grid; gap: 0.85rem; }
+.marketing-hierarchy h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+.marketing-hierarchy .muted-copy { margin: 0; }
+.hierarchy-flow {
+  display: flex;
+  align-items: stretch;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.hierarchy-node {
+  flex: 1 1 200px;
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.hierarchy-step {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: white;
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, white 6%);
+}
+.hierarchy-node p { margin: 0; color: var(--text-muted); line-height: 1.55; font-size: 0.92rem; }
+.hierarchy-arrow {
+  align-self: center;
+  font-size: 1.6rem;
+  color: color-mix(in srgb, white 60%, var(--accent));
+}
+.marketing-about { display: grid; gap: 0.85rem; }
+.marketing-about h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 2rem); }
+.marketing-about > .muted-copy { margin: 0; max-width: 80ch; }
+.about-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.9rem;
+  margin-top: 0.5rem;
+}
+.about-highlight {
+  padding: 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.about-highlight h3 { margin: 0 0 0.4rem; font-size: 1rem; color: color-mix(in srgb, white 78%, var(--accent)); }
+.about-highlight p { margin: 0; color: var(--text-muted); line-height: 1.55; font-size: 0.92rem; }
+.marketing-sample-note {
+  margin: 0.85rem auto 0;
+  max-width: 54ch;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+/* ── Load error fallback ── */
+.load-error-shell {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+.load-error-card {
+  max-width: 460px;
+  text-align: center;
+  display: grid;
+  gap: 0.6rem;
+  justify-items: center;
+}
+.load-error-card h2 { margin: 0; }
+.load-error-card .muted-copy { margin: 0; }
+.load-error-card .marketing-cta-row { margin-top: 0.75rem; }
+.load-error-mark {
+  font-size: 2.4rem;
+  line-height: 1;
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--accent) 30%, transparent));
+}
+
+@media (max-width: 760px) {
+  .onboarding-footer { flex-direction: column; align-items: stretch; }
+  .hierarchy-arrow { display: none; }
+}

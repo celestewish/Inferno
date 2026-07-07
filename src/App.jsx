@@ -62,18 +62,47 @@ function MarketingHome({ openLogin, openSignup }) {
         </p>
 
         <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" onClick={openSignup}>
+          <button type="button" className="primary-btn" data-testid="hero-signup" onClick={openSignup}>
             Sign up free
           </button>
-          <button type="button" className="secondary-btn" onClick={openLogin}>
+          <button type="button" className="secondary-btn" data-testid="hero-login" onClick={openLogin}>
             Log in
           </button>
         </div>
+
+        <p className="marketing-sample-note">
+          New accounts start with a fully seeded sample board — real projects and tasks — so you can explore
+          Inferno before adding your own.
+        </p>
 
         <div className="marketing-proof">
           <span>Free to use</span>
           <span>Built for game projects</span>
           <span>Kanban + task details + team planning</span>
+        </div>
+      </section>
+
+      <section className="marketing-hierarchy panel" aria-label="How Inferno is organized">
+        <p className="eyebrow">How it fits together</p>
+        <h2>Board → Project → Task</h2>
+        <p className="muted-copy">
+          Inferno keeps production organized with a simple, predictable hierarchy.
+        </p>
+        <div className="hierarchy-flow">
+          <article className="hierarchy-node">
+            <span className="hierarchy-step">Board</span>
+            <p>Your studio workspace — one shared home for a game or team, with chat and invites built in.</p>
+          </article>
+          <span className="hierarchy-arrow" aria-hidden="true">→</span>
+          <article className="hierarchy-node">
+            <span className="hierarchy-step">Project</span>
+            <p>A feature area, milestone, or game inside the board. Switch between projects from the sidebar.</p>
+          </article>
+          <span className="hierarchy-arrow" aria-hidden="true">→</span>
+          <article className="hierarchy-node">
+            <span className="hierarchy-step">Task</span>
+            <p>The actual work — design, art, code, audio, polish — moving across a Kanban pipeline.</p>
+          </article>
         </div>
       </section>
 
@@ -100,6 +129,31 @@ function MarketingHome({ openLogin, openSignup }) {
         </article>
       </section>
 
+      <section className="marketing-about panel" aria-label="About Inferno">
+        <p className="eyebrow">About Inferno</p>
+        <h2>A production board designed around how games actually get made</h2>
+        <p className="muted-copy">
+          Most task tools are built for generic software teams. Inferno is opinionated about game
+          development: disciplines like design, combat, audio, and polish are first-class, tasks carry
+          the estimates and sprint context producers care about, and the whole board reads like a
+          pipeline instead of a spreadsheet.
+        </p>
+        <div className="about-highlights">
+          <div className="about-highlight">
+            <h3>The problem</h3>
+            <p>Small studios juggle planning docs, chat apps, and spreadsheets — context scatters and work stalls.</p>
+          </div>
+          <div className="about-highlight">
+            <h3>The approach</h3>
+            <p>One dark, focused board that unifies tasks, discussion, and team planning around a clear Board → Project → Task model.</p>
+          </div>
+          <div className="about-highlight">
+            <h3>The outcome</h3>
+            <p>Everyone sees the same pipeline, decisions live next to the work, and momentum stays visible from backlog to ship.</p>
+          </div>
+        </div>
+      </section>
+
       <section className="marketing-banner panel">
         <div>
           <p className="eyebrow">Why Inferno</p>
@@ -110,15 +164,157 @@ function MarketingHome({ openLogin, openSignup }) {
         </div>
 
         <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" onClick={openSignup}>
+          <button type="button" className="primary-btn" data-testid="banner-signup" onClick={openSignup}>
             Create free account
           </button>
-          <button type="button" className="secondary-btn" onClick={openLogin}>
+          <button type="button" className="secondary-btn" data-testid="banner-login" onClick={openLogin}>
             I already have an account
           </button>
         </div>
       </section>
     </main>
+  )
+}
+
+function OnboardingGuide({
+  boardName,
+  projectCount,
+  taskCount,
+  onDismiss,
+  onFocusCreateTask,
+  onScrollToMessages,
+  onScrollToInvites,
+}) {
+  const steps = [
+    {
+      key: 'board',
+      badge: '1',
+      title: 'Start with a board',
+      body: (
+        <>
+          A <strong>board</strong> is your studio workspace — one shared home for a game or team.
+          {boardName ? (
+            <> You are currently working in <strong>{boardName}</strong>.</>
+          ) : (
+            <> We created your first board automatically so you can dive right in.</>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'project',
+      badge: '2',
+      title: 'Organize work into projects',
+      body: (
+        <>
+          Inside a board, <strong>projects</strong> group related work — a feature area, a milestone,
+          or a whole game. Add or switch projects from the left sidebar.
+          {projectCount > 0 ? <> You already have {projectCount} to explore.</> : null}
+        </>
+      ),
+    },
+    {
+      key: 'task',
+      badge: '3',
+      title: 'Break projects into tasks',
+      body: (
+        <>
+          <strong>Tasks</strong> are the actual work — design, art, code, audio, polish. Create one from
+          the quick-create bar, then drag it across the pipeline from Backlog to Done.
+          {taskCount > 0 ? <> {taskCount} tasks are already on the board.</> : null}
+        </>
+      ),
+      action: onFocusCreateTask
+        ? { label: 'Create a task', testid: 'onboarding-create-task', onClick: onFocusCreateTask }
+        : null,
+    },
+    {
+      key: 'messages',
+      badge: '4',
+      title: 'Talk it through in board chat',
+      body: (
+        <>
+          Use <strong>Team messages</strong> to keep decisions next to the work — no separate tool
+          needed. Everyone on the board sees updates in real time.
+        </>
+      ),
+      action: onScrollToMessages
+        ? { label: 'Open board chat', testid: 'onboarding-open-chat', onClick: onScrollToMessages }
+        : null,
+    },
+    {
+      key: 'invite',
+      badge: '5',
+      title: 'Invite your collaborators',
+      body: (
+        <>
+          Bring teammates in with an email <strong>invite</strong>. Choose their access level and they
+          join the board with the right permissions.
+        </>
+      ),
+      action: onScrollToInvites
+        ? { label: 'Invite a teammate', testid: 'onboarding-open-invites', onClick: onScrollToInvites }
+        : null,
+    },
+  ]
+
+  return (
+    <section className="onboarding-panel panel" data-testid="onboarding-guide" aria-label="Getting started with Inferno">
+      <div className="onboarding-header">
+        <div>
+          <p className="eyebrow">Getting started</p>
+          <h2>Welcome to Inferno — here's how it works</h2>
+          <p className="muted-copy">
+            Board → Project → Task. Follow these steps to set up your production pipeline in a couple of minutes.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="icon-btn"
+          data-testid="onboarding-dismiss"
+          aria-label="Dismiss getting started guide"
+          onClick={onDismiss}
+        >
+          ✕
+        </button>
+      </div>
+
+      <div className="onboarding-steps">
+        {steps.map((step) => (
+          <article key={step.key} className="onboarding-step">
+            <span className="onboarding-badge" aria-hidden="true">{step.badge}</span>
+            <div className="onboarding-step-body">
+              <h3>{step.title}</h3>
+              <p>{step.body}</p>
+              {step.action ? (
+                <button
+                  type="button"
+                  className="secondary-btn onboarding-step-action"
+                  data-testid={step.action.testid}
+                  onClick={step.action.onClick}
+                >
+                  {step.action.label}
+                </button>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="onboarding-footer">
+        <p className="muted-copy">
+          <strong>Recommended next step:</strong> create your first real task, then invite one teammate so the board isn't empty.
+        </p>
+        <button
+          type="button"
+          className="primary-btn"
+          data-testid="onboarding-done"
+          onClick={onDismiss}
+        >
+          Got it, let's build
+        </button>
+      </div>
+    </section>
   )
 }
 
@@ -275,6 +471,10 @@ function App() {
   const [authMessage, setAuthMessage] = useState('')
   const [myInvites, setMyInvites] = useState([])
   const [acceptingInviteId, setAcceptingInviteId] = useState(null)
+  const [loadError, setLoadError] = useState('')
+  const [showOnboarding, setShowOnboarding] = useState(true)
+  const chatPanelRef = useRef(null)
+  const invitePanelRef = useRef(null)
 
   // ── Auth listener ──
 useEffect(() => {
@@ -393,6 +593,7 @@ useEffect(() => {
   // ── Load everything from Supabase ──
   const loadAllData = async (userId, preferredBoardId = null) => {
   setLoading(true)
+  setLoadError('')
 
 let { data: membershipRows, error: membershipError } = await supabase
   .from('board_members')
@@ -401,6 +602,7 @@ let { data: membershipRows, error: membershipError } = await supabase
 
 if (membershipError) {
   console.error('Membership load error:', membershipError)
+  setLoadError('We could not load your boards. Check your connection and try again.')
   setLoading(false)
   return
 }
@@ -418,6 +620,7 @@ if (membershipError) {
 
 if (boardError || !createdBoard) {
   console.error('Board creation error:', boardError)
+  setLoadError('We could not set up your first board. Please try again in a moment.')
   setLoading(false)
   return
 }
@@ -432,6 +635,7 @@ const { error: memberInsertError } = await supabase
 
 if (memberInsertError) {
   console.error('Board member creation error:', memberInsertError)
+  setLoadError('We could not finish setting up your board membership. Please try again.')
   setLoading(false)
   return
 }
@@ -1192,6 +1396,20 @@ function dbToInvite(row) {
   }, 150)
 }
 
+const scrollToChatPanel = () => {
+  chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  window.setTimeout(() => {
+    chatPanelRef.current?.querySelector('.chat-form input')?.focus()
+  }, 200)
+}
+
+const scrollToInvitePanel = () => {
+  invitePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  window.setTimeout(() => {
+    invitePanelRef.current?.querySelector('.invite-form input')?.focus()
+  }, 200)
+}
+
 const openLogin = () => {
   setAuthError('')
   setAuthMessage('')
@@ -1422,6 +1640,37 @@ if (loading) {
   )
 }
 
+// Error fallback: data load failed for a signed-in user
+if (!loading && session && loadError) {
+  return (
+    <div className="load-error-shell" data-testid="load-error">
+      <section className="panel load-error-card">
+        <div className="load-error-mark" aria-hidden="true">⚠</div>
+        <p className="eyebrow">Something went wrong</p>
+        <h2>We hit a snag loading your board</h2>
+        <p className="muted-copy">{loadError}</p>
+        <div className="marketing-cta-row">
+          <button
+            type="button"
+            className="primary-btn"
+            data-testid="load-error-retry"
+            onClick={() => userId && loadAllData(userId, currentBoardId)}
+          >
+            Try again
+          </button>
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() => supabase.auth.signOut()}
+          >
+            Sign out
+          </button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 // Guard: if auth is done but projects haven't resolved yet
 if (!loading && session && !currentProject) {
   return (
@@ -1508,6 +1757,28 @@ return (
         onSignOut={() => supabase.auth.signOut()}
       />
       <main className="board-area">
+        {showOnboarding ? (
+          <OnboardingGuide
+            boardName={currentBoard?.name}
+            projectCount={projects.length}
+            taskCount={tasks.length}
+            onDismiss={() => setShowOnboarding(false)}
+            onFocusCreateTask={focusQuickCreate}
+            onScrollToMessages={scrollToChatPanel}
+            onScrollToInvites={scrollToInvitePanel}
+          />
+        ) : (
+          <div className="onboarding-reopen-row">
+            <button
+              type="button"
+              className="secondary-btn onboarding-reopen"
+              data-testid="onboarding-reopen"
+              onClick={() => setShowOnboarding(true)}
+            >
+              Getting started guide
+            </button>
+          </div>
+        )}
         <ProjectHeader
           project={currentProject}
           updateProjectField={updateProjectField}
@@ -1538,6 +1809,7 @@ return (
             <div className="quick-create-grid">
               <input
                 ref={quickCreateInputRef}
+                data-testid="quick-create-input"
                 value={newTask.title}
                 onChange={(e) => setNewTask((c) => ({ ...c, title: e.target.value }))}
                 placeholder="Add a new feature or task"
@@ -1587,7 +1859,7 @@ return (
           </form>
         </section>
         <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
-        <section className="chat-panel panel" aria-label="Board chat">
+        <section className="chat-panel panel" aria-label="Board chat" ref={chatPanelRef} data-testid="chat-panel">
   <div className="chat-panel-header">
     <div>
       <p className="eyebrow">Board chat</p>
@@ -1698,7 +1970,7 @@ return (
   </form>
 </section>
 
-<section className="panel invite-panel" aria-label="Invite collaborators">
+<section className="panel invite-panel" aria-label="Invite collaborators" ref={invitePanelRef} data-testid="invite-panel">
   <div className="invite-panel-header">
     <p className="eyebrow">Invites</p>
     <h3>Invite collaborators</h3>
