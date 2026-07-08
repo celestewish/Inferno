@@ -5,6 +5,24 @@ export const defaultTheme = {
   background: '#0f1220',
 }
 
+// The only theme tokens we read from / write to profiles.theme_settings. Acts
+// as an allowlist so unknown or malicious keys in stored JSON are ignored.
+export const themeTokenKeys = Object.keys(defaultTheme)
+
+// Coerce an arbitrary stored value into a safe theme object: keep only known
+// token keys whose value is a non-empty string, and fall back to the default
+// for anything missing or malformed.
+export function sanitizeTheme(stored) {
+  const theme = { ...defaultTheme }
+  if (stored && typeof stored === 'object') {
+    for (const key of themeTokenKeys) {
+      const value = stored[key]
+      if (typeof value === 'string' && value.trim()) theme[key] = value.trim()
+    }
+  }
+  return theme
+}
+
 export const defaultTeamMembers = ['Celeste', 'Unassigned']
 
 // Default Kanban sections (columns / status lanes) for a new board.
