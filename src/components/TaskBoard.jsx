@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import InlineText from './InlineText'
 import InfernoLogo from './InfernoLogo'
+import DatePicker from './DatePicker.jsx'
 
 const priorityTone = { High: 'high', Medium: 'medium', Low: 'low' }
 
@@ -171,9 +172,10 @@ export default function TaskBoard({
                     <div>
                       <dt>Due</dt>
                       <dd>
-                        <InlineText
+                        <DatePicker
                           value={task.due}
-                          onSave={(value) => updateTask(task.id, { due: value })}
+                          onChange={(iso) => updateTask(task.id, { due: iso })}
+                          onClear={() => updateTask(task.id, { due: 'TBD' })}
                         />
                       </dd>
                     </div>

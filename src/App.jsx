@@ -9,6 +9,7 @@ import TaskModal from './components/TaskModal'
 import TasksView from './components/TasksView'
 import CalendarView from './components/CalendarView'
 import ReportsView from './components/ReportsView'
+import DatePicker from './components/DatePicker.jsx'
 import {
   createActivity,
   defaultProjects,
@@ -2091,6 +2092,12 @@ return (
                   >
                     {disciplines.map((item) => <option key={item}>{item}</option>)}
                   </select>
+                  <DatePicker
+                    value={newTask.due}
+                    onChange={(iso) => setNewTask((c) => ({ ...c, due: iso }))}
+                    onClear={() => setNewTask((c) => ({ ...c, due: '' }))}
+                    placeholder="Due date"
+                  />
                   <button type="submit" className="primary-btn">Create task</button>
                 </div>
                 <div className="presence-strip">

@@ -1,3 +1,5 @@
+import { formatDueLabel } from '../lib/dates.js'
+
 const priorityTone = { High: 'high', Medium: 'medium', Low: 'low' }
 
 // Focused, low-scroll task management view: search + discipline filter, then a
@@ -99,10 +101,10 @@ export default function TasksView({
                         <span>{task.assignee}</span>
                         <span>·</span>
                         <span>{sectionLabel(task.status)}</span>
-                        {task.due ? (
+                        {task.due && !/^tbd$/i.test(String(task.due).trim()) ? (
                           <>
                             <span>·</span>
-                            <span>Due {task.due}</span>
+                            <span>Due {formatDueLabel(task.due) ?? task.due}</span>
                           </>
                         ) : null}
                       </div>

@@ -1,42 +1,15 @@
 import { useMemo, useState } from 'react'
+import {
+  formatDayLabel as dayLabel,
+  formatMonthLabel as monthLabel,
+  parseDueDate as parseDue,
+  startOfToday,
+  toISODate as dayKey,
+} from '../lib/dates.js'
 
-// Lightweight due-date calendar built from existing task `due` values. Due dates
-// are free-text (e.g. "Jun 20", "TBD"), so we best-effort parse them: parseable
-// dates form the calendar/agenda, everything else falls into "No due date".
-const parseDue = (due) => {
-  if (!due) return null
-  const raw = String(due).trim()
-  if (!raw || /^tbd$/i.test(raw)) return null
-
-  // ISO date-only (YYYY-MM-DD): parse as *local* midnight. `new Date('2026-06-20')`
-  // is interpreted as UTC, which shifts to the previous day in negative
-  // timezones — the classic calendar off-by-one. Building from parts avoids it.
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
-  if (iso) {
-    const [, y, m, d] = iso
-    return new Date(Number(y), Number(m) - 1, Number(d))
-  }
-
-  let parsed = new Date(raw)
-  if (Number.isNaN(parsed.getTime())) {
-    // Free-text like "Jun 20" has no year; assume the current one.
-    parsed = new Date(`${raw} ${new Date().getFullYear()}`)
-  }
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-const dayKey = (date) => {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
-}
-
-const dayLabel = (date) =>
-  date.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
-
-const monthLabel = (date) =>
-  date.toLocaleDateString([], { month: 'long', year: 'numeric' })
+// Due-date calendar built from task `due` values. Dates selected through the UI
+// are canonical ISO strings; legacy free-text values are best-effort parsed via
+// the shared helpers. Anything unparseable falls into "No due date".
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -50,9 +23,8 @@ export default function CalendarView({ tasks, projects, onOpenTask }) {
   })
   const [selectedDay, setSelectedDay] = useState(null)
 
-  const startOfToday = new Date()
-  startOfToday.setHours(0, 0, 0, 0)
-  const todayKey = dayKey(startOfToday)
+  const today = startOfToday()
+  const todayKey = dayKey(today)
 
   const { dated, undated, tasksByDay } = useMemo(() => {
     const datedList = []
@@ -74,7 +46,7 @@ export default function CalendarView({ tasks, projects, onOpenTask }) {
   }, [tasks])
 
   const overdueCount = dated.filter(
-    ({ task, date }) => date < startOfToday && !task.completed
+    ({ task, date }) => date < today && !task.completed
   ).length
 
   // ── Agenda (list) grouping ──
@@ -116,7 +88,7 @@ export default function CalendarView({ tasks, projects, onOpenTask }) {
   }
 
   const goToToday = () => {
-    setMonthCursor(new Date(startOfToday.getFullYear(), startOfToday.getMonth(), 1))
+    setMonthCursor(new Date(today.getFullYear(), today.getMonth(), 1))
     setSelectedDay(todayKey)
   }
 
@@ -300,7 +272,7 @@ export default function CalendarView({ tasks, projects, onOpenTask }) {
         groups.length ? (
           <ol className="agenda">
             {groups.map((group) => {
-              const isOverdue = group.date < startOfToday
+              const isOverdue = group.date < today
               return (
                 <li key={group.key} className="agenda-day">
                   <div className={isOverdue ? 'agenda-date overdue' : 'agenda-date'}>
