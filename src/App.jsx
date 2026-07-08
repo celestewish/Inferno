@@ -495,8 +495,18 @@ function App() {
   const [myInvites, setMyInvites] = useState([])
   const [acceptingInviteId, setAcceptingInviteId] = useState(null)
   const [loadError, setLoadError] = useState('')
-  const [showOnboarding, setShowOnboarding] = useState(true)
+  const [showOnboarding, setShowOnboarding] = useState(false)
   const [activeSection, setActiveSection] = useState('board')
+  const [myProfile, setMyProfile] = useState(null)
+  const [profileForm, setProfileForm] = useState({
+    display_name: '',
+    gamer_tag: '',
+    pronouns: '',
+    avatar_url: '',
+  })
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [profileSaved, setProfileSaved] = useState(false)
+  const [profileError, setProfileError] = useState('')
 
   // ── Auth listener ──
 useEffect(() => {
@@ -524,6 +534,8 @@ useEffect(() => {
       setBoards([])
       setBoardMembers([])
       setProfiles({})
+      setMyProfile(null)
+      setShowOnboarding(false)
       setCurrentBoardId(null)
       setOnlineUsers([])
       setTypingUsers([])
@@ -766,17 +778,30 @@ setCurrentProjectId((currentId) =>
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
-    const { data: profileRows, error: profileError } = await supabase
+    const { data: profileRows, error: profileLoadError } = await supabase
       .from('profiles')
-      .select('id, display_name')
+      .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at')
       .in('id', memberIds)
 
-    if (profileError) {
-      console.error('Profiles load error:', profileError)
+    if (profileLoadError) {
+      console.error('Profiles load error:', profileLoadError)
     } else {
+      const rows = profileRows ?? []
       setProfiles(
-        Object.fromEntries((profileRows ?? []).map((row) => [row.id, row.display_name]))
+        Object.fromEntries(rows.map((row) => [row.id, row.display_name]))
       )
+
+      const ownProfile = rows.find((row) => row.id === userId) ?? null
+      setMyProfile(ownProfile)
+      if (!background) {
+        setProfileForm({
+          display_name: ownProfile?.display_name ?? '',
+          gamer_tag: ownProfile?.gamer_tag ?? '',
+          pronouns: ownProfile?.pronouns ?? '',
+          avatar_url: ownProfile?.avatar_url ?? '',
+        })
+        setShowOnboarding(!ownProfile?.onboarding_seen_at)
+      }
     }
   } else {
     setProfiles({})
@@ -1727,6 +1752,76 @@ const createInvite = async (event) => {
   }
 }
 
+const deleteInvite = async (invite) => {
+  if (!invite?.id) return
+  if (!window.confirm(`Cancel the pending invite for ${invite.email}?`)) return
+
+  const previous = invites
+  setInvites((current) => current.filter((item) => item.id !== invite.id))
+
+  const { error } = await supabase
+    .from('board_invites')
+    .delete()
+    .eq('id', invite.id)
+    .is('accepted_at', null)
+
+  if (error) {
+    console.error('Delete invite error:', error)
+    setInvites(previous)
+    window.alert('We could not cancel that invite. Please try again.')
+  }
+}
+
+const dismissOnboarding = async () => {
+  setShowOnboarding(false)
+  if (!userId) return
+
+  const seenAt = new Date().toISOString()
+  setMyProfile((current) => ({ ...(current ?? { id: userId }), onboarding_seen_at: seenAt }))
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, onboarding_seen_at: seenAt }, { onConflict: 'id' })
+
+  if (error) console.error('Dismiss onboarding error:', error)
+}
+
+const updateProfileField = (field, value) => {
+  setProfileSaved(false)
+  setProfileError('')
+  setProfileForm((current) => ({ ...current, [field]: value }))
+}
+
+const saveProfile = async (event) => {
+  event.preventDefault()
+  if (!userId || savingProfile) return
+
+  setSavingProfile(true)
+  setProfileSaved(false)
+  setProfileError('')
+
+  const payload = {
+    id: userId,
+    display_name: profileForm.display_name.trim() || null,
+    gamer_tag: profileForm.gamer_tag.trim() || null,
+    pronouns: profileForm.pronouns.trim() || null,
+    avatar_url: profileForm.avatar_url.trim() || null,
+  }
+
+  const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' })
+
+  if (error) {
+    console.error('Save profile error:', error)
+    setProfileError('We could not save your profile. Please try again.')
+  } else {
+    setMyProfile((current) => ({ ...(current ?? {}), ...payload }))
+    setProfiles((current) => ({ ...current, [userId]: payload.display_name }))
+    setProfileSaved(true)
+  }
+
+  setSavingProfile(false)
+}
+
 if (loading) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
@@ -1840,6 +1935,7 @@ return (
         activeSection={activeSection}
         onSelectSection={handleSelectSection}
         userEmail={session?.user?.email}
+        profile={myProfile}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
         {activeSection === 'board' ? (
@@ -1849,7 +1945,7 @@ return (
               projectCount={projects.length}
               taskCount={tasks.length}
               isExampleBoard={isExampleBoard}
-              onDismiss={() => setShowOnboarding(false)}
+              onDismiss={dismissOnboarding}
               onFocusCreateTask={goToCreateTask}
               onScrollToMessages={goToTeam}
               onScrollToInvites={goToTeam}
@@ -1875,13 +1971,6 @@ return (
 
         {activeSection === 'board' ? (
           <>
-            <ProjectHeader
-              project={currentProject}
-              updateProjectField={updateProjectField}
-              methodologies={methodologies}
-              gameCategories={gameCategories}
-              deleteProject={deleteProject}
-            />
             <section className="toolbar panel">
               <form className="toolbar-group" onSubmit={handleCreateTask}>
                 <input
@@ -2134,11 +2223,29 @@ return (
               <div className="section-heading">
                 <h2>Appearance</h2>
               </div>
-              <div className="theme-panel-body">
-                <label>Accent<input type="color" value={theme.accent} onChange={(e) => setTheme((c) => ({ ...c, accent: e.target.value }))} /></label>
-                <label>Accent 2<input type="color" value={theme.accentSecondary} onChange={(e) => setTheme((c) => ({ ...c, accentSecondary: e.target.value }))} /></label>
-                <label>Surface<input type="color" value={theme.surface} onChange={(e) => setTheme((c) => ({ ...c, surface: e.target.value }))} /></label>
-                <label>Background<input type="color" value={theme.background} onChange={(e) => setTheme((c) => ({ ...c, background: e.target.value }))} /></label>
+              <p className="muted-copy">
+                Tap a color to customize the board. Each swatch shows the current color.
+              </p>
+              <div className="theme-swatch-row" data-testid="theme-swatches">
+                {[
+                  { key: 'accent', label: 'Accent' },
+                  { key: 'accentSecondary', label: 'Glow' },
+                  { key: 'surface', label: 'Surface' },
+                  { key: 'background', label: 'Background' },
+                ].map(({ key, label }) => (
+                  <label key={key} className="theme-swatch">
+                    <span className="theme-swatch-circle" style={{ background: theme[key] }}>
+                      <input
+                        type="color"
+                        value={theme[key]}
+                        data-testid={`theme-swatch-${key}`}
+                        aria-label={`${label} color`}
+                        onChange={(e) => setTheme((c) => ({ ...c, [key]: e.target.value }))}
+                      />
+                    </span>
+                    <span className="theme-swatch-label">{label}</span>
+                  </label>
+                ))}
               </div>
               <button
                 type="button"
@@ -2148,6 +2255,92 @@ return (
               >
                 Reset to default colors
               </button>
+            </div>
+
+            <div className="panel settings-panel" data-testid="settings-profile">
+              <div className="section-heading">
+                <h2>Profile</h2>
+              </div>
+              <p className="muted-copy">
+                Personalize how you appear to teammates across this board.
+              </p>
+              <form className="profile-form" onSubmit={saveProfile}>
+                <div className="profile-avatar-row">
+                  <span className="profile-avatar-preview" aria-hidden="true">
+                    {profileForm.avatar_url.trim() ? (
+                      <img src={profileForm.avatar_url.trim()} alt="" />
+                    ) : (
+                      <span className="profile-avatar-fallback">
+                        {(profileForm.display_name.trim()[0] ||
+                          session?.user?.email?.trim()?.[0] ||
+                          'I').toUpperCase()}
+                      </span>
+                    )}
+                  </span>
+                  <label className="profile-field profile-field-grow">
+                    Profile picture URL
+                    <input
+                      type="url"
+                      value={profileForm.avatar_url}
+                      data-testid="profile-avatar-url"
+                      maxLength={500}
+                      placeholder="https://example.com/avatar.png"
+                      onChange={(e) => updateProfileField('avatar_url', e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                <label className="profile-field">
+                  Name
+                  <input
+                    type="text"
+                    value={profileForm.display_name}
+                    data-testid="profile-display-name"
+                    maxLength={80}
+                    placeholder="Your name"
+                    onChange={(e) => updateProfileField('display_name', e.target.value)}
+                  />
+                </label>
+
+                <div className="form-row">
+                  <label className="profile-field">
+                    Gamer tag
+                    <input
+                      type="text"
+                      value={profileForm.gamer_tag}
+                      data-testid="profile-gamer-tag"
+                      maxLength={60}
+                      placeholder="e.g. NightRunner"
+                      onChange={(e) => updateProfileField('gamer_tag', e.target.value)}
+                    />
+                  </label>
+                  <label className="profile-field">
+                    Pronouns
+                    <input
+                      type="text"
+                      value={profileForm.pronouns}
+                      data-testid="profile-pronouns"
+                      maxLength={40}
+                      placeholder="e.g. she/her"
+                      onChange={(e) => updateProfileField('pronouns', e.target.value)}
+                    />
+                  </label>
+                </div>
+
+                {profileError ? <p className="auth-error">{profileError}</p> : null}
+                {profileSaved ? (
+                  <p className="auth-success" data-testid="profile-saved">Profile saved.</p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  data-testid="profile-save"
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? 'Saving…' : 'Save profile'}
+                </button>
+              </form>
             </div>
 
             <div className="panel settings-panel" data-testid="settings-account">
@@ -2360,6 +2553,14 @@ return (
             <strong>{invite.email}</strong>
             <p>{invite.role} · pending</p>
           </div>
+          <button
+            type="button"
+            className="chip-action danger invite-delete-btn"
+            data-testid={`invite-delete-${invite.id}`}
+            onClick={() => deleteInvite(invite)}
+          >
+            Cancel
+          </button>
         </article>
       ))
     ) : (
