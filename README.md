@@ -79,15 +79,37 @@ confirmation links return users to the production domain instead of localhost.
 
 ## Database migrations
 
-Schema changes live in `supabase/migrations/`. Apply them with the Supabase CLI:
+Schema changes live in `supabase/migrations/`. Apply them with the Supabase CLI
+from the project root:
 
 ```bash
+# One-time: link the local project to your Supabase project (skip if already linked).
+# The <ref> is the Project Ref from Supabase → Project Settings → General.
+supabase link --project-ref <ref>
+
+# Push every pending migration in supabase/migrations to the linked project.
 supabase db push
 ```
 
-`20260708000000_add_kanban_sections.sql` adds a non-destructive `kanban_sections`
-`jsonb` column to `boards` (defaulted to the standard five-lane pipeline), which
-persists each board's Kanban columns. It is safe to re-run.
+All migrations are idempotent and non-destructive, so `supabase db push` is safe
+to re-run.
+
+Current migrations:
+
+- `20260708000000_add_kanban_sections.sql` — adds a `kanban_sections` `jsonb`
+  column to `boards` (defaulted to the standard five-lane pipeline) so each
+  board's Kanban columns persist.
+- `20260709000000_add_profile_fields.sql` — adds the personalization columns
+  (`avatar_url`, `gamer_tag`, `pronouns`, `onboarding_seen_at`, `display_name`)
+  to `profiles`.
+- `20260710000000_profiles_rls_policies.sql` — enables row level security on
+  `profiles` and creates the read / insert / update policies.
+
+> **"Your profile database is missing the new profile columns."**
+> This message in **Settings → Profile** means the two profile migrations above
+> have not been applied to the linked project yet. Run `supabase db push` (and
+> `supabase link --project-ref <ref>` first if the project is not linked) and
+> save again.
 
 ### 3. Deploy the function
 

@@ -507,6 +507,8 @@ function App() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const [passwordResetStatus, setPasswordResetStatus] = useState('idle')
+  const [passwordResetMessage, setPasswordResetMessage] = useState('')
 
   // ── Auth listener ──
 useEffect(() => {
@@ -1823,7 +1825,9 @@ const saveProfile = async (event) => {
     if (isMissingColumnError(error)) {
       setProfileError(
         'Your profile database is missing the new profile columns. Apply the ' +
-        'latest Supabase migrations (supabase/migrations) and try again.'
+        'latest Supabase migrations, then try again — from the project root run ' +
+        '`supabase db push` (linking first with `supabase link --project-ref <ref>` ' +
+        'if the project is not linked yet). See README “Database migrations”.'
       )
     } else {
       setProfileError(`We could not save your profile. ${formatSupabaseError(error)}`)
@@ -1836,6 +1840,26 @@ const saveProfile = async (event) => {
   }
 
   setSavingProfile(false)
+}
+
+const sendPasswordReset = async () => {
+  const email = session?.user?.email
+  if (!email || passwordResetStatus === 'sending') return
+
+  setPasswordResetStatus('sending')
+  setPasswordResetMessage('')
+
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${siteUrl}/`,
+  })
+
+  if (error) {
+    setPasswordResetStatus('error')
+    setPasswordResetMessage(`We could not send the reset email. ${formatSupabaseError(error)}`)
+  } else {
+    setPasswordResetStatus('sent')
+    setPasswordResetMessage(`Password reset email sent to ${email}. Check your inbox.`)
+  }
 }
 
 if (loading) {
@@ -2059,7 +2083,7 @@ return (
               </div>
               </form>
             </section>
-            <div data-testid="board-section">
+            <div className="board-scroll-region" data-testid="board-section">
               <TaskBoard
                 columns={sections}
                 tasks={filteredTasks}
@@ -2369,6 +2393,31 @@ return (
                   <dd>{session?.user?.email ?? 'Signed in'}</dd>
                 </div>
               </dl>
+
+              <div className="settings-security">
+                <h3>Password</h3>
+                <p className="muted-copy">
+                  We'll email you a secure link to choose a new password.
+                </p>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="settings-reset-password"
+                  onClick={sendPasswordReset}
+                  disabled={passwordResetStatus === 'sending' || !session?.user?.email}
+                >
+                  {passwordResetStatus === 'sending' ? 'Sending…' : 'Send password reset email'}
+                </button>
+                {passwordResetMessage ? (
+                  <p
+                    className={passwordResetStatus === 'error' ? 'auth-error' : 'auth-success'}
+                    data-testid="settings-reset-password-status"
+                  >
+                    {passwordResetMessage}
+                  </p>
+                ) : null}
+              </div>
+
               <button
                 type="button"
                 className="danger-btn"
