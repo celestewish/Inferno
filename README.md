@@ -104,12 +104,33 @@ Current migrations:
   to `profiles`.
 - `20260710000000_profiles_rls_policies.sql` — enables row level security on
   `profiles` and creates the read / insert / update policies.
+- `20260711000000_repair_profile_columns.sql` — idempotent repair that
+  re-asserts every profile column, re-creates the RLS policies, and refreshes
+  the PostgREST schema cache. Fixes environments where `supabase db push`
+  reports "up to date" but the columns are still missing.
 
 > **"Your profile database is missing the new profile columns."**
-> This message in **Settings → Profile** means the two profile migrations above
-> have not been applied to the linked project yet. Run `supabase db push` (and
-> `supabase link --project-ref <ref>` first if the project is not linked) and
-> save again.
+> This message in **Settings → Profile** means the profile columns are absent
+> from the linked project. Normally running `supabase db push` (and
+> `supabase link --project-ref <ref>` first if the project is not linked) applies
+> the profile migrations above and fixes it.
+>
+> **If `supabase db push` says "Remote database is up to date" but the app still
+> shows this error**, the migration history thinks the profile migration was
+> already applied (or the `profiles` table was created outside of migrations),
+> so there is no new migration for `db push` to run. Fix it one of two ways:
+>
+> 1. **Pull/merge this branch** so
+>    `20260711000000_repair_profile_columns.sql` is present locally, then run
+>    `supabase db push` again — the fresh timestamp makes it a pending migration
+>    that will actually run.
+> 2. **Or run the SQL manually** in the Supabase dashboard: open
+>    **SQL Editor → New query**, paste the contents of
+>    `supabase/migrations/20260711000000_repair_profile_columns.sql`, and run it.
+>    It is idempotent, so it is safe even if some columns already exist.
+>
+> Either path adds the missing columns and issues `NOTIFY pgrst, 'reload schema'`
+> so the Supabase API picks up the change immediately.
 
 ### 3. Deploy the function
 
