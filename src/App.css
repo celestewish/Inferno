@@ -291,7 +291,7 @@ textarea:hover {
 .board-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(320px, 360px);
+  grid-auto-columns: minmax(240px, 1fr);
   gap: 1rem;
   align-items: start;
   overflow-x: auto;
@@ -323,8 +323,7 @@ textarea:hover {
 /* ── Columns ── */
 .column {
   width: 100%;
-  min-width: 320px;
-  max-width: 360px;
+  min-width: 0;
   overflow: visible;
 }
 .column-cards { min-width: 0; display: grid; gap: 0.85rem; }
