@@ -1047,6 +1047,31 @@ textarea:hover {
   font-size: 0.95rem;
 }
 
+.auth-success {
+  color: #8ce0b0;
+  font-size: 0.95rem;
+}
+
+.auth-forgot-btn {
+  align-self: center;
+  color: #aeb8dd;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  font-size: 0.9rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.auth-forgot-btn:hover:not(:disabled) {
+  color: #ffffff;
+}
+
+.auth-forgot-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .auth-close-btn {
   position: absolute;
   top: 12px;

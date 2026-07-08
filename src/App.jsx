@@ -351,6 +351,7 @@ function AuthModal({
   onClose,
   onSubmit,
   onSwitchMode,
+  onForgotPassword,
 }) {
   const emailInputRef = useRef(null)
 
@@ -425,12 +426,28 @@ function AuthModal({
             </>
           )}
 
-          {error ? <p className="auth-error">{error}</p> : null}
-          {message ? <p className="auth-success">{message}</p> : null}
+          {error ? (
+            <p className="auth-error" data-testid="auth-status" role="alert">{error}</p>
+          ) : null}
+          {message ? (
+            <p className="auth-success" data-testid="auth-status" role="status">{message}</p>
+          ) : null}
 
           <button type="submit" className="primary-btn" disabled={loading}>
             {loading ? 'Please wait…' : mode === 'login' ? 'Log in' : 'Create account'}
           </button>
+
+          {mode === 'login' ? (
+            <button
+              type="button"
+              className="auth-forgot-btn"
+              data-testid="auth-forgot-password"
+              onClick={onForgotPassword}
+              disabled={loading}
+            >
+              Forgot password?
+            </button>
+          ) : null}
         </form>
 
         <p className="auth-switch-copy">
@@ -1590,6 +1607,28 @@ const handleAuthSubmit = async (event) => {
   }
 }
 
+const handleForgotPassword = async () => {
+  setAuthError('')
+  setAuthMessage('')
+
+  const email = authForm.email.trim()
+  if (!email) return setAuthError('Enter your email above, then select “Forgot password?” to get a reset link.')
+
+  setAuthLoading(true)
+
+  try {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${siteUrl}/`,
+    })
+    if (error) throw error
+    setAuthMessage(`Password reset email sent to ${email}. Check your inbox for the reset link.`)
+  } catch (error) {
+    setAuthError(error.message || 'We could not send the reset email. Please try again.')
+  } finally {
+    setAuthLoading(false)
+  }
+}
+
 const sendMessage = async (event) => {
   event.preventDefault()
 
@@ -1927,6 +1966,7 @@ if (!loading && !session) {
         onClose={closeAuthModal}
         onSubmit={handleAuthSubmit}
         onSwitchMode={setAuthMode}
+        onForgotPassword={handleForgotPassword}
       />
     </>
   )
