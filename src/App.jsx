@@ -183,6 +183,7 @@ function OnboardingGuide({
   boardName,
   projectCount,
   taskCount,
+  isExampleBoard,
   onDismiss,
   onFocusCreateTask,
   onScrollToMessages,
@@ -201,6 +202,9 @@ function OnboardingGuide({
           ) : (
             <> We created your first board automatically so you can dive right in.</>
           )}
+          {isExampleBoard ? (
+            <> It's pre-filled with an <strong>example board</strong> — sample projects and tasks you can freely edit or delete as you make it your own.</>
+          ) : null}
         </>
       ),
     },
@@ -266,10 +270,23 @@ function OnboardingGuide({
       <div className="onboarding-header">
         <div>
           <p className="eyebrow">Getting started</p>
-          <h2>Welcome to Inferno — here's how it works</h2>
+          <div className="onboarding-title-row">
+            <h2>Welcome to Inferno — here's how it works</h2>
+            {isExampleBoard ? (
+              <span className="example-board-badge" data-testid="example-board-badge">
+                Example board
+              </span>
+            ) : null}
+          </div>
           <p className="muted-copy">
             Board → Project → Task. Follow these steps to set up your production pipeline in a couple of minutes.
           </p>
+          {isExampleBoard ? (
+            <p className="onboarding-sample-callout" data-testid="onboarding-sample-callout">
+              Everything you see right now is a <strong>sample board</strong> we set up so you can explore.
+              Rename it, edit the tasks, or delete them — nothing here is permanent.
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -594,8 +611,10 @@ useEffect(() => {
 }, [session?.user?.id, session?.user?.email, currentBoardId, currentProjectId])
 
   // ── Load everything from Supabase ──
-  const loadAllData = async (userId, preferredBoardId = null) => {
-  setLoading(true)
+  const loadAllData = async (userId, preferredBoardId = null, { background = false } = {}) => {
+  // Background refreshes (realtime updates) must not flip the full-screen
+  // loading state — doing so unmounts the board and scrolls the page to the top.
+  if (!background) setLoading(true)
   setLoadError('')
 
 let { data: membershipRows, error: membershipError } = await supabase
@@ -765,7 +784,7 @@ setCurrentProjectId((currentId) =>
 useEffect(() => {
   if (!session?.user?.id || !currentBoardId) return
 
-  const refresh = () => loadAllData(session.user.id)
+  const refresh = () => loadAllData(session.user.id, null, { background: true })
 
   const projectsChannel = supabase
     .channel(`projects-${currentBoardId}`)
@@ -1173,6 +1192,14 @@ function dbToInvite(row) {
 }
   const currentProject = projects.find((p) => p.id === currentProjectId) || projects[0]
   const userId = session?.user?.id
+
+  // Heuristic: the seeded starter board still contains its original sample
+  // projects. Used to clearly label seeded data as an example board.
+  const isExampleBoard = useMemo(() => {
+    if (!projects.length) return false
+    const seededNames = new Set(defaultProjects.map((p) => p.name.toLowerCase()))
+    return projects.some((p) => p.name && seededNames.has(p.name.toLowerCase()))
+  }, [projects])
 
   // ── Kanban sections (board-level columns) ──
   const sections = useMemo(
@@ -1829,6 +1856,7 @@ return (
             boardName={currentBoard?.name}
             projectCount={projects.length}
             taskCount={tasks.length}
+            isExampleBoard={isExampleBoard}
             onDismiss={() => setShowOnboarding(false)}
             onFocusCreateTask={focusQuickCreate}
             onScrollToMessages={scrollToChatPanel}
@@ -1836,6 +1864,11 @@ return (
           />
         ) : (
           <div className="onboarding-reopen-row">
+            {isExampleBoard ? (
+              <span className="example-board-badge" data-testid="example-board-badge-collapsed">
+                Example board
+              </span>
+            ) : null}
             <button
               type="button"
               className="secondary-btn onboarding-reopen"

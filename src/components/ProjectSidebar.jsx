@@ -115,15 +115,18 @@ export default function ProjectSidebar({
         Sign out
       </button>
 
-      <div className="panel theme-panel">
-        <div className="section-heading">
-          <h2>Colors</h2>
+      <details className="panel theme-panel">
+        <summary className="theme-panel-summary">
+          <span>Customize colors</span>
+          <span className="theme-panel-caret" aria-hidden="true">▾</span>
+        </summary>
+        <div className="theme-panel-body">
+          <label>Accent<input type="color" value={theme.accent} onChange={(e) => setTheme((c) => ({ ...c, accent: e.target.value }))} /></label>
+          <label>Accent 2<input type="color" value={theme.accentSecondary} onChange={(e) => setTheme((c) => ({ ...c, accentSecondary: e.target.value }))} /></label>
+          <label>Surface<input type="color" value={theme.surface} onChange={(e) => setTheme((c) => ({ ...c, surface: e.target.value }))} /></label>
+          <label>Background<input type="color" value={theme.background} onChange={(e) => setTheme((c) => ({ ...c, background: e.target.value }))} /></label>
         </div>
-        <label>Accent<input type="color" value={theme.accent} onChange={(e) => setTheme((c) => ({ ...c, accent: e.target.value }))} /></label>
-        <label>Accent 2<input type="color" value={theme.accentSecondary} onChange={(e) => setTheme((c) => ({ ...c, accentSecondary: e.target.value }))} /></label>
-        <label>Surface<input type="color" value={theme.surface} onChange={(e) => setTheme((c) => ({ ...c, surface: e.target.value }))} /></label>
-        <label>Background<input type="color" value={theme.background} onChange={(e) => setTheme((c) => ({ ...c, background: e.target.value }))} /></label>
-      </div>
+      </details>
     </aside>
   )
 }
