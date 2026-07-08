@@ -78,7 +78,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 /* ── Shell ── */
 .app-shell {
   display: grid;
-  grid-template-columns: var(--sidebar-width) 1fr;
+  /* minmax(0, 1fr) lets the board column shrink below its content width so the
+     Kanban strip scrolls internally instead of expanding past the viewport and
+     getting clipped (which made the extra columns unreachable). */
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
   width: 100%;
   align-items: start;
@@ -1053,7 +1056,7 @@ textarea:hover {
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     /* Sidebar stacks on top, so the board no longer needs to clear it. */
     --sidebar-width: 0px;
   }

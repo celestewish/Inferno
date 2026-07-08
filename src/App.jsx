@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { supabase } from './lib/supabase'
+import { supabase, formatSupabaseError, isMissingColumnError } from './lib/supabase'
 import ProjectSidebar from './components/ProjectSidebar'
 import ProjectHeader from './components/ProjectHeader'
 import TaskBoard from './components/TaskBoard'
@@ -1783,7 +1783,9 @@ const dismissOnboarding = async () => {
     .from('profiles')
     .upsert({ id: userId, onboarding_seen_at: seenAt }, { onConflict: 'id' })
 
-  if (error) console.error('Dismiss onboarding error:', error)
+  // The guide is already hidden locally; a persistence failure should not
+  // break the app. Log a readable reason so a missing migration is obvious.
+  if (error) console.error('Dismiss onboarding error:', formatSupabaseError(error), error)
 }
 
 const updateProfileField = (field, value) => {
@@ -1800,6 +1802,8 @@ const saveProfile = async (event) => {
   setProfileSaved(false)
   setProfileError('')
 
+  // Only send known columns. Blank inputs become null rather than empty
+  // strings, and we never send undefined.
   const payload = {
     id: userId,
     display_name: profileForm.display_name.trim() || null,
@@ -1808,14 +1812,26 @@ const saveProfile = async (event) => {
     avatar_url: profileForm.avatar_url.trim() || null,
   }
 
-  const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' })
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert(payload, { onConflict: 'id' })
+    .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at')
+    .single()
 
   if (error) {
-    console.error('Save profile error:', error)
-    setProfileError('We could not save your profile. Please try again.')
+    console.error('Save profile error:', formatSupabaseError(error), error)
+    if (isMissingColumnError(error)) {
+      setProfileError(
+        'Your profile database is missing the new profile columns. Apply the ' +
+        'latest Supabase migrations (supabase/migrations) and try again.'
+      )
+    } else {
+      setProfileError(`We could not save your profile. ${formatSupabaseError(error)}`)
+    }
   } else {
-    setMyProfile((current) => ({ ...(current ?? {}), ...payload }))
-    setProfiles((current) => ({ ...current, [userId]: payload.display_name }))
+    const saved = data ?? payload
+    setMyProfile((current) => ({ ...(current ?? {}), ...saved }))
+    setProfiles((current) => ({ ...current, [userId]: saved.display_name }))
     setProfileSaved(true)
   }
 
