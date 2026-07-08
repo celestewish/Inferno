@@ -1,4 +1,21 @@
+import { useRef } from 'react'
 import InfernoLogo from './InfernoLogo'
+
+// Primary nav maps to real, in-page areas of the single-scroll board app.
+const PRIMARY_NAV = [
+  { id: 'board', label: 'Board', icon: '▦' },
+  { id: 'projects', label: 'Projects', icon: '◆' },
+  { id: 'tasks', label: 'Tasks', icon: '✎' },
+  { id: 'team', label: 'Team', icon: '◍' },
+]
+
+// Not built yet — shown as clearly-disabled "coming soon" items so the nav
+// reads like the full concept without offering broken navigation.
+const COMING_SOON_NAV = [
+  { id: 'calendar', label: 'Calendar', icon: '▤' },
+  { id: 'reports', label: 'Reports', icon: '▧' },
+  { id: 'settings', label: 'Settings', icon: '⚙' },
+]
 
 export default function ProjectSidebar({
   stats,
@@ -19,17 +36,76 @@ export default function ProjectSidebar({
   gameCategories,
   deleteProject,
   onSignOut,
+  activeSection = 'board',
+  onSelectSection,
+  userEmail,
 }) {
+  const projectsRef = useRef(null)
+  const teamRef = useRef(null)
+
   if (!project) return null
+
+  const handleNav = (sectionId) => {
+    onSelectSection?.(sectionId)
+    if (sectionId === 'projects') {
+      projectsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    } else if (sectionId === 'team') {
+      teamRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+  }
+
+  const accountLabel = userEmail || 'Signed in'
+  const accountInitial = (userEmail?.trim()?.[0] || 'I').toUpperCase()
+
   return (
-    <aside className="sidebar">
+    <aside className="sidebar app-nav" aria-label="Primary navigation">
       <div className="brand">
-  <InfernoLogo size={30} />
-  <div>
-    <h2>Inferno</h2>
-    <p className="muted-copy">The game design task board</p>
-  </div>
-</div>
+        <InfernoLogo size={30} />
+        <div>
+          <h2>Inferno</h2>
+          <p className="muted-copy">The game design task board</p>
+        </div>
+      </div>
+
+      <nav className="app-nav-menu" aria-label="Sections">
+        <p className="app-nav-heading">Workspace</p>
+        <ul className="app-nav-list">
+          {PRIMARY_NAV.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className={activeSection === item.id ? 'app-nav-item active' : 'app-nav-item'}
+                aria-current={activeSection === item.id ? 'page' : undefined}
+                data-testid={`nav-${item.id}`}
+                onClick={() => handleNav(item.id)}
+              >
+                <span className="app-nav-icon" aria-hidden="true">{item.icon}</span>
+                <span className="app-nav-label">{item.label}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        <p className="app-nav-heading">More</p>
+        <ul className="app-nav-list">
+          {COMING_SOON_NAV.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="app-nav-item"
+                disabled
+                aria-disabled="true"
+                data-testid={`nav-${item.id}`}
+                title={`${item.label} — coming soon`}
+              >
+                <span className="app-nav-icon" aria-hidden="true">{item.icon}</span>
+                <span className="app-nav-label">{item.label}</span>
+                <span className="app-nav-soon">Soon</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       <div className="panel stats-panel">
         <div>
@@ -46,7 +122,7 @@ export default function ProjectSidebar({
         </div>
       </div>
 
-      <div className="panel project-switcher">
+      <div className="panel project-switcher" ref={projectsRef} data-testid="project-switcher">
         <div className="section-heading">
           <h2>Projects</h2>
           <span>{projects.length}</span>
@@ -57,7 +133,12 @@ export default function ProjectSidebar({
               key={item.id}
               type="button"
               className={project.id === item.id ? 'project-tab active' : 'project-tab'}
-              onClick={() => setCurrentProjectId(item.id)}
+              aria-current={project.id === item.id ? 'true' : undefined}
+              data-testid={`project-tab-${item.id}`}
+              onClick={() => {
+                setCurrentProjectId(item.id)
+                onSelectSection?.('projects')
+              }}
             >
               <strong>{item.name}</strong>
               <small>{item.methodology}</small>
@@ -75,7 +156,7 @@ export default function ProjectSidebar({
               {methodologies.map((item) => <option key={item}>{item}</option>)}
             </select>
           </div>
-          <button type="submit" className="primary-btn">Create project</button>
+          <button type="submit" className="primary-btn" data-testid="create-project">Create project</button>
           <button
             type="button"
             className="danger-btn"
@@ -84,7 +165,7 @@ export default function ProjectSidebar({
         </form>
       </div>
 
-      <div className="panel team-panel">
+      <div className="panel team-panel" ref={teamRef} data-testid="team-panel">
         <div className="section-heading">
           <h2>Team</h2>
           <span>{teamMembers.length}</span>
@@ -107,14 +188,6 @@ export default function ProjectSidebar({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="danger-btn"
-        onClick={onSignOut}
-      >
-        Sign out
-      </button>
-
       <details className="panel theme-panel">
         <summary className="theme-panel-summary">
           <span>Customize colors</span>
@@ -127,6 +200,24 @@ export default function ProjectSidebar({
           <label>Background<input type="color" value={theme.background} onChange={(e) => setTheme((c) => ({ ...c, background: e.target.value }))} /></label>
         </div>
       </details>
+
+      <div className="app-nav-account" data-testid="account-block">
+        <div className="app-nav-account-id">
+          <span className="app-nav-avatar" aria-hidden="true">{accountInitial}</span>
+          <div className="app-nav-account-copy">
+            <strong title={accountLabel}>{accountLabel}</strong>
+            <small>Signed in</small>
+          </div>
+        </div>
+        <button
+          type="button"
+          className="danger-btn app-nav-signout"
+          data-testid="sign-out"
+          onClick={onSignOut}
+        >
+          Sign out
+        </button>
+      </div>
     </aside>
   )
 }

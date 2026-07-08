@@ -493,8 +493,10 @@ function App() {
   const [acceptingInviteId, setAcceptingInviteId] = useState(null)
   const [loadError, setLoadError] = useState('')
   const [showOnboarding, setShowOnboarding] = useState(true)
+  const [activeSection, setActiveSection] = useState('board')
   const chatPanelRef = useRef(null)
   const invitePanelRef = useRef(null)
+  const boardRef = useRef(null)
 
   // ── Auth listener ──
 useEffect(() => {
@@ -1486,6 +1488,16 @@ function dbToInvite(row) {
   }, 150)
 }
 
+const handleSelectSection = (section) => {
+  setActiveSection(section)
+  if (section === 'board') {
+    boardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else if (section === 'tasks') {
+    focusQuickCreate()
+  }
+  // 'projects' / 'team' scroll to their sidebar panels inside ProjectSidebar.
+}
+
 const scrollToChatPanel = () => {
   chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   window.setTimeout(() => {
@@ -1849,6 +1861,9 @@ return (
         gameCategories={gameCategories}
         deleteProject={deleteProject}
         onSignOut={() => supabase.auth.signOut()}
+        activeSection={activeSection}
+        onSelectSection={handleSelectSection}
+        userEmail={session?.user?.email}
       />
       <main className="board-area">
         {showOnboarding ? (
@@ -2116,6 +2131,7 @@ return (
     )}
   </div>
 </section>
+        <div ref={boardRef} data-testid="board-section">
         <TaskBoard
           columns={sections}
           tasks={filteredTasks}
@@ -2132,6 +2148,7 @@ return (
           onAddSection={addSection}
           onRemoveSection={removeSection}
         />
+        </div>
       </main>
     </div>
 
