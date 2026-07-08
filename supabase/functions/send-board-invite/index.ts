@@ -1,36 +1,18 @@
-import { Resend } from 'npm:resend'
-
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+const DEFAULT_FROM = 'Inferno <celeste@infernotaskboard.com>'
 
-  try {
-    const { email, role, acceptUrl } = await req.json()
+const json = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 
-    const resendApiKey = Deno.env.get('RESEND_API_KEY')
-    if (!resendApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Missing RESEND_API_KEY' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
-    const resend = new Resend(resendApiKey)
-
-    const { data, error } = await resend.emails.send({
-      from: 'Inferno <onboarding@resend.dev>',
-      to: email,
-      subject: 'You’ve been invited to join an Inferno board',
-      html: `
+const inviteHtml = (role: string, acceptUrl: string) => `
   <div style="margin:0;padding:0;background:#09111f;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#09111f;padding:40px 16px;">
       <tr>
@@ -88,33 +70,73 @@ Deno.serve(async (req) => {
       </tr>
     </table>
   </div>
-`,
-    })
+`
 
-    if (error) {
-      return new Response(
-        JSON.stringify({ error }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      )
-    }
-
-    return new Response(
-      JSON.stringify({ success: true, data }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
-  } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    )
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
+
+  if (req.method !== 'POST') {
+    return json({ error: 'Method not allowed' }, 405)
+  }
+
+  const resendApiKey = Deno.env.get('RESEND_API_KEY')
+  if (!resendApiKey) {
+    console.error('RESEND_API_KEY is not configured')
+    return json({ error: 'Email service is not configured' }, 500)
+  }
+
+  let payload: { email?: string; role?: string; acceptUrl?: string }
+  try {
+    payload = await req.json()
+  } catch {
+    return json({ error: 'Invalid JSON body' }, 400)
+  }
+
+  const { email, role, acceptUrl } = payload
+  if (!email || !acceptUrl) {
+    return json({ error: 'Missing required fields: email and acceptUrl' }, 400)
+  }
+
+  const from = Deno.env.get('INVITE_FROM_EMAIL') || DEFAULT_FROM
+  const roleLabel = role || 'collaborator'
+
+  let resendResponse: Response
+  try {
+    resendResponse = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from,
+        to: email,
+        subject: 'You’ve been invited to join an Inferno board',
+        html: inviteHtml(roleLabel, acceptUrl),
+      }),
+    })
+  } catch (err) {
+    console.error('Failed to reach Resend:', err)
+    return json({ error: 'Failed to reach email service' }, 502)
+  }
+
+  if (!resendResponse.ok) {
+    let detail: unknown
+    try {
+      detail = await resendResponse.json()
+    } catch {
+      detail = await resendResponse.text().catch(() => '')
+    }
+    console.error('Resend returned an error:', resendResponse.status, detail)
+    const message =
+      (detail && typeof detail === 'object' && 'message' in detail
+        ? (detail as { message?: string }).message
+        : undefined) || 'Email service rejected the request'
+    return json({ error: message, status: resendResponse.status }, 502)
+  }
+
+  const data = await resendResponse.json().catch(() => ({}))
+  return json({ success: true, data }, 200)
 })
