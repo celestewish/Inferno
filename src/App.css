@@ -337,6 +337,28 @@ textarea:hover {
 .column-header, .section-heading, .member-chip-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 .column-header { margin-bottom: 1rem; }
 .column-header span, .section-heading span { width: 2rem; height: 2rem; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.06); color: #b9c3ef; }
+.column-header-actions { display: flex; align-items: center; gap: 0.4rem; }
+.section-remove-btn {
+  width: 1.9rem; height: 1.9rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,99,132,0.08); color: #ff8ba0; font-size: 0.85rem; line-height: 1;
+  cursor: pointer; display: grid; place-items: center; transition: background 140ms ease, border-color 140ms ease;
+}
+.section-remove-btn:hover { background: rgba(255,99,132,0.18); border-color: rgba(255,99,132,0.4); }
+
+/* ── Add-section composer ── */
+.column-add-section {
+  border: 1px dashed rgba(255,255,255,0.14);
+  border-radius: 20px;
+  padding: 1rem;
+  background: rgba(255,255,255,0.02);
+  align-self: start;
+}
+.add-section-form { display: grid; grid-template-columns: 1fr auto; gap: 0.5rem; }
+.add-section-form input {
+  width: 100%; padding: 0.6rem 0.75rem; border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); color: #e8ecff;
+}
+.add-section-hint { margin: 0.65rem 0 0; font-size: 0.78rem; color: #7f8abb; line-height: 1.5; }
 
 /* ── Task cards ── */
 .task-card {

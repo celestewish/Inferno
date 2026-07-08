@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import InlineText from './InlineText'
 import InfernoLogo from './InfernoLogo'
 
@@ -16,7 +17,19 @@ export default function TaskBoard({
   setDraggingId,
   moveTask,
   onCreateFirstTask,
+  onAddSection,
+  onRemoveSection,
 }) {
+  const [newSection, setNewSection] = useState('')
+
+  const submitSection = (event) => {
+    event.preventDefault()
+    const label = newSection.trim()
+    if (!label) return
+    onAddSection?.(label)
+    setNewSection('')
+  }
+
   const isEmpty = tasks.length === 0
 
   if (isEmpty) {
@@ -79,7 +92,20 @@ export default function TaskBoard({
           >
             <div className="column-header">
               <h3>{column.label}</h3>
-              <span>{columnTasks.length}</span>
+              <div className="column-header-actions">
+                <span>{columnTasks.length}</span>
+                {onRemoveSection && columns.length > 1 ? (
+                  <button
+                    type="button"
+                    className="section-remove-btn"
+                    aria-label={`Remove ${column.label} section`}
+                    title="Remove section"
+                    onClick={() => onRemoveSection(column.id)}
+                  >
+                    ✕
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             <div className="column-cards">
@@ -225,6 +251,29 @@ export default function TaskBoard({
           </div>
         )
       })}
+
+      {onAddSection ? (
+        <div className="column column-add-section">
+          <div className="column-header">
+            <h3>Add section</h3>
+          </div>
+          <form className="add-section-form" onSubmit={submitSection}>
+            <input
+              value={newSection}
+              onChange={(event) => setNewSection(event.target.value)}
+              placeholder="New section name"
+              aria-label="New section name"
+              maxLength={40}
+            />
+            <button type="submit" className="secondary-btn" disabled={!newSection.trim()}>
+              Add
+            </button>
+          </form>
+          <p className="add-section-hint">
+            Sections are shared across this board's projects and saved automatically.
+          </p>
+        </div>
+      ) : null}
     </section>
   )
 }

@@ -7,6 +7,9 @@ export const defaultTheme = {
 
 export const defaultTeamMembers = ['Celeste', 'Unassigned']
 
+// Default Kanban sections (columns / status lanes) for a new board.
+// Boards persist their own sections in boards.kanban_sections; this is the
+// fallback used for seeding and for older boards missing the column.
 export const columns = [
   { id: 'backlog', label: 'Backlog' },
   { id: 'todo', label: 'To Do' },
@@ -14,6 +17,44 @@ export const columns = [
   { id: 'review', label: 'Review' },
   { id: 'done', label: 'Done' },
 ]
+
+export const defaultSections = columns
+
+// Fallback status used when a section is removed while it still holds tasks.
+export const FALLBACK_STATUS = 'backlog'
+
+// Turn a human label into a stable, unique section id.
+export const slugifySection = (label, existingIds = []) => {
+  const base =
+    label
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') || 'section'
+  let id = base
+  let n = 2
+  while (existingIds.includes(id)) {
+    id = `${base}-${n}`
+    n += 1
+  }
+  return id
+}
+
+// Merge a board's saved sections with any task statuses that aren't covered,
+// so existing/unknown statuses always render as a lane instead of disappearing.
+export const resolveSections = (savedSections, tasks = []) => {
+  const base =
+    Array.isArray(savedSections) && savedSections.length ? savedSections : defaultSections
+  const known = new Set(base.map((section) => section.id))
+  const orphanStatuses = [
+    ...new Set(tasks.map((task) => task.status).filter((status) => status && !known.has(status))),
+  ]
+  const orphanSections = orphanStatuses.map((status) => ({
+    id: status,
+    label: status.charAt(0).toUpperCase() + status.slice(1),
+  }))
+  return [...base, ...orphanSections]
+}
 
 export const methodologies = ['Agile Sprint', 'Kanban', 'Vertical Slice', 'Milestone Driven', 'Playtest Driven']
 export const gameCategories = ['Educational', 'Horror', 'Strategy', 'Narrative', 'Hyper-Casual', 'Adventure', 'FPS', 'Action']

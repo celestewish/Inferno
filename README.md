@@ -10,6 +10,12 @@ This app talks to Supabase and needs two variables **at build time** (Vite inlin
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
+Optional:
+
+- `VITE_SITE_URL` — canonical site URL used for auth email-confirmation redirects
+  and invite accept links. Defaults to `https://infernotaskboard.com/` when unset.
+  Set it to `http://localhost:5173` for local development.
+
 Local development: copy `.env.example` to `.env` and fill in your values.
 
 ## Deploying to IONOS Deploy Now
@@ -55,8 +61,33 @@ supabase secrets set \
 - `RESEND_API_KEY` **(required)** — the function returns a 500 JSON error if missing.
 - `INVITE_FROM_EMAIL` *(optional)* — defaults to `Inferno <celeste@infernotaskboard.com>`.
 
-The invite link (`acceptUrl`) is built in the browser from the current origin, so no
-`SITE_URL`/`APP_URL` secret is required for the function.
+The invite link (`acceptUrl`) is built in the browser from `VITE_SITE_URL` (falling
+back to `https://infernotaskboard.com/`) and sent to the function, so no
+`SITE_URL`/`APP_URL` secret is required for the function itself.
+
+## Supabase Auth URL configuration
+
+Email confirmation and magic-link redirects are controlled by Supabase, not the app.
+In the Supabase dashboard under **Authentication → URL Configuration**:
+
+- **Site URL**: `https://infernotaskboard.com`
+- **Redirect URLs**: add `https://infernotaskboard.com/**` (and any local dev origin,
+  e.g. `http://localhost:5173/**`)
+
+The signup flow also passes `emailRedirectTo` derived from `VITE_SITE_URL`, so
+confirmation links return users to the production domain instead of localhost.
+
+## Database migrations
+
+Schema changes live in `supabase/migrations/`. Apply them with the Supabase CLI:
+
+```bash
+supabase db push
+```
+
+`20260708000000_add_kanban_sections.sql` adds a non-destructive `kanban_sections`
+`jsonb` column to `boards` (defaulted to the standard five-lane pipeline), which
+persists each board's Kanban columns. It is safe to re-run.
 
 ### 3. Deploy the function
 

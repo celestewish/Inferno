@@ -7,18 +7,21 @@ import TaskBoard from './components/TaskBoard'
 import DetailsPanel from './components/DetailsPanel'
 import TaskModal from './components/TaskModal'
 import {
-  columns,
   createActivity,
   defaultProjects,
   defaultTasks,
   defaultTeamMembers,
   defaultTheme,
   disciplines,
+  FALLBACK_STATUS,
   gameCategories,
   labelPool,
   methodologies,
   priorities,
+  resolveSections,
+  slugifySection,
 } from './data/defaultData'
+import { buildInviteUrl, siteUrl } from './lib/site'
 
 // board_invites uses owner/admin/member; board_members uses owner/editor/viewer.
 const inviteRoleToMemberRole = (role) =>
@@ -1171,6 +1174,66 @@ function dbToInvite(row) {
   const currentProject = projects.find((p) => p.id === currentProjectId) || projects[0]
   const userId = session?.user?.id
 
+  // ── Kanban sections (board-level columns) ──
+  const sections = useMemo(
+    () => resolveSections(currentBoard?.kanban_sections, tasks),
+    [currentBoard, tasks]
+  )
+
+  const persistSections = async (nextSections) => {
+    if (!currentBoardId) return
+    setBoards((current) =>
+      current.map((board) =>
+        board.id === currentBoardId ? { ...board, kanban_sections: nextSections } : board
+      )
+    )
+    const { error } = await supabase
+      .from('boards')
+      .update({ kanban_sections: nextSections })
+      .eq('id', currentBoardId)
+    if (error) console.error('Persist sections error:', error)
+  }
+
+  const addSection = async (label) => {
+    const name = (label ?? '').trim()
+    if (!name || name.length > 40) return
+    if (sections.some((section) => section.label.toLowerCase() === name.toLowerCase())) return
+    const id = slugifySection(name, sections.map((section) => section.id))
+    await persistSections([...sections, { id, label: name }])
+  }
+
+  const removeSection = async (sectionId) => {
+    if (sections.length <= 1) return
+    const section = sections.find((item) => item.id === sectionId)
+    const remaining = sections.filter((item) => item.id !== sectionId)
+    const fallbackId = remaining.find((item) => item.id === FALLBACK_STATUS)?.id ?? remaining[0].id
+    const fallbackLabel = remaining.find((item) => item.id === fallbackId)?.label ?? fallbackId
+    const affected = tasks.filter((task) => task.status === sectionId)
+
+    const confirmed = window.confirm(
+      affected.length
+        ? `Remove the "${section?.label}" section? Its ${affected.length} task${affected.length === 1 ? '' : 's'} will move to "${fallbackLabel}".`
+        : `Remove the "${section?.label}" section?`
+    )
+    if (!confirmed) return
+
+    if (affected.length) {
+      const completed = fallbackId === 'done'
+      setTasks((current) =>
+        current.map((task) =>
+          task.status === sectionId ? { ...task, status: fallbackId, completed } : task
+        )
+      )
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: fallbackId, completed })
+        .in('id', affected.map((task) => task.id))
+      if (error) console.error('Reassign tasks on section removal error:', error)
+    }
+
+    await persistSections(remaining)
+  }
+
   // ── Filtered tasks ──
   const filteredTasks = useMemo(() => {
     if (!currentProject) return []
@@ -1457,7 +1520,11 @@ const handleAuthSubmit = async (event) => {
       if (error) throw error
       setAuthMode(null)
     } else {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: `${siteUrl}/` },
+      })
       if (error) throw error
       setAuthMessage('Account created. Check your email if confirmation is enabled.')
     }
@@ -1599,7 +1666,7 @@ const createInvite = async (event) => {
     }
 
     const invite = dbToInvite(data)
-    const acceptUrl = `${window.location.origin}${window.location.pathname}?invite=${invite.token}`
+    const acceptUrl = buildInviteUrl(invite.token)
 
     setInvites((current) => [invite, ...current])
     setInviteEmail('')
@@ -2017,7 +2084,7 @@ return (
   </div>
 </section>
         <TaskBoard
-          columns={columns}
+          columns={sections}
           tasks={filteredTasks}
           teamMembers={teamMembers}
           updateTask={updateTask}
@@ -2029,6 +2096,8 @@ return (
           setDraggingId={setDraggingId}
           moveTask={moveTask}
           onCreateFirstTask={focusQuickCreate}
+          onAddSection={addSection}
+          onRemoveSection={removeSection}
         />
       </main>
     </div>
@@ -2038,7 +2107,7 @@ return (
       setEditingTask={setEditingTask}
       handleEditSave={handleEditSave}
       teamMembers={teamMembers}
-      columns={columns}
+      columns={sections}
       disciplines={disciplines}
       priorities={priorities}
       labelPool={labelPool}
