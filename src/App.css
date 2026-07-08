@@ -1097,16 +1097,91 @@ textarea:hover {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
-    /* Sidebar stacks on top, so the board no longer needs to clear it. */
+    /* Sidebar becomes a fixed bottom bar, so it leaves the grid flow entirely. */
     --sidebar-width: 0px;
   }
-  .sidebar {
+
+  /* ── Mobile: sidebar → fixed bottom tab bar ──
+     Pulling the nav out of flow drops the section content to the very top of
+     the screen, so the onboarding guide (first child of .board-area) is the
+     first thing a first-time user sees on mobile — no scrolling past nav. */
+  .sidebar.app-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 30;
+    flex-direction: row;
+    align-items: stretch;
     min-height: unset;
-    position: static;
+    gap: 0;
+    padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
     border-right: none;
-    border-bottom: 1px solid var(--card-border);
-    gap: 0.9rem;
+    border-top: 1px solid var(--card-border);
+    border-bottom: none;
+    background: color-mix(in srgb, var(--surface-custom) 92%, #05070f);
+    box-shadow: 0 -12px 30px rgba(4, 6, 14, 0.4);
+    overflow: visible;
   }
+
+  /* Only the section links live in the bar; the rest is reachable via the
+     Projects, Reports and Settings pages. */
+  .app-nav .brand,
+  .app-nav-heading,
+  .app-nav .stats-panel,
+  .app-nav .project-switcher,
+  .app-nav-account {
+    display: none;
+  }
+
+  .app-nav-menu {
+    flex: 1 1 auto;
+    display: flex;
+    gap: 0.15rem;
+    min-width: 0;
+  }
+
+  /* Flatten both grouped lists into one evenly spaced tab row. */
+  .app-nav-list { display: contents; }
+  .app-nav-list li { flex: 1 1 0; min-width: 0; }
+
+  .app-nav-item {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.15rem;
+    min-height: 52px;
+    border-radius: var(--radius-sm);
+    text-align: center;
+    font-size: 0.66rem;
+    font-weight: 600;
+  }
+
+  .app-nav-item.active {
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
+    color: var(--accent);
+  }
+
+  .app-nav-item.active .app-nav-icon {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent-secondary) 22%, transparent));
+    color: white;
+  }
+
+  .app-nav-icon { width: 1.7rem; height: 1.7rem; font-size: 1rem; }
+
+  .app-nav-label {
+    flex: 0 0 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    line-height: 1.1;
+  }
+
+  /* Reserve space so the fixed bar never covers content or primary actions. */
+  .board-area { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+
   .details-grid,
   .hero-panel {
     grid-template-columns: 1fr;
