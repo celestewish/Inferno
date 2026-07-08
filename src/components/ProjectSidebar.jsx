@@ -24,11 +24,16 @@ export default function ProjectSidebar({
   activeSection = 'board',
   onSelectSection,
   userEmail,
+  profile,
 }) {
   if (!project) return null
 
-  const accountLabel = userEmail || 'Signed in'
-  const accountInitial = (userEmail?.trim()?.[0] || 'I').toUpperCase()
+  const displayName = profile?.display_name?.trim()
+  const gamerTag = profile?.gamer_tag?.trim()
+  const avatarUrl = profile?.avatar_url?.trim()
+  const accountLabel = displayName || userEmail || 'Signed in'
+  const accountSub = gamerTag || (displayName ? userEmail : null) || 'Signed in'
+  const accountInitial = (displayName?.[0] || userEmail?.trim()?.[0] || 'I').toUpperCase()
 
   const renderNavItem = (item) => (
     <li key={item.id}>
@@ -114,10 +119,16 @@ export default function ProjectSidebar({
 
       <div className="app-nav-account" data-testid="account-block">
         <div className="app-nav-account-id">
-          <span className="app-nav-avatar" aria-hidden="true">{accountInitial}</span>
+          <span className="app-nav-avatar" aria-hidden="true">
+            {avatarUrl ? (
+              <img className="app-nav-avatar-img" src={avatarUrl} alt="" />
+            ) : (
+              accountInitial
+            )}
+          </span>
           <div className="app-nav-account-copy">
             <strong title={accountLabel}>{accountLabel}</strong>
-            <small>Signed in</small>
+            <small title={accountSub ?? undefined}>{accountSub}</small>
           </div>
         </div>
         <button
