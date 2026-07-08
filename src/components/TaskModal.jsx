@@ -1,3 +1,5 @@
+import DatePicker from './DatePicker.jsx'
+
 export default function TaskModal({ editingTask, setEditingTask, handleEditSave, teamMembers, columns, disciplines, priorities, labelPool, deleteTask, addSubtaskToEditing }) {
   if (!editingTask) return null
 
@@ -40,7 +42,14 @@ export default function TaskModal({ editingTask, setEditingTask, handleEditSave,
             <input value={editingTask.sprint} onChange={(e) => setEditingTask((c) => ({ ...c, sprint: e.target.value }))} placeholder="Sprint" />
             <input value={editingTask.estimate} onChange={(e) => setEditingTask((c) => ({ ...c, estimate: e.target.value }))} placeholder="Estimate" />
           </div>
-          <input value={editingTask.due} onChange={(e) => setEditingTask((c) => ({ ...c, due: e.target.value }))} placeholder="Due date" />
+          <div className="form-field">
+            <span className="form-field-label">Due date</span>
+            <DatePicker
+              value={editingTask.due}
+              onChange={(iso) => setEditingTask((c) => ({ ...c, due: iso }))}
+              onClear={() => setEditingTask((c) => ({ ...c, due: '' }))}
+            />
+          </div>
           <div className="modal-labels">
             {labelPool.map((label) => (
               <button
