@@ -51,7 +51,7 @@ export default function ProjectSidebar({
   )
 
   return (
-    <aside className="sidebar app-nav" aria-label="Primary navigation">
+    <aside className="sidebar app-nav" aria-label="Primary navigation" data-testid="app-bottom-nav">
       <div className="brand">
         <InfernoLogo size={30} />
         <div>
