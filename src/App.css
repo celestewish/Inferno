@@ -1436,6 +1436,7 @@ textarea:hover {
 
 /* Settings view */
 .settings-panel { display: grid; gap: 0.9rem; justify-items: start; }
+.settings-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
 .settings-panel .theme-panel-body { display: grid; gap: 0.6rem; width: 100%; }
 .settings-list { display: grid; gap: 0.6rem; width: 100%; margin: 0; }
 .settings-list > div {

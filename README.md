@@ -108,6 +108,11 @@ Current migrations:
   re-asserts every profile column, re-creates the RLS policies, and refreshes
   the PostgREST schema cache. Fixes environments where `supabase db push`
   reports "up to date" but the columns are still missing.
+- `20260712000000_add_profile_theme_settings.sql` — adds a nullable
+  `theme_settings` `jsonb` column to `profiles` so the **Settings → Appearance**
+  swatches (accent, glow, surface, background) persist per user. A null value
+  means "use the default theme". The existing update RLS policy already covers
+  it, so no policy change is needed.
 
 > **"Your profile database is missing the new profile columns."**
 > This message in **Settings → Profile** means the profile columns are absent

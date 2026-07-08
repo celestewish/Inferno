@@ -23,6 +23,7 @@ import {
   methodologies,
   priorities,
   resolveSections,
+  sanitizeTheme,
   slugifySection,
 } from './data/defaultData'
 import { buildInviteUrl, siteUrl } from './lib/site'
@@ -525,6 +526,9 @@ function App() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileSaved, setProfileSaved] = useState(false)
   const [profileError, setProfileError] = useState('')
+  const [savingTheme, setSavingTheme] = useState(false)
+  const [themeSaved, setThemeSaved] = useState(false)
+  const [themeError, setThemeError] = useState('')
   const [passwordResetStatus, setPasswordResetStatus] = useState('idle')
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
 
@@ -825,6 +829,26 @@ setCurrentProjectId((currentId) =>
     }
   } else {
     setProfiles({})
+  }
+
+  // Load and apply the signed-in user's saved appearance. Queried separately
+  // from the profile columns above so that a missing theme_settings column
+  // (migration not yet applied) degrades gracefully to the default theme
+  // instead of breaking core profile loading. Skipped on background refreshes
+  // so an in-progress, unsaved swatch edit is not reverted underfoot.
+  if (!background) {
+    const { data: themeRow, error: themeLoadError } = await supabase
+      .from('profiles')
+      .select('theme_settings')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (themeLoadError) {
+      console.error('Theme settings load error:', formatSupabaseError(themeLoadError), themeLoadError)
+      setTheme(defaultTheme)
+    } else {
+      setTheme(themeRow?.theme_settings ? sanitizeTheme(themeRow.theme_settings) : defaultTheme)
+    }
   }
 }
 
@@ -1882,6 +1906,62 @@ const saveProfile = async (event) => {
   setSavingProfile(false)
 }
 
+const updateThemeToken = (key, value) => {
+  setThemeSaved(false)
+  setThemeError('')
+  setTheme((current) => ({ ...current, [key]: value }))
+}
+
+// Persist appearance to the user's profile row. Kept separate from saveProfile
+// so a missing theme_settings column never blocks saving the profile fields.
+const persistThemeSettings = async (nextTheme) => {
+  if (!userId || savingTheme) return
+
+  setSavingTheme(true)
+  setThemeSaved(false)
+  setThemeError('')
+
+  const themeSettings = sanitizeTheme(nextTheme)
+  const { data, error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, theme_settings: themeSettings }, { onConflict: 'id' })
+    .select('id, theme_settings')
+    .single()
+
+  if (error) {
+    console.error('Save theme error:', formatSupabaseError(error), error)
+    if (isMissingColumnError(error)) {
+      setThemeError(
+        'Your profile database is missing the theme_settings column. Apply the ' +
+        'latest Supabase migrations, then try again — from the project root run ' +
+        '`supabase db push` (linking first with `supabase link --project-ref <ref>` ' +
+        'if the project is not linked yet). See README “Database migrations”.'
+      )
+    } else {
+      setThemeError(`We could not save your colors. ${formatSupabaseError(error)}`)
+    }
+  } else {
+    setMyProfile((current) => ({
+      ...(current ?? { id: userId }),
+      theme_settings: data?.theme_settings ?? themeSettings,
+    }))
+    setThemeSaved(true)
+  }
+
+  setSavingTheme(false)
+}
+
+const saveTheme = () => persistThemeSettings(theme)
+
+// Reset applies the default immediately and persists it, so the change sticks
+// across reloads without a second click.
+const resetTheme = () => {
+  setThemeSaved(false)
+  setThemeError('')
+  setTheme(defaultTheme)
+  persistThemeSettings(defaultTheme)
+}
+
 const sendPasswordReset = async () => {
   const email = session?.user?.email
   if (!email || passwordResetStatus === 'sending') return
@@ -2311,7 +2391,8 @@ return (
                 <h2>Appearance</h2>
               </div>
               <p className="muted-copy">
-                Tap a color to customize the board. Each swatch shows the current color.
+                Tap a color to customize the board, then save to keep it on your
+                profile across devices. Each swatch shows the current color.
               </p>
               <div className="theme-swatch-row" data-testid="theme-swatches">
                 {[
@@ -2327,21 +2408,37 @@ return (
                         value={theme[key]}
                         data-testid={`theme-swatch-${key}`}
                         aria-label={`${label} color`}
-                        onChange={(e) => setTheme((c) => ({ ...c, [key]: e.target.value }))}
+                        onChange={(e) => updateThemeToken(key, e.target.value)}
                       />
                     </span>
                     <span className="theme-swatch-label">{label}</span>
                   </label>
                 ))}
               </div>
-              <button
-                type="button"
-                className="secondary-btn"
-                data-testid="settings-reset-theme"
-                onClick={() => setTheme(defaultTheme)}
-              >
-                Reset to default colors
-              </button>
+              {themeError ? <p className="auth-error">{themeError}</p> : null}
+              {themeSaved ? (
+                <p className="auth-success" data-testid="theme-saved">Colors saved.</p>
+              ) : null}
+              <div className="settings-actions">
+                <button
+                  type="button"
+                  className="primary-btn"
+                  data-testid="settings-save-theme"
+                  onClick={saveTheme}
+                  disabled={savingTheme}
+                >
+                  {savingTheme ? 'Saving…' : 'Save colors'}
+                </button>
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  data-testid="settings-reset-theme"
+                  onClick={resetTheme}
+                  disabled={savingTheme}
+                >
+                  Reset to default colors
+                </button>
+              </div>
             </div>
 
             <div className="panel settings-panel" data-testid="settings-profile">
