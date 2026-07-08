@@ -6,6 +6,9 @@ import ProjectHeader from './components/ProjectHeader'
 import TaskBoard from './components/TaskBoard'
 import DetailsPanel from './components/DetailsPanel'
 import TaskModal from './components/TaskModal'
+import TasksView from './components/TasksView'
+import CalendarView from './components/CalendarView'
+import ReportsView from './components/ReportsView'
 import {
   createActivity,
   defaultProjects,
@@ -494,9 +497,6 @@ function App() {
   const [loadError, setLoadError] = useState('')
   const [showOnboarding, setShowOnboarding] = useState(true)
   const [activeSection, setActiveSection] = useState('board')
-  const chatPanelRef = useRef(null)
-  const invitePanelRef = useRef(null)
-  const boardRef = useRef(null)
 
   // ── Auth listener ──
 useEffect(() => {
@@ -1490,27 +1490,16 @@ function dbToInvite(row) {
 
 const handleSelectSection = (section) => {
   setActiveSection(section)
-  if (section === 'board') {
-    boardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  } else if (section === 'tasks') {
-    focusQuickCreate()
-  }
-  // 'projects' / 'team' scroll to their sidebar panels inside ProjectSidebar.
+  window.scrollTo({ top: 0, behavior: 'auto' })
 }
 
-const scrollToChatPanel = () => {
-  chatPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  window.setTimeout(() => {
-    chatPanelRef.current?.querySelector('.chat-form input')?.focus()
-  }, 200)
+// Onboarding actions now switch to the relevant page instead of scrolling.
+const goToCreateTask = () => {
+  setActiveSection('board')
+  focusQuickCreate()
 }
 
-const scrollToInvitePanel = () => {
-  invitePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  window.setTimeout(() => {
-    invitePanelRef.current?.querySelector('.invite-form input')?.focus()
-  }, 200)
-}
+const goToTeam = () => setActiveSection('team')
 
 const openLogin = () => {
   setAuthError('')
@@ -1847,134 +1836,381 @@ return (
         project={currentProject}
         projects={projects}
         setCurrentProjectId={setCurrentProjectId}
-        newProject={newProject}
-        setNewProject={setNewProject}
-        createProject={createProject}
-        teamMembers={teamMembers}
-        newMember={newMember}
-        setNewMember={setNewMember}
-        addTeamMember={addTeamMember}
-        removeTeamMember={removeTeamMember}
-        theme={theme}
-        setTheme={setTheme}
-        methodologies={methodologies}
-        gameCategories={gameCategories}
-        deleteProject={deleteProject}
         onSignOut={() => supabase.auth.signOut()}
         activeSection={activeSection}
         onSelectSection={handleSelectSection}
         userEmail={session?.user?.email}
       />
-      <main className="board-area">
-        {showOnboarding ? (
-          <OnboardingGuide
-            boardName={currentBoard?.name}
-            projectCount={projects.length}
-            taskCount={tasks.length}
-            isExampleBoard={isExampleBoard}
-            onDismiss={() => setShowOnboarding(false)}
-            onFocusCreateTask={focusQuickCreate}
-            onScrollToMessages={scrollToChatPanel}
-            onScrollToInvites={scrollToInvitePanel}
-          />
-        ) : (
-          <div className="onboarding-reopen-row">
-            {isExampleBoard ? (
-              <span className="example-board-badge" data-testid="example-board-badge-collapsed">
-                Example board
-              </span>
-            ) : null}
-            <button
-              type="button"
-              className="secondary-btn onboarding-reopen"
-              data-testid="onboarding-reopen"
-              onClick={() => setShowOnboarding(true)}
-            >
-              Getting started guide
-            </button>
-          </div>
-        )}
-        <ProjectHeader
-          project={currentProject}
-          updateProjectField={updateProjectField}
-          methodologies={methodologies}
-          gameCategories={gameCategories}
-          deleteProject={deleteProject}
-        />
-        <section className="toolbar panel">
-          <form className="toolbar-group" onSubmit={handleCreateTask}>
-            <input
-              className="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tasks or assignees"
+      <main className="board-area" data-testid={`view-${activeSection}`}>
+        {activeSection === 'board' ? (
+          showOnboarding ? (
+            <OnboardingGuide
+              boardName={currentBoard?.name}
+              projectCount={projects.length}
+              taskCount={tasks.length}
+              isExampleBoard={isExampleBoard}
+              onDismiss={() => setShowOnboarding(false)}
+              onFocusCreateTask={goToCreateTask}
+              onScrollToMessages={goToTeam}
+              onScrollToInvites={goToTeam}
             />
-            <div className="filter-chips">
-              {['All', ...disciplines].map((item) => (
-                <button
-                  key={item}
-                  className={filter === item ? 'chip active' : 'chip'}
-                  onClick={() => setFilter(item)}
-                  type="button"
+          ) : (
+            <div className="onboarding-reopen-row">
+              {isExampleBoard ? (
+                <span className="example-board-badge" data-testid="example-board-badge-collapsed">
+                  Example board
+                </span>
+              ) : null}
+              <button
+                type="button"
+                className="secondary-btn onboarding-reopen"
+                data-testid="onboarding-reopen"
+                onClick={() => setShowOnboarding(true)}
+              >
+                Getting started guide
+              </button>
+            </div>
+          )
+        ) : null}
+
+        {activeSection === 'board' ? (
+          <>
+            <ProjectHeader
+              project={currentProject}
+              updateProjectField={updateProjectField}
+              methodologies={methodologies}
+              gameCategories={gameCategories}
+              deleteProject={deleteProject}
+            />
+            <section className="toolbar panel">
+              <form className="toolbar-group" onSubmit={handleCreateTask}>
+                <input
+                  className="search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search tasks or assignees"
+                />
+                <div className="filter-chips">
+                  {['All', ...disciplines].map((item) => (
+                    <button
+                      key={item}
+                      className={filter === item ? 'chip active' : 'chip'}
+                      onClick={() => setFilter(item)}
+                      type="button"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+                <div className="quick-create-grid">
+                  <input
+                    ref={quickCreateInputRef}
+                    data-testid="quick-create-input"
+                    value={newTask.title}
+                    onChange={(e) => setNewTask((c) => ({ ...c, title: e.target.value }))}
+                    placeholder="Add a new feature or task"
+                  />
+                  <select
+                    value={newTask.assignee}
+                    onChange={(e) => setNewTask((c) => ({ ...c, assignee: e.target.value }))}
+                  >
+                    {teamMembers.map((m) => <option key={m}>{m}</option>)}
+                  </select>
+                  <select
+                    value={newTask.discipline}
+                    onChange={(e) => setNewTask((c) => ({ ...c, discipline: e.target.value }))}
+                  >
+                    {disciplines.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                  <button type="submit" className="primary-btn">Create task</button>
+                </div>
+                <div className="presence-strip">
+                <span className="presence-label">
+                  Online now ({onlineUsers.length})
+                </span>
+
+                <div className="presence-list">
+                  {onlineUsers.map((user) => {
+                    const activeProject = projects.find((p) => p.id === user.projectId)
+
+                    return (
+                      <div
+                        key={`${user.userId}-${user.onlineAt ?? 'now'}`}
+                        className="presence-pill"
+                        title={
+                          activeProject
+                            ? `${user.email} · Viewing ${activeProject.name}`
+                            : user.email
+                        }
+                      >
+                        <span className="presence-dot" />
+                        <span className="presence-name">
+                          {user.email === session?.user?.email ? 'You' : user.email}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+              </form>
+            </section>
+            <div data-testid="board-section">
+              <TaskBoard
+                columns={sections}
+                tasks={filteredTasks}
+                teamMembers={teamMembers}
+                updateTask={updateTask}
+                toggleComplete={toggleComplete}
+                deleteTask={deleteTask}
+                shiftTask={shiftTask}
+                setEditingTask={setEditingTask}
+                draggingId={draggingId}
+                setDraggingId={setDraggingId}
+                moveTask={moveTask}
+                onCreateFirstTask={focusQuickCreate}
+                onAddSection={addSection}
+                onRemoveSection={removeSection}
+              />
+            </div>
+          </>
+        ) : null}
+
+        {activeSection === 'tasks' ? (
+          <TasksView
+            project={currentProject}
+            tasks={filteredTasks}
+            sections={sections}
+            search={search}
+            setSearch={setSearch}
+            filter={filter}
+            setFilter={setFilter}
+            disciplines={disciplines}
+            onOpenTask={setEditingTask}
+            toggleComplete={toggleComplete}
+            deleteTask={deleteTask}
+            onCreateTask={goToCreateTask}
+          />
+        ) : null}
+
+        {activeSection === 'projects' ? (
+          <section className="projects-view" data-testid="projects-view" aria-label="Projects">
+            <header className="view-header">
+              <div>
+                <p className="eyebrow">Workspace</p>
+                <h1>Projects</h1>
+                <p className="muted-copy">
+                  Switch between projects, edit the active one, or spin up a new game project.
+                </p>
+              </div>
+            </header>
+
+            <div className="projects-grid" data-testid="projects-grid">
+              {projects.map((item) => (
+                <article
+                  key={item.id}
+                  className={item.id === currentProject.id ? 'project-card active' : 'project-card'}
+                  data-testid={`project-card-${item.id}`}
                 >
-                  {item}
-                </button>
+                  <button
+                    type="button"
+                    className="project-card-select"
+                    aria-current={item.id === currentProject.id ? 'true' : undefined}
+                    onClick={() => setCurrentProjectId(item.id)}
+                  >
+                    <strong>{item.name}</strong>
+                    <span className="project-card-tagline">{item.tagline}</span>
+                    <span className="project-card-meta">
+                      {item.methodology} · {item.phase}
+                    </span>
+                  </button>
+                  {projects.length > 1 ? (
+                    <button
+                      type="button"
+                      className="chip-action danger project-card-delete"
+                      onClick={() => deleteProject(item.id)}
+                    >
+                      Delete
+                    </button>
+                  ) : null}
+                </article>
               ))}
             </div>
-            <div className="quick-create-grid">
-              <input
-                ref={quickCreateInputRef}
-                data-testid="quick-create-input"
-                value={newTask.title}
-                onChange={(e) => setNewTask((c) => ({ ...c, title: e.target.value }))}
-                placeholder="Add a new feature or task"
-              />
-              <select
-                value={newTask.assignee}
-                onChange={(e) => setNewTask((c) => ({ ...c, assignee: e.target.value }))}
-              >
-                {teamMembers.map((m) => <option key={m}>{m}</option>)}
-              </select>
-              <select
-                value={newTask.discipline}
-                onChange={(e) => setNewTask((c) => ({ ...c, discipline: e.target.value }))}
-              >
-                {disciplines.map((item) => <option key={item}>{item}</option>)}
-              </select>
-              <button type="submit" className="primary-btn">Create task</button>
-            </div>
-            <div className="presence-strip">
-            <span className="presence-label">
-              Online now ({onlineUsers.length})
-            </span>
 
-            <div className="presence-list">
-              {onlineUsers.map((user) => {
-                const activeProject = projects.find((p) => p.id === user.projectId)
-
-                return (
-                  <div
-                    key={`${user.userId}-${user.onlineAt ?? 'now'}`}
-                    className="presence-pill"
-                    title={
-                      activeProject
-                        ? `${user.email} · Viewing ${activeProject.name}`
-                        : user.email
-                    }
+            <div className="panel new-project-panel">
+              <div className="section-heading">
+                <h2>New project</h2>
+              </div>
+              <form className="team-form" onSubmit={createProject}>
+                <input
+                  value={newProject.name}
+                  onChange={(e) => setNewProject((c) => ({ ...c, name: e.target.value }))}
+                  placeholder="New project name"
+                />
+                <input
+                  value={newProject.tagline}
+                  onChange={(e) => setNewProject((c) => ({ ...c, tagline: e.target.value }))}
+                  placeholder="Short tagline"
+                />
+                <div className="form-row">
+                  <select
+                    value={newProject.category}
+                    onChange={(e) => setNewProject((c) => ({ ...c, category: e.target.value }))}
                   >
-                    <span className="presence-dot" />
-                    <span className="presence-name">
-                      {user.email === session?.user?.email ? 'You' : user.email}
-                    </span>
-                  </div>
-                )
-              })}
+                    {gameCategories.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                  <select
+                    value={newProject.methodology}
+                    onChange={(e) => setNewProject((c) => ({ ...c, methodology: e.target.value }))}
+                  >
+                    {methodologies.map((item) => <option key={item}>{item}</option>)}
+                  </select>
+                </div>
+                <button type="submit" className="primary-btn" data-testid="create-project">
+                  Create project
+                </button>
+              </form>
             </div>
-          </div>
-          </form>
-        </section>
-        <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
-        <section className="chat-panel panel" aria-label="Board chat" ref={chatPanelRef} data-testid="chat-panel">
+
+            <ProjectHeader
+              project={currentProject}
+              updateProjectField={updateProjectField}
+              methodologies={methodologies}
+              gameCategories={gameCategories}
+              deleteProject={deleteProject}
+            />
+            <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
+          </section>
+        ) : null}
+
+        {activeSection === 'calendar' ? (
+          <CalendarView tasks={tasks} projects={projects} onOpenTask={setEditingTask} />
+        ) : null}
+
+        {activeSection === 'reports' ? (
+          <ReportsView
+            tasks={tasks}
+            projects={projects}
+            sections={sections}
+            priorities={priorities}
+            disciplines={disciplines}
+          />
+        ) : null}
+
+        {activeSection === 'settings' ? (
+          <section className="settings-view" data-testid="settings-view" aria-label="Settings">
+            <header className="view-header">
+              <div>
+                <p className="eyebrow">Preferences</p>
+                <h1>Settings</h1>
+                <p className="muted-copy">Board information, appearance, and your account.</p>
+              </div>
+            </header>
+
+            <div className="panel settings-panel" data-testid="settings-board">
+              <div className="section-heading">
+                <h2>Board</h2>
+              </div>
+              <dl className="settings-list">
+                <div>
+                  <dt>Board name</dt>
+                  <dd>{currentBoard?.name ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>Projects</dt>
+                  <dd>{projects.length}</dd>
+                </div>
+                <div>
+                  <dt>Team members</dt>
+                  <dd>{teamMembers.filter((m) => m !== 'Unassigned').length}</dd>
+                </div>
+              </dl>
+              <p className="muted-copy">
+                Pipeline sections are managed from the Board page. Add or remove columns there and they
+                apply across every project on this board.
+              </p>
+            </div>
+
+            <div className="panel settings-panel" data-testid="settings-theme">
+              <div className="section-heading">
+                <h2>Appearance</h2>
+              </div>
+              <div className="theme-panel-body">
+                <label>Accent<input type="color" value={theme.accent} onChange={(e) => setTheme((c) => ({ ...c, accent: e.target.value }))} /></label>
+                <label>Accent 2<input type="color" value={theme.accentSecondary} onChange={(e) => setTheme((c) => ({ ...c, accentSecondary: e.target.value }))} /></label>
+                <label>Surface<input type="color" value={theme.surface} onChange={(e) => setTheme((c) => ({ ...c, surface: e.target.value }))} /></label>
+                <label>Background<input type="color" value={theme.background} onChange={(e) => setTheme((c) => ({ ...c, background: e.target.value }))} /></label>
+              </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="settings-reset-theme"
+                onClick={() => setTheme(defaultTheme)}
+              >
+                Reset to default colors
+              </button>
+            </div>
+
+            <div className="panel settings-panel" data-testid="settings-account">
+              <div className="section-heading">
+                <h2>Account</h2>
+              </div>
+              <dl className="settings-list">
+                <div>
+                  <dt>Signed in as</dt>
+                  <dd>{session?.user?.email ?? 'Signed in'}</dd>
+                </div>
+              </dl>
+              <button
+                type="button"
+                className="danger-btn"
+                data-testid="settings-sign-out"
+                onClick={() => supabase.auth.signOut()}
+              >
+                Sign out
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {activeSection === 'team' ? (
+          <section className="team-view" data-testid="team-view" aria-label="Team">
+            <header className="view-header">
+              <div>
+                <p className="eyebrow">Collaboration</p>
+                <h1>Team</h1>
+                <p className="muted-copy">Manage members, invite collaborators, and talk it through.</p>
+              </div>
+            </header>
+
+            <div className="panel team-manage-panel" data-testid="team-manage">
+              <div className="section-heading">
+                <h2>Members</h2>
+                <span>{teamMembers.length}</span>
+              </div>
+              <form onSubmit={addTeamMember} className="team-form">
+                <input
+                  value={newMember}
+                  onChange={(e) => setNewMember(e.target.value)}
+                  placeholder="Add team member"
+                  aria-label="New team member name"
+                />
+                <button type="submit" className="secondary-btn">Add</button>
+              </form>
+              <div className="member-list">
+                {teamMembers.map((member) => (
+                  <div key={member} className="member-chip-row">
+                    <span className="discipline-pill">{member}</span>
+                    {member !== 'Unassigned' && (
+                      <button type="button" className="chip-action" onClick={() => removeTeamMember(member)}>
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+        <section className="chat-panel panel" aria-label="Board chat" data-testid="chat-panel">
   <div className="chat-panel-header">
     <div>
       <p className="eyebrow">Board chat</p>
@@ -2085,7 +2321,7 @@ return (
   </form>
 </section>
 
-<section className="panel invite-panel" aria-label="Invite collaborators" ref={invitePanelRef} data-testid="invite-panel">
+<section className="panel invite-panel" aria-label="Invite collaborators" data-testid="invite-panel">
   <div className="invite-panel-header">
     <p className="eyebrow">Invites</p>
     <h3>Invite collaborators</h3>
@@ -2131,24 +2367,8 @@ return (
     )}
   </div>
 </section>
-        <div ref={boardRef} data-testid="board-section">
-        <TaskBoard
-          columns={sections}
-          tasks={filteredTasks}
-          teamMembers={teamMembers}
-          updateTask={updateTask}
-          toggleComplete={toggleComplete}
-          deleteTask={deleteTask}
-          shiftTask={shiftTask}
-          setEditingTask={setEditingTask}
-          draggingId={draggingId}
-          setDraggingId={setDraggingId}
-          moveTask={moveTask}
-          onCreateFirstTask={focusQuickCreate}
-          onAddSection={addSection}
-          onRemoveSection={removeSection}
-        />
-        </div>
+          </section>
+        ) : null}
       </main>
     </div>
 
