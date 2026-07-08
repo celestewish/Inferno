@@ -114,6 +114,16 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   align-content: start;
 }
 
+/* Wrapper around the Kanban board. As a grid item its default min-width is
+   `auto`, which would let it grow to the full width of all columns and push the
+   scroll onto the page (clipped by the shell's overflow-x: hidden). Pinning
+   min-width: 0 keeps it bounded to the board-area so .board-grid scrolls
+   horizontally inside its own width instead. */
+.board-scroll-region {
+  min-width: 0;
+  width: 100%;
+}
+
 .board-empty {
   display: grid;
   gap: 1.25rem;
@@ -339,6 +349,11 @@ textarea:hover {
   padding: 0.5rem 0 1.25rem;
   min-width: 0;
   scroll-behavior: smooth;
+  /* Keep the horizontal scrollbar space reserved and visible even when a column
+     count barely overflows, and style it for Firefox (webkit rules below). */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124, 92, 255, 0.55) rgba(255, 255, 255, 0.05);
 }
 
 .board-grid::-webkit-scrollbar {
@@ -1407,6 +1422,21 @@ textarea:hover {
 }
 .settings-list dt { color: var(--text-muted); }
 .settings-list dd { margin: 0; font-weight: 600; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent, #7c5cff);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  align-self: center;
+}
+.link-btn:disabled { opacity: 0.6; cursor: default; }
+
+.settings-security { display: grid; gap: 0.6rem; justify-items: start; width: 100%; }
+.settings-security h3 { margin: 0; font-size: 0.98rem; }
+.settings-security .muted-copy { margin: 0; }
 
 /* Calendar view */
 .agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
@@ -1615,10 +1645,15 @@ textarea:hover {
   border-color: color-mix(in srgb, var(--accent) 60%, white 10%);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
+.calendar-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 100%;
+}
 .calendar-cell-day { font-weight: 600; font-size: 0.9rem; }
 .calendar-cell-count {
-  align-self: flex-end;
-  margin-top: auto;
   min-width: 1.4rem;
   height: 1.4rem;
   padding: 0 0.35rem;
@@ -1630,9 +1665,37 @@ textarea:hover {
   color: white;
   background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
 }
+.calendar-cell-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  width: 100%;
+}
+.calendar-chip {
+  max-width: 100%;
+  padding: 0.12rem 0.4rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.72rem;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-main);
+  background: color-mix(in srgb, var(--accent) 24%, rgba(255, 255, 255, 0.06));
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.calendar-chip.done { text-decoration: line-through; color: var(--text-muted); }
+.calendar-chip.more {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding-left: 0.2rem;
+}
 .calendar-day-detail { display: grid; gap: 0.75rem; }
 
 @media (max-width: 620px) {
   .calendar-cell { min-height: 3.2rem; padding: 0.35rem; }
   .calendar-cell-day { font-size: 0.8rem; }
+  /* Chips get cramped on phones; fall back to the count badge only. */
+  .calendar-cell-tasks { display: none; }
 }

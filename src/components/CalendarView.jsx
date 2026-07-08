@@ -7,8 +7,19 @@ const parseDue = (due) => {
   if (!due) return null
   const raw = String(due).trim()
   if (!raw || /^tbd$/i.test(raw)) return null
+
+  // ISO date-only (YYYY-MM-DD): parse as *local* midnight. `new Date('2026-06-20')`
+  // is interpreted as UTC, which shifts to the previous day in negative
+  // timezones — the classic calendar off-by-one. Building from parts avoids it.
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+  if (iso) {
+    const [, y, m, d] = iso
+    return new Date(Number(y), Number(m) - 1, Number(d))
+  }
+
   let parsed = new Date(raw)
   if (Number.isNaN(parsed.getTime())) {
+    // Free-text like "Jun 20" has no year; assume the current one.
     parsed = new Date(`${raw} ${new Date().getFullYear()}`)
   }
   return Number.isNaN(parsed.getTime()) ? null : parsed
@@ -234,9 +245,27 @@ export default function CalendarView({ tasks, projects, onOpenTask }) {
                   aria-label={`${dayLabel(cell.date)}${hasTasks ? `, ${cell.tasks.length} task${cell.tasks.length === 1 ? '' : 's'}` : ''}`}
                   onClick={() => setSelectedDay(cell.key)}
                 >
-                  <span className="calendar-cell-day">{cell.day}</span>
+                  <span className="calendar-cell-head">
+                    <span className="calendar-cell-day">{cell.day}</span>
+                    {hasTasks ? (
+                      <span className="calendar-cell-count" aria-hidden="true">{cell.tasks.length}</span>
+                    ) : null}
+                  </span>
                   {hasTasks ? (
-                    <span className="calendar-cell-count" aria-hidden="true">{cell.tasks.length}</span>
+                    <span className="calendar-cell-tasks" aria-hidden="true">
+                      {cell.tasks.slice(0, 3).map((task) => (
+                        <span
+                          key={task.id}
+                          className={task.completed ? 'calendar-chip done' : 'calendar-chip'}
+                          title={task.title}
+                        >
+                          {task.title}
+                        </span>
+                      ))}
+                      {cell.tasks.length > 3 ? (
+                        <span className="calendar-chip more">+{cell.tasks.length - 3} more</span>
+                      ) : null}
+                    </span>
                   ) : null}
                 </button>
               )
