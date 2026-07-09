@@ -2427,8 +2427,9 @@ const toggleMessageReaction = async (message, reactionKey) => {
     pushCelebration({ kind: 'error', title: 'Reaction not saved', detail: 'Change kept locally only.' })
     return
   }
-  if (data) {
-    const synced = normalizeReactions(data.reactions)
+  const row = Array.isArray(data) ? data[0] : data
+  if (row) {
+    const synced = normalizeReactions(row.reactions)
     setMessages((current) =>
       current.map((item) => (item.id === message.id ? { ...item, reactions: synced } : item)),
     )
