@@ -2197,26 +2197,6 @@ textarea:hover {
 }
 .landing-final-cta h2 { margin: 0; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
 .landing-final-cta .muted-copy { margin: 0; max-width: 48ch; }
-.landing-gallop {
-  display: grid;
-  place-items: center;
-  width: 100%;
-  margin-bottom: 0.25rem;
-  pointer-events: none;
-}
-.landing-gallop-img {
-  width: min(360px, 82vw);
-  height: auto;
-  mix-blend-mode: screen;
-  filter: drop-shadow(0 18px 30px color-mix(in srgb, var(--accent) 30%, transparent));
-}
-@media (prefers-reduced-motion: no-preference) {
-  .landing-gallop-img { animation: gallop-charge 3.4s ease-in-out infinite; }
-}
-@keyframes gallop-charge {
-  0%, 100% { transform: translateY(0) scale(1); }
-  50% { transform: translateY(-6px) scale(1.015); }
-}
 
 /* Footer */
 .landing-footer {
