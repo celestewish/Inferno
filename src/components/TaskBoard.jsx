@@ -1,15 +1,11 @@
 import { useState } from 'react'
-import InlineText from './InlineText'
 import InfernoLogo from './InfernoLogo'
-import DatePicker from './DatePicker.jsx'
 
 const priorityTone = { High: 'high', Medium: 'medium', Low: 'low' }
 
 export default function TaskBoard({
   columns,
   tasks,
-  teamMembers,
-  updateTask,
   toggleComplete,
   deleteTask,
   shiftTask,
@@ -110,145 +106,103 @@ export default function TaskBoard({
             </div>
 
             <div className="column-cards">
-              {columnTasks.map((task, index) => (
-                <article
-                  key={task.id}
-                  className={task.completed ? 'task-card completed' : 'task-card'}
-                  draggable
-                  onDragStart={() => setDraggingId(task.id)}
-                  onDragEnd={() => setDraggingId(null)}
-                >
-                  <div className="card-topline">
-                    <span className={`priority-badge ${priorityTone[task.priority]}`}>{task.priority}</span>
-                    <div className="label-row">
-                      {task.labels?.map((label) => (
-                        <span key={label} className="task-label">{label}</span>
-                      ))}
-                    </div>
-                  </div>
-
-                  <InlineText
-                    className="task-title-inline"
-                    value={task.title}
-                    onSave={(value) => updateTask(task.id, { title: value })}
-                  />
-
-                  <InlineText
-                    className="task-body-inline"
-                    multiline
-                    value={task.description}
-                    onSave={(value) => updateTask(task.id, { description: value })}
-                  />
-
-                  <dl className="meta-grid">
-                    <div>
-                      <dt>Assignee</dt>
-                      <dd>
-                        <select
-                          className="inline-select"
-                          value={task.assignee}
-                          onChange={(e) => updateTask(task.id, { assignee: e.target.value })}
-                        >
-                          {teamMembers.map((member) => <option key={member}>{member}</option>)}
-                        </select>
-                      </dd>
+              {columnTasks.map((task, index) => {
+                const openDetails = () => setEditingTask({ ...task })
+                const totalSubtasks = task.subtasks?.length ?? 0
+                const doneSubtasks = task.subtasks?.filter((item) => item.done).length ?? 0
+                const hasDueDate = task.due && task.due !== 'TBD'
+                return (
+                  <article
+                    key={task.id}
+                    className={task.completed ? 'task-card compact completed' : 'task-card compact'}
+                    data-testid="task-card"
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Open details for ${task.title}`}
+                    draggable
+                    onDragStart={() => setDraggingId(task.id)}
+                    onDragEnd={() => setDraggingId(null)}
+                    onClick={openDetails}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault()
+                        openDetails()
+                      }
+                    }}
+                  >
+                    <div className="card-topline">
+                      <span className={`priority-badge ${priorityTone[task.priority]}`}>{task.priority}</span>
+                      <span className="card-discipline-chip">{task.discipline}</span>
                     </div>
 
-                    <div>
-                      <dt>Discipline</dt>
-                      <dd>{task.discipline}</dd>
+                    <h4 className="task-card-title">{task.title}</h4>
+
+                    <div className="task-card-meta-row">
+                      <span className="task-card-meta-item">{task.assignee}</span>
+                      {hasDueDate ? <span className="task-card-meta-item">Due {task.due}</span> : null}
+                      {totalSubtasks ? (
+                        <span className="task-card-meta-item">{doneSubtasks}/{totalSubtasks} subtasks</span>
+                      ) : null}
                     </div>
 
-                    <div>
-                      <dt>Estimate</dt>
-                      <dd>
-                        <InlineText
-                          value={task.estimate}
-                          onSave={(value) => updateTask(task.id, { estimate: value })}
-                        />
-                      </dd>
+                    {task.labels?.length ? (
+                      <div className="label-row">
+                        {task.labels.map((label) => (
+                          <span key={label} className="task-label">{label}</span>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    <div className="manipulation-row" onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        disabled={index === 0}
+                        aria-label="Move task up"
+                        title="Move up"
+                        onClick={(event) => { event.stopPropagation(); shiftTask(task.id, -1) }}
+                      >
+                        ↑
+                      </button>
+
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        disabled={index === columnTasks.length - 1}
+                        aria-label="Move task down"
+                        title="Move down"
+                        onClick={(event) => { event.stopPropagation(); shiftTask(task.id, 1) }}
+                      >
+                        ↓
+                      </button>
+
+                      <button
+                        type="button"
+                        className="secondary-btn"
+                        onClick={(event) => { event.stopPropagation(); openDetails() }}
+                      >
+                        Details
+                      </button>
+
+                      <button
+                        type="button"
+                        className="primary-btn"
+                        onClick={(event) => { event.stopPropagation(); toggleComplete(task) }}
+                      >
+                        {task.completed ? 'Reopen' : 'Complete'}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="danger-btn"
+                        onClick={(event) => { event.stopPropagation(); deleteTask(task.id) }}
+                      >
+                        Delete
+                      </button>
                     </div>
-
-                    <div>
-                      <dt>Due</dt>
-                      <dd>
-                        <DatePicker
-                          value={task.due}
-                          onChange={(iso) => updateTask(task.id, { due: iso })}
-                          onClear={() => updateTask(task.id, { due: 'TBD' })}
-                        />
-                      </dd>
-                    </div>
-                  </dl>
-
-                  <div className="subtask-list">
-                    {task.subtasks?.map((subtask) => (
-                      <label key={subtask.id} className="subtask-item">
-                        <input
-                          type="checkbox"
-                          checked={subtask.done}
-                          onChange={() =>
-                            updateTask(task.id, {
-                              subtasks: task.subtasks.map((item) =>
-                                item.id === subtask.id ? { ...item, done: !item.done } : item
-                              ),
-                            })
-                          }
-                        />
-                        <span>{subtask.title}</span>
-                      </label>
-                    ))}
-                  </div>
-
-                  <div className="manipulation-row">
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      disabled={index === 0}
-                      aria-label="Move task up"
-                      title="Move up"
-                      onClick={() => shiftTask(task.id, -1)}
-                    >
-                      ↑
-                    </button>
-
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      disabled={index === columnTasks.length - 1}
-                      aria-label="Move task down"
-                      title="Move down"
-                      onClick={() => shiftTask(task.id, 1)}
-                    >
-                      ↓
-                    </button>
-
-                    <button
-                      type="button"
-                      className="secondary-btn"
-                      onClick={() => setEditingTask({ ...task })}
-                    >
-                      Details
-                    </button>
-
-                    <button
-                      type="button"
-                      className="primary-btn"
-                      onClick={() => toggleComplete(task)}
-                    >
-                      {task.completed ? 'Reopen' : 'Complete'}
-                    </button>
-
-                    <button
-                      type="button"
-                      className="danger-btn"
-                      onClick={() => deleteTask(task.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </article>
-              ))}
+                  </article>
+                )
+              })}
             </div>
           </div>
         )

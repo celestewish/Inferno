@@ -524,6 +524,9 @@ function App() {
     avatar_url: '',
   })
   const [savingProfile, setSavingProfile] = useState(false)
+  // Defaults to true (hidden) so the hint never flashes before the profile
+  // loads and never nags when the backing column is missing.
+  const [mobileBoardHintSeen, setMobileBoardHintSeen] = useState(true)
   const [profileSaved, setProfileSaved] = useState(false)
   const [profileError, setProfileError] = useState('')
   const [savingTheme, setSavingTheme] = useState(false)
@@ -848,6 +851,24 @@ setCurrentProjectId((currentId) =>
       setTheme(defaultTheme)
     } else {
       setTheme(themeRow?.theme_settings ? sanitizeTheme(themeRow.theme_settings) : defaultTheme)
+    }
+
+    // Load the one-time mobile board swipe hint flag separately for the same
+    // graceful-degradation reason as theme_settings: a missing column (migration
+    // not yet applied) must not break profile loading. When it errors we treat
+    // the hint as already seen so users are never nagged with something we
+    // cannot persist a dismissal for.
+    const { data: hintRow, error: hintLoadError } = await supabase
+      .from('profiles')
+      .select('mobile_board_hint_seen_at')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (hintLoadError) {
+      console.error('Mobile board hint load error:', formatSupabaseError(hintLoadError), hintLoadError)
+      setMobileBoardHintSeen(true)
+    } else {
+      setMobileBoardHintSeen(Boolean(hintRow?.mobile_board_hint_seen_at))
     }
   }
 }
@@ -1854,6 +1875,21 @@ const dismissOnboarding = async () => {
   if (error) console.error('Dismiss onboarding error:', formatSupabaseError(error), error)
 }
 
+// Dismiss the mobile "swipe through the board" hint permanently. Hidden locally
+// right away; a persistence failure (e.g. missing column) is logged but never
+// blocks the board, matching dismissOnboarding.
+const dismissMobileBoardHint = async () => {
+  setMobileBoardHintSeen(true)
+  if (!userId) return
+
+  const seenAt = new Date().toISOString()
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, mobile_board_hint_seen_at: seenAt }, { onConflict: 'id' })
+
+  if (error) console.error('Dismiss mobile board hint error:', formatSupabaseError(error), error)
+}
+
 const updateProfileField = (field, value) => {
   setProfileSaved(false)
   setProfileError('')
@@ -2210,12 +2246,31 @@ return (
               </div>
               </form>
             </section>
+            {!mobileBoardHintSeen ? (
+              <div
+                className="mobile-board-hint"
+                data-testid="mobile-board-hint"
+                role="status"
+              >
+                <span className="mobile-board-hint-icon" aria-hidden="true">↔</span>
+                <p className="mobile-board-hint-copy">
+                  Swipe left or right to move through your board sections and columns.
+                </p>
+                <button
+                  type="button"
+                  className="mobile-board-hint-dismiss"
+                  data-testid="mobile-board-hint-dismiss"
+                  aria-label="Dismiss swipe hint"
+                  onClick={dismissMobileBoardHint}
+                >
+                  ✕
+                </button>
+              </div>
+            ) : null}
             <div className="board-scroll-region" data-testid="board-section">
               <TaskBoard
                 columns={sections}
                 tasks={filteredTasks}
-                teamMembers={teamMembers}
-                updateTask={updateTask}
                 toggleComplete={toggleComplete}
                 deleteTask={deleteTask}
                 shiftTask={shiftTask}
