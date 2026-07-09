@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import InfernoLogo from './InfernoLogo'
+import FeatureIcon from './FeatureIcon'
+import HeroCarousel from './HeroCarousel'
+import SandboxDemo from './SandboxDemo'
 
 const NAV_LINKS = [
   { href: '#features', label: 'Features' },
+  { href: '#sandbox', label: 'Try it' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#story', label: 'Story' },
   { href: '#roadmap', label: 'Roadmap' },
@@ -10,42 +14,42 @@ const NAV_LINKS = [
 
 const FEATURES = [
   {
-    icon: '🗂️',
+    icon: 'boards',
     title: 'Boards',
     body: 'A shared studio workspace per game or team, with chat and invites built in.',
   },
   {
-    icon: '🎮',
+    icon: 'projects',
     title: 'Projects',
-    body: 'Group work by feature area, milestone, or whole game — and switch in a click.',
+    body: 'Group work by feature area, milestone, or whole game, then switch in a click.',
   },
   {
-    icon: '📋',
+    icon: 'kanban',
     title: 'Kanban sections',
-    body: 'Backlog, To Do, In Progress, Review, and Done — customize the pipeline to fit.',
+    body: 'Backlog, To Do, In Progress, Review, and Done. Customize the pipeline to fit.',
   },
   {
-    icon: '✅',
+    icon: 'tasks',
     title: 'Tasks',
     body: 'Assignees, discipline, priority, estimates, due dates, and notes on every card.',
   },
   {
-    icon: '📅',
+    icon: 'calendar',
     title: 'Calendar',
     body: 'See due dates across the board on a month view so nothing slips through.',
   },
   {
-    icon: '📊',
+    icon: 'reports',
     title: 'Reports',
     body: 'Live snapshots by status, priority, and discipline to track production health.',
   },
   {
-    icon: '🤝',
+    icon: 'team',
     title: 'Team',
     body: 'Invite collaborators, assign work, and talk it through in real-time board chat.',
   },
   {
-    icon: '🎨',
+    icon: 'customization',
     title: 'Customization',
     body: 'Recolor accent, glow, surface, and background to make each board your own.',
   },
@@ -57,7 +61,7 @@ const DEEP_DIVES = [
     eyebrow: 'Collaboration',
     title: 'Keep the whole team on the same pipeline',
     body: 'Invite teammates by email, assign tasks to a per-board roster, and discuss decisions in real-time chat that lives right next to the work. Presence shows who is on the board so nothing gets duplicated.',
-    points: ['Email invites with access levels', 'Per-board assignable roster', 'Live board chat + presence'],
+    points: ['Email invites with access levels', 'Per-board assignable roster', 'Live board chat and presence'],
     image: '/marketing/team.webp',
     width: 1100,
     height: 647,
@@ -68,7 +72,7 @@ const DEEP_DIVES = [
     eyebrow: 'Custom workflow',
     title: 'Shape the board around how you actually ship',
     body: 'Rename and reorder Kanban sections, tune project category and methodology, and restyle the board with a live color editor. Inferno bends to your process instead of forcing a generic one.',
-    points: ['Editable Kanban sections', 'Category + methodology per project', 'Live accent / glow / surface theming'],
+    points: ['Editable Kanban sections', 'Category and methodology per project', 'Live accent, glow, and surface theming'],
     image: '/marketing/customization.webp',
     width: 661,
     height: 388,
@@ -76,10 +80,10 @@ const DEEP_DIVES = [
   },
   {
     id: 'deep-insights',
-    eyebrow: 'Calendar & reports',
+    eyebrow: 'Calendar and reports',
     title: 'Know where production really stands',
-    body: 'A month calendar surfaces every due date, while reports roll up totals by status, priority, and discipline across the whole board — so producers can spot bottlenecks before they become blockers.',
-    points: ['Month calendar of due dates', 'Totals by status & priority', 'Breakdown by discipline'],
+    body: 'A month calendar surfaces every due date, while reports roll up totals by status, priority, and discipline across the whole board, so producers can spot bottlenecks before they become blockers.',
+    points: ['Month calendar of due dates', 'Totals by status and priority', 'Breakdown by discipline'],
     image: '/marketing/reports.webp',
     width: 1100,
     height: 621,
@@ -89,8 +93,8 @@ const DEEP_DIVES = [
     id: 'deep-permissions',
     eyebrow: 'Board-specific permissions',
     title: 'Give people exactly the access they need',
-    body: 'Each board has its own members and roles. Assign viewer, editor, or owner access, transfer ownership, and remove members — permissions stay scoped to the board so studios can run several at once.',
-    points: ['Per-board member roles', 'Owner transfer & removal', 'Scoped, separate boards'],
+    body: 'Each board has its own members and roles. Assign viewer, editor, or owner access, transfer ownership, and remove members. Permissions stay scoped to the board so studios can run several at once.',
+    points: ['Per-board member roles', 'Owner transfer and removal', 'Scoped, separate boards'],
     image: '/marketing/projects.webp',
     width: 1100,
     height: 666,
@@ -129,10 +133,20 @@ export default function MarketingHome({ openLogin, openSignup }) {
 
   const closeMenu = () => setMenuOpen(false)
 
+  const handleNavClick = (event, href) => {
+    const target = document.querySelector(href)
+    if (target) {
+      event.preventDefault()
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      window.history.replaceState(null, '', href)
+    }
+    closeMenu()
+  }
+
   return (
     <div className="landing">
       <header className="landing-nav" data-testid="landing-nav">
-        <a className="landing-brand" href="#top" onClick={closeMenu}>
+        <a className="landing-brand" href="#top" onClick={(event) => handleNavClick(event, '#top')}>
           <InfernoLogo size={30} />
           <span className="landing-brand-name">Inferno</span>
         </a>
@@ -149,7 +163,7 @@ export default function MarketingHome({ openLogin, openSignup }) {
 
         <nav className={menuOpen ? 'landing-nav-links is-open' : 'landing-nav-links'} aria-label="Primary">
           {NAV_LINKS.map((link) => (
-            <a key={link.href} href={link.href} onClick={closeMenu}>
+            <a key={link.href} href={link.href} onClick={(event) => handleNavClick(event, link.href)}>
               {link.label}
             </a>
           ))}
@@ -179,8 +193,8 @@ export default function MarketingHome({ openLogin, openSignup }) {
             <h1 className="inferno-wordmark landing-hero-title">Inferno</h1>
             <p className="landing-hero-pitch">
               The free task board built for indie game developers and small studios. Plan features,
-              assign work, and track production from backlog to final polish — all on one dark,
-              focused board.
+              assign work, and drive production from first prototype to final polish, all on one dark,
+              focused board that thinks in disciplines instead of spreadsheets.
             </p>
 
             <div className="landing-cta-row">
@@ -200,38 +214,51 @@ export default function MarketingHome({ openLogin, openSignup }) {
           </div>
 
           <div className="landing-hero-visual">
-            <div className="landing-hero-glow" aria-hidden="true" />
-            <img
-              className="landing-shot"
-              src="/marketing/board.webp"
-              width={1280}
-              height={582}
-              alt="Inferno Kanban board with backlog, to do, in progress, and review columns alongside the project sidebar"
-              fetchPriority="high"
-            />
+            <HeroCarousel />
           </div>
         </section>
+
+        <div className="landing-divider landing-divider--warm" aria-hidden="true" />
 
         <section className="landing-section" id="features" aria-label="Features">
           <div className="landing-section-head">
             <p className="eyebrow">Everything in one board</p>
-            <h2>Features made for making games</h2>
+            <h2>Tools made for making games</h2>
             <p className="muted-copy">
               Inferno unifies planning, tasks, scheduling, and team coordination around a simple
-              Board → Project → Task model.
+              Board, Project, Task model your whole studio can follow.
             </p>
           </div>
 
           <div className="landing-feature-grid">
             {FEATURES.map((feature) => (
               <article key={feature.title} className="landing-feature-card">
-                <span className="landing-feature-icon" aria-hidden="true">{feature.icon}</span>
+                <span className="landing-feature-icon">
+                  <FeatureIcon name={feature.icon} />
+                </span>
                 <h3>{feature.title}</h3>
                 <p>{feature.body}</p>
               </article>
             ))}
           </div>
         </section>
+
+        <div className="landing-divider landing-divider--cool" aria-hidden="true" />
+
+        <section className="landing-section landing-sandbox" id="sandbox" aria-label="Interactive demo">
+          <div className="landing-section-head">
+            <p className="eyebrow">Try it, no signup</p>
+            <h2>Play with a live pipeline</h2>
+            <p className="muted-copy">
+              This is a tiny sandbox version of an Inferno board. Add your own tasks and move cards
+              across the pipeline to feel how production flows. It runs entirely in your browser.
+            </p>
+          </div>
+
+          <SandboxDemo />
+        </section>
+
+        <div className="landing-divider landing-divider--ember" aria-hidden="true" />
 
         <section className="landing-section landing-deep" aria-label="Feature details">
           {DEEP_DIVES.map((dive, index) => (
@@ -264,6 +291,8 @@ export default function MarketingHome({ openLogin, openSignup }) {
           ))}
         </section>
 
+        <div className="landing-divider landing-divider--cool" aria-hidden="true" />
+
         <section className="landing-section" id="how-it-works" aria-label="How it works">
           <div className="landing-section-head">
             <p className="eyebrow">How it works</p>
@@ -282,6 +311,8 @@ export default function MarketingHome({ openLogin, openSignup }) {
           </ol>
         </section>
 
+        <div className="landing-divider landing-divider--warm" aria-hidden="true" />
+
         <section className="landing-section landing-story" id="story" aria-label="Why Inferno exists">
           <div className="landing-story-copy">
             <p className="eyebrow">Why Inferno exists</p>
@@ -291,9 +322,9 @@ export default function MarketingHome({ openLogin, openSignup }) {
               planning docs, chat apps, and spreadsheets until context scatters and momentum stalls.
             </p>
             <p className="muted-copy">
-              Inferno is opinionated about game development: disciplines like design, art, audio, and
+              Inferno is opinionated about game development. Disciplines like design, art, audio, and
               polish are first-class, tasks carry the estimates and sprint context producers care
-              about, and the whole board reads like a pipeline instead of a spreadsheet. It's free
+              about, and the whole board reads like a pipeline instead of a spreadsheet. It stays free
               because indie teams and student projects deserve production tooling that fits them.
             </p>
           </div>
@@ -309,11 +340,13 @@ export default function MarketingHome({ openLogin, openSignup }) {
           </figure>
         </section>
 
+        <div className="landing-divider landing-divider--ember" aria-hidden="true" />
+
         <section className="landing-section" id="roadmap" aria-label="Roadmap">
           <div className="landing-section-head">
             <p className="eyebrow">Roadmap</p>
-            <h2>What's coming next</h2>
-            <p className="muted-copy">Inferno is actively evolving. Here's where it's headed.</p>
+            <h2>What is coming next</h2>
+            <p className="muted-copy">Inferno is actively evolving. Here is where it is headed.</p>
           </div>
 
           <div className="landing-roadmap-grid">
