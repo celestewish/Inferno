@@ -197,6 +197,10 @@ export default function MarketingHome({ openLogin, openSignup }) {
               <li>Built for game projects</li>
               <li>Starts with a seeded sample board</li>
             </ul>
+
+            <p className="landing-mobile-hint" aria-hidden="true">
+              Built for planning on desktop, checking progress on mobile.
+            </p>
           </div>
 
           <div className="landing-hero-visual">
@@ -350,6 +354,25 @@ export default function MarketingHome({ openLogin, openSignup }) {
         </div>
         <p className="muted-copy">A free game production task board for indie developers and small teams.</p>
       </footer>
+
+      <div className="landing-mobile-cta" data-testid="mobile-cta" aria-label="Get started">
+        <button
+          type="button"
+          className="primary-btn landing-mobile-cta-signup"
+          data-testid="mobile-cta-signup"
+          onClick={openSignup}
+        >
+          Sign up free
+        </button>
+        <button
+          type="button"
+          className="secondary-btn landing-mobile-cta-login"
+          data-testid="mobile-cta-login"
+          onClick={openLogin}
+        >
+          Log in
+        </button>
+      </div>
     </div>
   )
 }
