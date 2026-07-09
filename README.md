@@ -1,6 +1,86 @@
-# React + Vite
+# Inferno
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**A free, collaborative task board built for game development.**
+
+Inferno is a shared production board for indie game developers and small studios.
+Plan features, assign work, and track a game from backlog to final polish — all on
+one dark, focused board.
+
+**Live site: [infernotaskboard.com](https://infernotaskboard.com/)**
+
+![Inferno Kanban board](public/marketing/board.webp)
+
+## What is Inferno?
+
+Making a game means juggling a lot of moving parts — art, design, code, audio, QA —
+often across a small team where everyone wears several hats. Inferno gives that team
+a single place to see what needs doing, who is doing it, and how close the game is to
+shipping. It combines a Kanban board, a calendar, and live production reports into
+one workspace so nothing slips through the cracks.
+
+It's free to use, and every new account starts with a fully seeded sample board so
+you can explore how everything fits together before inviting your team.
+
+## Who it's for
+
+- **Indie game developers** planning a solo or small-team project.
+- **Small studios** coordinating art, design, engineering, and QA in one place.
+- **Game jam teams** who need to organize fast and ship on a deadline.
+- Anyone who wants a focused, game-flavored alternative to a generic task tracker.
+
+## Features
+
+- **Boards** — a shared studio workspace per game or team, with chat and invites built in.
+- **Projects** — group work by feature area, milestone, or whole game, and switch between them in a click.
+- **Kanban sections** — a Backlog → To Do → In Progress → Review → Done pipeline you can rename and reorder to match how you actually ship.
+- **Tasks** — rich cards with assignees, discipline, priority, estimates, due dates, and notes.
+- **Due dates & calendar** — pick due dates with a built-in date picker and see them all on a month calendar so deadlines stay visible.
+- **Reports** — live production snapshots that roll up totals by status, priority, and discipline to reveal bottlenecks early.
+- **Team members** — invite collaborators by email, assign work to a per-board roster, and discuss it in real-time board chat with presence.
+- **Board-specific permissions** — each board has its own members and roles (viewer / editor / owner), with ownership transfer and member removal.
+- **Customization** — set per-board task tags, game categories, and team roles, plus a live color editor for accent, glow, surface, and background.
+- **Profile & settings** — a personal profile (display name, gamer tag, pronouns, avatar) and appearance settings that persist to your account.
+- **Mobile support** — a touch-friendly layout so you can check progress on the go.
+- **Landing page** — a polished public marketing page introducing the product to new visitors.
+
+### A closer look
+
+| | |
+|---|---|
+| ![Team collaboration](public/marketing/team.webp) | ![Customization](public/marketing/customization.webp) |
+| **Collaboration** — invite teammates, assign a per-board roster, and chat in real time. | **Custom workflow** — reshape sections and restyle the board to fit your process. |
+| ![Reports](public/marketing/reports.webp) | ![Calendar](public/marketing/calendar.webp) |
+| **Reports** — totals by status, priority, and discipline across the board. | **Calendar** — every due date on a single month view. |
+
+## How it works
+
+1. **Sign up** — create a free account. You'll land on a fully seeded sample board that shows how projects, tasks, and sections work.
+2. **Create a board** — spin up a workspace for your own game or studio.
+3. **Plan the work** — add projects, break them into tasks, and drag cards across the Kanban pipeline from backlog to done.
+4. **Invite your team** — send email invites, assign tasks to members, and talk it through in board chat.
+5. **Track progress** — watch due dates on the calendar and production health in live reports as you ship together.
+
+## Security & permissions
+
+Access in Inferno is **board-specific**. Invitations are always tied to a single
+board, and members can only see and work on the boards they've actually been invited
+to — one team's board is never visible to another. Within a board, each member has a
+role (viewer, editor, or owner), owners can transfer ownership or remove members, and
+these boundaries are enforced at the database level. This lets a studio safely run
+several separate boards from one account.
+
+## Tech stack
+
+- **Frontend:** React + [Vite](https://vitejs.dev/)
+- **Backend & auth:** [Supabase](https://supabase.com/) (Postgres, authentication, row-level security, and Edge Functions)
+- **Transactional email:** [Resend](https://resend.com/) for board invitation emails
+- **Hosting:** IONOS Deploy Now, serving the production domain [infernotaskboard.com](https://infernotaskboard.com/)
+
+---
+
+# Developer guide
+
+The rest of this document covers local development, configuration, and deployment.
 
 ## Environment variables
 
@@ -158,17 +238,12 @@ supabase functions deploy send-board-invite
 `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` remain **frontend build vars**
 (GitHub Actions secrets / local `.env`) and are unrelated to the Resend secrets above.
 
-## Vite plugins
+## Project scripts
 
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install        # install dependencies
+npm run dev        # start the Vite dev server (http://localhost:5173)
+npm run build      # production build to dist/
+npm run preview    # preview the production build locally
+npm run test:dates # run the date-handling sanity checks
+```
