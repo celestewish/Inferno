@@ -2,14 +2,23 @@ import { useMemo, useState } from 'react'
 import FlameHorse from './FlameHorse'
 
 const COLUMNS = [
-  { id: 'backlog', label: 'Backlog' },
+  { id: 'todo', label: 'To Do' },
   { id: 'building', label: 'In Progress' },
-  { id: 'shipped', label: 'Shipped' },
+  { id: 'done', label: 'Done' },
 ]
 
 const DISCIPLINES = ['Design', 'Art', 'Code', 'Audio', 'Polish']
 
 const ROSTER_SUGGESTIONS = ['Pixel', 'Nova', 'Riff', 'Sage']
+
+const BOARD_SUGGESTION = 'Game Jam Stable'
+const PROJECT_SUGGESTION = 'Emberhold'
+const TASK_SUGGESTIONS = [
+  { title: 'Main Menu', discipline: 'Design' },
+  { title: 'Core Movement', discipline: 'Code' },
+  { title: 'Soundtrack Loop', discipline: 'Audio' },
+  { title: 'Boss Polish', discipline: 'Polish' },
+]
 
 const STEPS = [
   {
@@ -29,16 +38,16 @@ const STEPS = [
   {
     id: 'task',
     title: 'Create your first task',
-    hint: 'Break the dream into cards. Pick a discipline so producers can read the pipeline at a glance.',
-    objective: 'Add at least one task to the Backlog.',
+    hint: 'Break the dream into cards. Pick a discipline so producers can read the pipeline at a glance. Tap a quest suggestion to add it fast.',
+    objective: 'Add at least one task to To Do.',
     done: (s) => s.tasks.length > 0,
   },
   {
     id: 'move',
     title: 'Move a card into In Progress',
-    hint: 'Work flows left to right. Tap a Backlog card to pull it into In Progress and start the sprint.',
+    hint: 'Work flows left to right. Tap a To Do card to pull it into In Progress and start the sprint.',
     objective: 'Advance a card into In Progress.',
-    done: (s) => s.tasks.some((t) => t.status === 'building' || t.status === 'shipped'),
+    done: (s) => s.tasks.some((t) => t.status === 'building' || t.status === 'done'),
   },
   {
     id: 'assign',
@@ -63,10 +72,10 @@ const STEPS = [
   },
   {
     id: 'ship',
-    title: 'Ship a milestone',
-    hint: 'Push a card all the way to Shipped. That final polish pass is the boss fight of every jam.',
-    objective: 'Move a card to Shipped.',
-    done: (s) => s.tasks.some((t) => t.status === 'shipped'),
+    title: 'Ship the jam build',
+    hint: 'Push a card all the way to Done. That final polish pass is the boss fight of every jam.',
+    objective: 'Move a card to Done.',
+    done: (s) => s.tasks.some((t) => t.status === 'done'),
   },
 ]
 
@@ -80,7 +89,7 @@ const INITIAL = {
   peeked: false,
 }
 
-export default function GuidedTour() {
+export default function GuidedTour({ openSignup }) {
   const [state, setState] = useState(INITIAL)
   const [boardDraft, setBoardDraft] = useState('')
   const [projectDraft, setProjectDraft] = useState('')
@@ -95,7 +104,7 @@ export default function GuidedTour() {
   const activeStep = finished ? null : STEPS[activeIndex]
 
   const grouped = useMemo(() => {
-    const map = { backlog: [], building: [], shipped: [] }
+    const map = { todo: [], building: [], done: [] }
     for (const task of state.tasks) map[task.status]?.push(task)
     return map
   }, [state.tasks])
@@ -121,9 +130,23 @@ export default function GuidedTour() {
     if (!title) return
     setState((s) => ({
       ...s,
-      tasks: [...s.tasks, { id: `t${(nextId += 1)}`, title, discipline, status: 'backlog', assignee: '' }],
+      tasks: [...s.tasks, { id: `t${(nextId += 1)}`, title, discipline, status: 'todo', assignee: '' }],
     }))
     setTaskDraft('')
+  }
+
+  const addSuggestedTask = (suggestion) => {
+    setState((s) =>
+      s.tasks.some((t) => t.title === suggestion.title)
+        ? s
+        : {
+            ...s,
+            tasks: [
+              ...s.tasks,
+              { id: `t${(nextId += 1)}`, title: suggestion.title, discipline: suggestion.discipline, status: 'todo', assignee: '' },
+            ],
+          },
+    )
   }
 
   const advance = (task) => {
@@ -232,7 +255,7 @@ export default function GuidedTour() {
                 className="tour-input"
                 value={boardDraft}
                 onChange={(event) => setBoardDraft(event.target.value)}
-                placeholder="e.g. Ember Jam Studio"
+                placeholder={`e.g. ${BOARD_SUGGESTION}`}
                 maxLength={40}
                 data-testid="tour-board-input"
               />
@@ -240,6 +263,16 @@ export default function GuidedTour() {
                 {state.boardName ? 'Rename' : 'Create'}
               </button>
             </div>
+            {!state.boardName ? (
+              <button
+                type="button"
+                className="tour-chip"
+                onClick={() => setBoardDraft(BOARD_SUGGESTION)}
+                data-testid="tour-board-suggestion"
+              >
+                Try: {BOARD_SUGGESTION}
+              </button>
+            ) : null}
           </form>
 
           <form className="tour-field" onSubmit={addProject}>
@@ -250,7 +283,7 @@ export default function GuidedTour() {
                 className="tour-input"
                 value={projectDraft}
                 onChange={(event) => setProjectDraft(event.target.value)}
-                placeholder="e.g. Vertical slice"
+                placeholder={`e.g. ${PROJECT_SUGGESTION}`}
                 maxLength={40}
                 data-testid="tour-project-input"
               />
@@ -258,6 +291,16 @@ export default function GuidedTour() {
                 Add
               </button>
             </div>
+            {!state.project ? (
+              <button
+                type="button"
+                className="tour-chip"
+                onClick={() => setProjectDraft(PROJECT_SUGGESTION)}
+                data-testid="tour-project-suggestion"
+              >
+                Try: {PROJECT_SUGGESTION}
+              </button>
+            ) : null}
           </form>
 
           <form className="tour-field" onSubmit={addTask}>
@@ -286,6 +329,23 @@ export default function GuidedTour() {
               <button type="submit" className="primary-btn tour-btn" data-testid="tour-task-add">
                 Add task
               </button>
+            </div>
+            <div className="tour-suggestions" aria-label="Quest task suggestions">
+              {TASK_SUGGESTIONS.map((suggestion) => {
+                const added = state.tasks.some((t) => t.title === suggestion.title)
+                return (
+                  <button
+                    key={suggestion.title}
+                    type="button"
+                    className="tour-chip"
+                    onClick={() => addSuggestedTask(suggestion)}
+                    disabled={added}
+                    data-testid="tour-task-suggestion"
+                  >
+                    {added ? '✓ ' : '+ '}{suggestion.title}
+                  </button>
+                )
+              })}
             </div>
           </form>
 
@@ -345,8 +405,8 @@ export default function GuidedTour() {
                 <strong>{grouped.building.length}</strong>
               </div>
               <div className="tour-insight-card">
-                <span className="tour-insight-label">Shipped</span>
-                <strong>{grouped.shipped.length}</strong>
+                <span className="tour-insight-label">Done</span>
+                <strong>{grouped.done.length}</strong>
               </div>
             </div>
           ) : null}
@@ -373,8 +433,8 @@ export default function GuidedTour() {
                           type="button"
                           className="tour-card-main"
                           onClick={() => advance(task)}
-                          title={task.status === 'shipped' ? 'Shipped' : 'Move to next column'}
-                          disabled={task.status === 'shipped'}
+                          title={task.status === 'done' ? 'Done' : 'Move to next column'}
+                          disabled={task.status === 'done'}
                           data-testid="tour-card-advance"
                         >
                           <span className={`tour-tag tour-tag--${task.discipline.toLowerCase()}`}>
@@ -382,7 +442,7 @@ export default function GuidedTour() {
                           </span>
                           <span className="tour-card-title">{task.title}</span>
                           <span className="tour-card-move" aria-hidden="true">
-                            {task.status === 'shipped' ? '✓' : '→'}
+                            {task.status === 'done' ? '✓' : '→'}
                           </span>
                         </button>
                         <label className="tour-card-assign">
@@ -413,7 +473,19 @@ export default function GuidedTour() {
           <span className="tour-win-spark" aria-hidden="true">
             <FlameHorse size={44} />
           </span>
-          <p>Milestone shipped. That is a full lap around Inferno, from empty board to final polish.</p>
+          <div className="tour-win-copy">
+            <p>Jam build shipped. That is a full lap around Inferno, from empty board to final polish.</p>
+            {openSignup ? (
+              <button
+                type="button"
+                className="primary-btn tour-win-cta"
+                onClick={openSignup}
+                data-testid="tour-win-signup"
+              >
+                Sign up free and do it for real
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 

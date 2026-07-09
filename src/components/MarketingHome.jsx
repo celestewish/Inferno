@@ -4,10 +4,11 @@ import FeatureIcon from './FeatureIcon'
 import HeroCarousel from './HeroCarousel'
 import GuidedTour from './GuidedTour'
 import RoadmapGantt from './RoadmapGantt'
+import FlameHorse from './FlameHorse'
 
 const NAV_LINKS = [
+  { href: '#sandbox', label: 'Try the quest' },
   { href: '#features', label: 'Features' },
-  { href: '#sandbox', label: 'Try it' },
   { href: '#how-it-works', label: 'How it works' },
   { href: '#story', label: 'Story' },
   { href: '#roadmap', label: 'Roadmap' },
@@ -17,42 +18,38 @@ const FEATURES = [
   {
     icon: 'boards',
     title: 'Boards',
+    tagline: 'Organize the jam.',
     body: 'A shared studio workspace per game or team, with chat and invites built in.',
   },
   {
     icon: 'projects',
     title: 'Projects',
+    tagline: 'Split the game into vertical slices.',
     body: 'Group work by feature area, milestone, or whole game, then switch in a click.',
-  },
-  {
-    icon: 'kanban',
-    title: 'Kanban sections',
-    body: 'Backlog, To Do, In Progress, Review, and Done. Customize the pipeline to fit.',
   },
   {
     icon: 'tasks',
     title: 'Tasks',
+    tagline: 'Break work into bite-sized quests.',
     body: 'Assignees, discipline, priority, estimates, due dates, and notes on every card.',
+  },
+  {
+    icon: 'team',
+    title: 'Team',
+    tagline: 'Assign roles and invite collaborators.',
+    body: 'Invite teammates, assign work, and talk it through in real-time board chat.',
   },
   {
     icon: 'calendar',
     title: 'Calendar',
+    tagline: 'Survive the deadline.',
     body: 'See due dates across the board on a month view so nothing slips through.',
   },
   {
     icon: 'reports',
     title: 'Reports',
+    tagline: 'See what shipped and what slipped.',
     body: 'Live snapshots by status, priority, and discipline to track production health.',
-  },
-  {
-    icon: 'team',
-    title: 'Team',
-    body: 'Invite collaborators, assign work, and talk it through in real-time board chat.',
-  },
-  {
-    icon: 'customization',
-    title: 'Customization',
-    body: 'Recolor accent, glow, surface, and background to make each board your own.',
   },
 ]
 
@@ -136,6 +133,15 @@ export default function MarketingHome({ openLogin, openSignup }) {
     closeMenu()
   }
 
+  const scrollToSection = (href) => {
+    const target = document.querySelector(href)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      window.history.replaceState(null, '', href)
+    }
+    closeMenu()
+  }
+
   return (
     <div className="landing">
       <header className="landing-nav" data-testid="landing-nav">
@@ -180,29 +186,48 @@ export default function MarketingHome({ openLogin, openSignup }) {
       </header>
 
       <main className="landing-main" id="top">
-        <section className="landing-hero" aria-label="Inferno overview">
+        <section className="landing-hero landing-hero--studio" aria-label="Inferno overview">
+          <div className="landing-hero-ember" aria-hidden="true" />
           <div className="landing-hero-copy">
-            <p className="eyebrow">Game production, organized</p>
-            <h1 className="inferno-wordmark landing-hero-title">Inferno</h1>
+            <p className="landing-hero-kicker">
+              <span className="landing-hero-mascot" aria-hidden="true">
+                <FlameHorse size={30} />
+              </span>
+              Indie game dev task board
+            </p>
+            <h1 className="landing-hero-title">
+              Turn chaos<br />into <span className="landing-hero-accent">creation.</span>
+            </h1>
             <p className="landing-hero-pitch">
-              The free task board built for indie game developers and small studios. Plan features,
-              assign work, and drive production from first prototype to final polish, all on one dark,
-              focused board that thinks in disciplines instead of spreadsheets.
+              It is game jam night. Sticky notes everywhere, three chat apps open, the build due at
+              dawn. Inferno is the quest board built for indie makers and small studios, so you can
+              plan features, assign work, and ship from first prototype to final polish on one focused
+              board that thinks in disciplines instead of spreadsheets.
             </p>
 
             <div className="landing-cta-row">
-              <button type="button" className="primary-btn" data-testid="hero-signup" onClick={openSignup}>
-                Sign up free
+              <button
+                type="button"
+                className="primary-btn"
+                data-testid="hero-start-quest"
+                onClick={() => scrollToSection('#sandbox')}
+              >
+                Start your quest
               </button>
-              <button type="button" className="secondary-btn" data-testid="hero-login" onClick={openLogin}>
-                Log in
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="hero-skip-features"
+                onClick={() => scrollToSection('#features')}
+              >
+                Skip to features
               </button>
             </div>
 
             <ul className="landing-proof" aria-label="Highlights">
               <li>Free to use</li>
+              <li>No signup to try the quest</li>
               <li>Built for game projects</li>
-              <li>Starts with a seeded sample board</li>
             </ul>
           </div>
 
@@ -230,6 +255,7 @@ export default function MarketingHome({ openLogin, openSignup }) {
                   <FeatureIcon name={feature.icon} />
                 </span>
                 <h3>{feature.title}</h3>
+                <p className="landing-feature-tagline">{feature.tagline}</p>
                 <p>{feature.body}</p>
               </article>
             ))}
@@ -240,16 +266,16 @@ export default function MarketingHome({ openLogin, openSignup }) {
 
         <section className="landing-section landing-sandbox" id="sandbox" aria-label="Interactive tutorial">
           <div className="landing-section-head">
-            <p className="eyebrow">Try it, no signup</p>
-            <h2>Run a game jam in eight steps</h2>
+            <p className="eyebrow">Game Jam Quest, no signup</p>
+            <h2>Run a game jam, one quest step at a time</h2>
             <p className="muted-copy">
               Dante the flame pony walks you through the whole Inferno loop, from naming a board to
-              shipping a milestone. Complete each quest step on a live mini board. It runs entirely
+              shipping the jam build. Complete each quest step on a live mini board. It runs entirely
               in your browser and nothing is saved.
             </p>
           </div>
 
-          <GuidedTour />
+          <GuidedTour openSignup={openSignup} />
         </section>
 
         <div className="landing-divider landing-divider--ember" aria-hidden="true" />
@@ -347,7 +373,7 @@ export default function MarketingHome({ openLogin, openSignup }) {
         </section>
 
         <section className="landing-section landing-final-cta" aria-label="Get started">
-          <h2>Start planning your game today</h2>
+          <h2>The jam build is ready. Your studio needs a board.</h2>
           <p className="muted-copy">
             Create a free account and explore a fully seeded sample board in seconds.
           </p>

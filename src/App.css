@@ -2066,10 +2066,60 @@ textarea:hover {
 }
 .landing-hero-visual .landing-shot { position: relative; z-index: 1; }
 
+/* Game Jam Studio Night hero */
+.landing-hero--studio { position: relative; isolation: isolate; }
+.landing-hero-ember {
+  position: absolute;
+  inset: -18% -10% auto -10%;
+  height: 70%;
+  z-index: -1;
+  background:
+    radial-gradient(60% 80% at 18% 30%, color-mix(in srgb, var(--ember) 28%, transparent), transparent 70%),
+    radial-gradient(50% 70% at 85% 20%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%);
+  filter: blur(46px);
+  pointer-events: none;
+}
+.landing-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  color: #ffd9c2;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  width: max-content;
+}
+.landing-hero-mascot { display: inline-flex; }
+.landing-hero--studio .landing-hero-title {
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+.landing-hero-accent {
+  background: linear-gradient(120deg, var(--accent), var(--ember) 55%, var(--accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-feature-tagline {
+  margin: 0 !important;
+  color: var(--text-main) !important;
+  font-weight: 700;
+  font-size: 0.92rem !important;
+}
+
 /* Feature grid */
 .landing-feature-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 .landing-feature-card {
@@ -2570,9 +2620,9 @@ textarea:hover {
   background: color-mix(in srgb, var(--surface-custom) 90%, white 3%);
   border-top: 3px solid var(--accent);
 }
-.tour-column--backlog { border-top-color: color-mix(in srgb, var(--accent-secondary) 80%, white 10%); }
+.tour-column--todo { border-top-color: color-mix(in srgb, var(--accent-secondary) 80%, white 10%); }
 .tour-column--building { border-top-color: var(--accent); }
-.tour-column--shipped { border-top-color: var(--ember); }
+.tour-column--done { border-top-color: var(--ember); }
 .tour-column-head { display: flex; align-items: center; justify-content: space-between; }
 .tour-column-head h4 { margin: 0; font-size: 0.9rem; }
 .tour-count {
@@ -2669,6 +2719,26 @@ textarea:hover {
 }
 .tour-win p { margin: 0; font-weight: 600; }
 .tour-win-spark { flex: none; }
+.tour-win-copy { display: grid; gap: 0.7rem; }
+.tour-win-cta { justify-self: start; }
+
+/* Quest quick-fill chips */
+.tour-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+.tour-chip {
+  align-self: start;
+  margin-top: 0.3rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-main);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+.tour-chip:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 22%, transparent); transform: translateY(-1px); }
+.tour-chip:disabled { opacity: 0.55; cursor: default; border-style: dashed; }
 
 .tour-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .tour-reset { padding: 0.55rem 0.95rem; }
