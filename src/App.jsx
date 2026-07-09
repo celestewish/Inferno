@@ -18,6 +18,7 @@ import CommandPalette from './components/CommandPalette'
 import TemplatesView from './components/TemplatesView'
 import { getTemplate, buildTemplateTasks, templateTaskCount } from './lib/templates'
 import RecapView from './components/RecapView'
+import PortfolioView from './components/PortfolioView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -4028,6 +4029,18 @@ return (
             repos={repos}
             messages={messages}
             meetingNotes={meetingNotes}
+            profiles={profiles}
+          />
+        ) : null}
+
+        {activeSection === 'portfolio' ? (
+          <PortfolioView
+            projects={projects}
+            tasks={tasks}
+            docs={docs}
+            repos={repos}
+            meetingNotes={meetingNotes}
+            messages={messages}
             profiles={profiles}
           />
         ) : null}
