@@ -1304,6 +1304,8 @@ function dbToTask(row) {
     labels: row.labels ?? [],
     subtasks: row.subtasks ?? [],
     activity: row.activity ?? [],
+    codeRefs: Array.isArray(row.code_refs) ? row.code_refs : [],
+    docRefs: Array.isArray(row.doc_refs) ? row.doc_refs : [],
   }
 }
 
@@ -1738,14 +1740,25 @@ function dbToInvite(row) {
         return next
       })
     )
-    const { subtasks, labels, activity, projectId, ...rest } = updates
-    await supabase.from('tasks').update({
+    const { subtasks, labels, activity, projectId, codeRefs, docRefs, ...rest } = updates
+    const patch = {
       ...rest,
       ...(subtasks !== undefined && { subtasks }),
       ...(labels !== undefined && { labels }),
       ...(activity !== undefined && { activity }),
       ...(projectId !== undefined && { project_id: projectId }),
-    }).eq('id', taskId)
+      ...(codeRefs !== undefined && { code_refs: codeRefs }),
+      ...(docRefs !== undefined && { doc_refs: docRefs }),
+    }
+    const { error } = await supabase.from('tasks').update(patch).eq('id', taskId)
+    // If the task-links migration has not been applied yet, the code_refs/doc_refs
+    // columns are missing. Retry without them so the rest of the edit still saves.
+    if (error && isMissingColumnError(error) && (codeRefs !== undefined || docRefs !== undefined)) {
+      const { code_refs, doc_refs, ...fallback } = patch
+      await supabase.from('tasks').update(fallback).eq('id', taskId)
+    } else if (error) {
+      console.error('Update task error:', formatSupabaseError(error), error)
+    }
   }
 
   const deleteTask = async (taskId) => {
