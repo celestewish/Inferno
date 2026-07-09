@@ -137,6 +137,10 @@ export default function TaskBoard({
 
                     <h4 className="task-card-title">{task.title}</h4>
 
+                    {task.description ? (
+                      <p className="task-card-desc">{task.description}</p>
+                    ) : null}
+
                     <div className="task-card-meta-row">
                       <span className="task-card-meta-item">{task.assignee}</span>
                       {hasDueDate ? <span className="task-card-meta-item">Due {task.due}</span> : null}

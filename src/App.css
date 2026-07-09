@@ -466,6 +466,20 @@ textarea:hover {
   word-break: break-word;
 }
 .task-card.completed .task-card-title { text-decoration: line-through; }
+.task-card-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #a3adcf;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.task-card.completed .task-card-desc { text-decoration: line-through; }
 .task-card-meta-row {
   display: flex;
   flex-wrap: wrap;
