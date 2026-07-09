@@ -565,6 +565,7 @@ textarea:hover {
 .modal-card { width: min(720px, 100%); max-height: calc(100dvh - 2rem); display: flex; flex-direction: column; background: var(--surface-custom); border: 1px solid rgba(255,255,255,0.08); border-radius: 24px; padding: 1.25rem; box-shadow: 0 30px 80px rgba(0,0,0,0.34); animation: riseIn 220ms ease; overflow: hidden; }
 .modal-header { flex: 0 0 auto; display: flex; justify-content: space-between; gap: 1rem; align-items: start; margin-bottom: 1rem; }
 .modal-form { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 0.25rem; }
+.modal-description { min-height: 8.5rem; line-height: 1.5; resize: vertical; }
 .checkbox-row { display: flex; align-items: center; gap: 0.75rem; color: #d7dfff; }
 .member-chip-row { padding: 0.25rem 0; }
 

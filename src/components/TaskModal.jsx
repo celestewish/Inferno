@@ -21,7 +21,7 @@ export default function TaskModal({ editingTask, setEditingTask, handleEditSave,
         </div>
         <form className="modal-form" onSubmit={handleEditSave}>
           <input value={editingTask.title} onChange={(e) => setEditingTask((c) => ({ ...c, title: e.target.value }))} placeholder="Task title" />
-          <textarea rows="4" value={editingTask.description} onChange={(e) => setEditingTask((c) => ({ ...c, description: e.target.value }))} placeholder="Task description" />
+          <textarea className="modal-description" rows="6" value={editingTask.description} onChange={(e) => setEditingTask((c) => ({ ...c, description: e.target.value }))} placeholder="Task description" />
           <div className="form-row">
             <select value={editingTask.discipline} onChange={(e) => setEditingTask((c) => ({ ...c, discipline: e.target.value }))}>
               {disciplines.map((item) => <option key={item}>{item}</option>)}
