@@ -70,6 +70,25 @@ assert(isAccessError(deployed) === true, 'deployed 42501/401 is an access error'
 assert(isMissingTableError(deployed) === false, 'deployed 42501/401 is NOT a missing table')
 assert(isMissingColumnError(deployed) === false, 'deployed 42501/401 is NOT a missing column')
 
+// Notifications write-path guard: an ON CONFLICT DO UPDATE against
+// notification_reads (which grants no UPDATE) fails with 42501. The migration
+// banner must be driven only by missing table/column, so this error must NOT be
+// classified as missing-table/column (the write handler shows the access banner
+// instead of "run supabase db push").
+const notifWrite = { code: '42501', message: 'permission denied for table notification_reads' }
+assert(
+  (isMissingTableError(notifWrite) || isMissingColumnError(notifWrite)) === false,
+  'notification_reads 42501 does NOT drive the migration banner',
+)
+assert(isAccessError(notifWrite) === true, 'notification_reads 42501 is an access error')
+
+// A genuinely missing notification_reads table must still drive the migration banner.
+const notifMissing = { code: 'PGRST205', message: 'Could not find the table public.notification_reads in the schema cache' }
+assert(
+  (isMissingTableError(notifMissing) || isMissingColumnError(notifMissing)) === true,
+  'a truly missing notification_reads table DOES drive the migration banner',
+)
+
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)
   process.exit(1)

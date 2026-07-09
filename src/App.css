@@ -4019,11 +4019,19 @@ textarea:hover {
 }
 .forge-search-input {
   width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
   border: 1px solid var(--card-border);
   background: rgba(255,255,255,0.045);
   color: var(--text-main);
   border-radius: var(--radius-md);
-  padding: 0.7rem 0.9rem 0.7rem 2.2rem;
+  padding: 0.7rem 0.9rem 0.7rem 2.6rem;
+  font: inherit;
+}
+.forge-search-input::-webkit-search-decoration,
+.forge-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
 }
 .forge-filter { display: grid; gap: 0.3rem; }
 .forge-filter-label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
@@ -4052,6 +4060,7 @@ textarea:hover {
 }
 .forge-card {
   display: grid; gap: 0.5rem;
+  min-width: 0;
   border: 1px solid var(--card-border);
   background: color-mix(in srgb, var(--surface-custom) 90%, white 4%);
   border-radius: var(--radius-md);
@@ -4083,7 +4092,7 @@ textarea:hover {
 .forge-card-title { margin: 0; font-size: 1rem; line-height: 1.35; word-break: break-word; }
 .forge-card-slug { margin: 0; font-size: 0.82rem; color: var(--text-muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
 .forge-card-desc { margin: 0; color: var(--text-muted); font-size: 0.88rem; line-height: 1.5; }
-.forge-card-clone { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.forge-card-clone { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
 .forge-clone-cmd {
   flex: 1 1 auto; min-width: 0;
   font-size: 0.76rem;
@@ -4093,7 +4102,9 @@ textarea:hover {
   border-radius: var(--radius-md);
   padding: 0.4rem 0.6rem;
   overflow-x: auto; white-space: nowrap;
+  scrollbar-width: thin;
 }
+.forge-card-clone .forge-icon-btn { flex: 0 0 auto; }
 .forge-copied { font-size: 0.72rem; color: var(--accent-secondary); }
 .forge-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; flex-wrap: wrap; margin-top: 0.15rem; }
 .forge-card-project { font-size: 0.78rem; color: var(--text-muted); }
