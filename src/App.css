@@ -2066,10 +2066,60 @@ textarea:hover {
 }
 .landing-hero-visual .landing-shot { position: relative; z-index: 1; }
 
+/* Game Jam Studio Night hero */
+.landing-hero--studio { position: relative; isolation: isolate; }
+.landing-hero-ember {
+  position: absolute;
+  inset: -18% -10% auto -10%;
+  height: 70%;
+  z-index: -1;
+  background:
+    radial-gradient(60% 80% at 18% 30%, color-mix(in srgb, var(--ember) 28%, transparent), transparent 70%),
+    radial-gradient(50% 70% at 85% 20%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 72%);
+  filter: blur(46px);
+  pointer-events: none;
+}
+.landing-hero-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.35rem 0.75rem 0.35rem 0.4rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  color: #ffd9c2;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  width: max-content;
+}
+.landing-hero-mascot { display: inline-flex; }
+.landing-hero--studio .landing-hero-title {
+  font-size: clamp(2.6rem, 6vw, 4.4rem);
+  line-height: 1.02;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-main);
+}
+.landing-hero-accent {
+  background: linear-gradient(120deg, var(--accent), var(--ember) 55%, var(--accent-secondary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.landing-feature-tagline {
+  margin: 0 !important;
+  color: var(--text-main) !important;
+  font-weight: 700;
+  font-size: 0.92rem !important;
+}
+
 /* Feature grid */
 .landing-feature-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1rem;
 }
 .landing-feature-card {
@@ -2404,203 +2454,443 @@ textarea:hover {
 
 /* Guided tutorial minigame */
 .landing-sandbox { scroll-margin-top: 84px; }
-.tour { display: grid; gap: 1.25rem; }
-
-.tour-quest {
+/* Pixel-art RPG guided quest
+   Local ember/pixel palette layered on the global theme tokens. */
+.tour-rpg {
+  --pixel-font: 'Press Start 2P', 'Segoe UI', system-ui, sans-serif;
+  --tour-panel-bg: color-mix(in srgb, var(--background-custom) 78%, #060810 22%);
+  --tour-panel-edge: color-mix(in srgb, var(--ember) 34%, rgba(255, 255, 255, 0.08));
+  --tour-glow: 0 0 0 1px color-mix(in srgb, var(--ember) 26%, transparent), 0 12px 30px -18px rgba(0, 0, 0, 0.8);
+  --tour-ember: var(--ember);
+  --tour-ember-deep: color-mix(in srgb, var(--ember) 70%, #b5410f);
   display: grid;
-  gap: 0.85rem;
-  padding: 1.25rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--card-border));
+  gap: 1rem;
+  padding: 1.1rem;
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--tour-panel-edge);
   background:
-    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 55%),
-    color-mix(in srgb, var(--surface-custom) 90%, white 3%);
+    radial-gradient(140% 120% at 0% 0%, color-mix(in srgb, var(--ember) 12%, transparent), transparent 52%),
+    radial-gradient(120% 120% at 100% 100%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 55%),
+    color-mix(in srgb, var(--background-custom) 82%, #05070e 18%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03), 0 24px 60px -34px rgba(0, 0, 0, 0.85);
 }
-.tour-quest-head { display: flex; gap: 0.9rem; align-items: flex-start; }
-.tour-mascot {
-  flex: none;
+
+/* HUD */
+.tour-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7rem 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--tour-panel-edge);
+  background: color-mix(in srgb, var(--background-custom) 65%, #05070e 35%);
+}
+.tour-hud-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-family: var(--pixel-font);
+  font-size: 0.72rem;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ember) 55%, #fff);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
+}
+.tour-hud-badge {
   display: grid;
   place-items: center;
-  width: 66px;
-  height: 66px;
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--background-custom) 70%, transparent);
-  border: 1px solid var(--card-border);
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #1a0f06;
+  background: linear-gradient(135deg, #ffd08a, var(--tour-ember) 60%, var(--tour-ember-deep));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ember) 60%, transparent), 0 0 14px -2px var(--ember);
 }
-.tour-quest-copy { display: grid; gap: 0.25rem; }
-.tour-quest-kicker {
-  margin: 0;
-  font-size: 0.72rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--accent-secondary);
+.tour-hud-track { display: flex; align-items: center; gap: 0.6rem; flex: 1 1 260px; min-width: 200px; }
+.tour-hud-count {
+  font-family: var(--pixel-font);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
-.tour-quest-title { margin: 0; font-size: 1.1rem; }
-.tour-quest-hint { margin: 0; color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; }
+.tour-pips { list-style: none; margin: 0; padding: 0; display: flex; gap: 4px; }
+.tour-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.tour-pip.is-active { background: color-mix(in srgb, var(--ember) 60%, #fff); box-shadow: 0 0 8px -1px var(--ember); }
+.tour-pip.is-done { background: linear-gradient(135deg, #ffd08a, var(--tour-ember)); }
 
 .tour-progress {
-  height: 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid var(--card-border);
+  flex: 1 1 auto;
+  height: 12px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 .tour-progress-fill {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent-secondary), var(--accent) 55%, var(--ember));
+  background: linear-gradient(90deg, #ffd08a, var(--tour-ember) 55%, var(--tour-ember-deep));
+  box-shadow: 0 0 12px -1px color-mix(in srgb, var(--ember) 70%, transparent);
   transition: width 320ms ease;
 }
 .tour-progress-text { margin: 0; font-size: 0.82rem; color: var(--text-muted); }
 
-.tour-checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.9rem;
+.tour-reset {
+  margin-left: auto;
+  padding: 0.45rem 0.85rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--tour-panel-edge);
+  background: color-mix(in srgb, var(--background-custom) 60%, transparent);
+  color: var(--text-main);
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, transform 140ms ease;
 }
-.tour-check {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-.tour-check-mark {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 1.5px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
-}
-.tour-check.is-active { color: var(--text-main); }
-.tour-check.is-active .tour-check-mark { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
-.tour-check.is-done { color: color-mix(in srgb, var(--text-main) 80%, var(--accent-secondary)); }
-.tour-check.is-done .tour-check-mark {
-  border-color: var(--accent-secondary);
-  background: linear-gradient(135deg, var(--accent-secondary), var(--accent));
-}
+.tour-reset:hover { border-color: var(--ember); transform: translateY(-1px); }
 
+/* Stage: three RPG panels */
 .tour-stage {
   display: grid;
-  grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
-  gap: 1.1rem;
+  grid-template-columns: minmax(0, 250px) minmax(0, 1.05fr) minmax(0, 1.15fr);
+  gap: 0.85rem;
   align-items: start;
 }
-.tour-controls {
+.tour-panel {
   display: grid;
-  gap: 0.85rem;
-  padding: 1rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--card-border);
-  background: color-mix(in srgb, var(--surface-custom) 90%, white 3%);
+  gap: 0.75rem;
   align-content: start;
+  padding: 0.95rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--tour-panel-edge);
+  background: var(--tour-panel-bg);
+  box-shadow: var(--tour-glow);
 }
+.tour-panel-eyebrow {
+  font-family: var(--pixel-font);
+  font-size: 0.52rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ember) 45%, var(--text-muted));
+}
+
+/* Character / stat panel */
+.tour-hero-top { display: flex; align-items: center; gap: 0.7rem; }
+.tour-crest {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  border-radius: 10px;
+  font-family: var(--pixel-font);
+  font-size: 0.85rem;
+  color: #1a0f06;
+  background: linear-gradient(135deg, #ffd08a, var(--tour-ember) 65%, var(--tour-ember-deep));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ember) 40%, transparent), inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+.tour-hero-id { display: grid; gap: 0.2rem; min-width: 0; }
+.tour-hero-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-hero-lvl {
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--ember) 55%, #fff);
+}
+.tour-xp { display: grid; gap: 0.3rem; }
+.tour-xp-bar {
+  height: 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.tour-xp-bar span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-secondary), var(--accent));
+  transition: width 320ms ease;
+}
+.tour-xp-text { font-family: var(--pixel-font); font-size: 0.5rem; color: var(--text-muted); }
+
+.tour-stats { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.tour-stat {
+  --stat-tone: var(--ember);
+  display: grid;
+  grid-template-columns: auto minmax(52px, auto) 1fr auto;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.38rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.tour-stat--hp { --stat-tone: #ff7a6b; }
+.tour-stat--focus { --stat-tone: var(--ember); }
+.tour-stat--mind { --stat-tone: var(--accent-secondary); }
+.tour-stat--grit { --stat-tone: #ffd08a; }
+.tour-stat-icon {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: var(--stat-tone);
+  box-shadow: 0 0 8px -2px var(--stat-tone);
+}
+.tour-stat-label { font-size: 0.72rem; color: var(--text-muted); }
+.tour-stat-meter {
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.tour-stat-meter span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--stat-tone) 70%, #fff), var(--stat-tone));
+  transition: width 320ms ease;
+}
+.tour-stat-value { font-family: var(--pixel-font); font-size: 0.5rem; color: var(--text-main); white-space: nowrap; }
+
+.tour-inventory, .tour-questlog { display: grid; gap: 0.45rem; }
+.tour-inventory-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.1rem;
+  padding: 0 0.25rem;
+  border-radius: 4px;
+  color: #1a0f06;
+  background: linear-gradient(135deg, #ffd08a, var(--tour-ember));
+}
+.tour-inventory-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.tour-inventory-empty { font-size: 0.74rem; color: var(--text-muted); font-style: italic; }
+
+.tour-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; }
+.tour-check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.76rem; color: var(--text-muted); }
+.tour-check-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.3);
+  flex: none;
+}
+.tour-check.is-active { color: var(--text-main); }
+.tour-check.is-active .tour-check-mark { border-color: var(--ember); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ember) 25%, transparent); }
+.tour-check.is-done { color: color-mix(in srgb, var(--text-main) 78%, var(--ember)); }
+.tour-check.is-done .tour-check-mark { border-color: transparent; background: linear-gradient(135deg, #ffd08a, var(--tour-ember)); }
+
+/* Quest panel */
+.tour-quest-head { display: grid; gap: 0.35rem; }
+.tour-quest-title { margin: 0; font-size: 1.05rem; line-height: 1.35; color: var(--text-main); }
+.tour-quest-obj {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.82rem;
+  color: color-mix(in srgb, var(--text-main) 70%, var(--ember));
+}
+.tour-quest-obj-flag { color: var(--ember); }
+
+.tour-dante {
+  display: flex;
+  gap: 0.7rem;
+  padding: 0.7rem 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--tour-panel-edge);
+  background:
+    radial-gradient(120% 120% at 0% 0%, color-mix(in srgb, var(--ember) 14%, transparent), transparent 60%),
+    rgba(0, 0, 0, 0.32);
+}
+.tour-dante-portrait {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-custom) 60%, transparent);
+  border: 1px solid var(--tour-panel-edge);
+  box-shadow: 0 0 14px -4px var(--ember);
+}
+.tour-dante-copy { display: grid; gap: 0.25rem; }
+.tour-dante-name { font-size: 0.82rem; font-weight: 800; color: var(--text-main); }
+.tour-dante-role {
+  font-family: var(--pixel-font);
+  font-size: 0.45rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--ember) 55%, #fff);
+  margin-left: 0.35rem;
+}
+.tour-dante-line { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--text-muted); }
+
+/* Actions (forms) */
+.tour-actions { display: grid; gap: 0.7rem; }
+.tour-actions-row { display: grid; grid-template-columns: 1fr; gap: 0.7rem; }
 .tour-field { display: grid; gap: 0.35rem; }
 .tour-field > label,
 .tour-field-label {
-  font-size: 0.74rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
+  letter-spacing: 0.03em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: color-mix(in srgb, var(--ember) 45%, var(--text-muted));
 }
 .tour-field-row { display: flex; flex-wrap: wrap; gap: 0.45rem; }
 .tour-input,
 .tour-select {
   flex: 1 1 140px;
   min-width: 0;
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.34);
   color: var(--text-main);
-  border-radius: var(--radius-md);
-  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.65rem;
   font-size: 0.85rem;
 }
+.tour-input:focus,
+.tour-select:focus { outline: 2px solid color-mix(in srgb, var(--ember) 55%, transparent); outline-offset: 1px; }
 .tour-select { flex: 0 1 auto; }
-.tour-btn { padding: 0.55rem 0.85rem; flex: 0 0 auto; }
-.tour-peek-btn { width: 100%; }
-.tour-roster { margin: 0; display: grid; gap: 0.2rem; font-size: 0.85rem; color: var(--text-main); }
 
-.tour-board-wrap { display: grid; gap: 0.8rem; }
+.tour-btn {
+  flex: 0 0 auto;
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--pixel-font);
+  font-size: 0.52rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+.tour-btn--ghost {
+  border: 1px solid var(--tour-panel-edge);
+  background: color-mix(in srgb, var(--background-custom) 55%, transparent);
+  color: var(--text-main);
+}
+.tour-btn--ghost:hover { border-color: var(--ember); transform: translateY(-1px); }
+.tour-btn--ember {
+  border: 1px solid var(--tour-ember-deep);
+  background: linear-gradient(135deg, #ffb877, var(--tour-ember) 60%, var(--tour-ember-deep));
+  color: #1a0f06;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ember) 40%, transparent), 0 8px 18px -10px var(--ember);
+}
+.tour-btn--ember:hover { transform: translateY(-1px); box-shadow: 0 0 0 1px var(--ember), 0 10px 22px -8px var(--ember); }
+.tour-peek-btn { width: 100%; }
+
+.tour-suggestions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.15rem; }
+.tour-chip {
+  align-self: start;
+  margin-top: 0.2rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--ember) 42%, rgba(255, 255, 255, 0.08));
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  color: var(--text-main);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 140ms ease, transform 140ms ease;
+}
+.tour-chip:hover:not(:disabled) { background: color-mix(in srgb, var(--ember) 24%, transparent); transform: translateY(-1px); }
+.tour-chip:disabled { opacity: 0.55; cursor: default; border-style: dashed; }
+
+/* Board preview panel */
 .tour-board-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.55rem 0.8rem;
+  padding: 0.5rem 0.7rem;
   border-radius: var(--radius-md);
-  border: 1px solid var(--card-border);
-  background: color-mix(in srgb, var(--surface-custom) 88%, white 4%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.28);
 }
-.tour-board-name { font-weight: 700; }
+.tour-board-name { font-weight: 800; font-size: 0.88rem; }
 .tour-board-project {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   padding: 0.16rem 0.55rem;
   border-radius: var(--radius-pill);
-  color: #e9ecff;
-  background: color-mix(in srgb, var(--accent) 26%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 42%, var(--card-border));
+  color: #1a0f06;
+  background: linear-gradient(135deg, #ffd08a, var(--tour-ember));
+  border: 1px solid var(--tour-ember-deep);
 }
 
-.tour-insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+.tour-insights { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
 .tour-insight-card {
   display: grid;
   gap: 0.2rem;
-  padding: 0.7rem;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.035);
+  padding: 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.28);
   text-align: center;
 }
-.tour-insight-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
-.tour-insight-card strong { font-size: 0.95rem; }
+.tour-insight-label { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.tour-insight-card strong { font-size: 0.9rem; }
 
-.tour-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
+.tour-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
 .tour-column {
   display: grid;
-  gap: 0.6rem;
+  gap: 0.5rem;
   align-content: start;
-  padding: 0.85rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--card-border);
-  background: color-mix(in srgb, var(--surface-custom) 90%, white 3%);
-  border-top: 3px solid var(--accent);
+  padding: 0.65rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(0, 0, 0, 0.26);
+  border-top: 3px solid var(--ember);
 }
-.tour-column--backlog { border-top-color: color-mix(in srgb, var(--accent-secondary) 80%, white 10%); }
+.tour-column--todo { border-top-color: color-mix(in srgb, var(--accent-secondary) 85%, white 10%); }
 .tour-column--building { border-top-color: var(--accent); }
-.tour-column--shipped { border-top-color: var(--ember); }
+.tour-column--done { border-top-color: var(--ember); }
 .tour-column-head { display: flex; align-items: center; justify-content: space-between; }
-.tour-column-head h4 { margin: 0; font-size: 0.9rem; }
+.tour-column-head h4 { margin: 0; font-family: var(--pixel-font); font-size: 0.5rem; letter-spacing: 0.02em; color: var(--text-main); }
 .tour-count {
-  min-width: 1.5rem;
+  min-width: 1.4rem;
   text-align: center;
-  border-radius: 999px;
-  padding: 0.1rem 0.5rem;
-  font-size: 0.72rem;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+  font-family: var(--pixel-font);
+  font-size: 0.5rem;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.07);
 }
-.tour-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; min-height: 2.5rem; }
+.tour-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; min-height: 2.5rem; }
 .tour-empty {
   color: var(--text-muted);
-  font-size: 0.8rem;
-  padding: 0.55rem;
-  border: 1px dashed var(--card-border);
-  border-radius: var(--radius-md);
+  font-size: 0.76rem;
+  padding: 0.5rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
   text-align: center;
 }
 .tour-card {
   display: grid;
   gap: 0.4rem;
-  padding: 0.55rem 0.6rem;
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.035);
-  border-radius: var(--radius-md);
+  padding: 0.5rem 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--background-custom) 55%, #05070e 45%);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.3);
 }
 .tour-card-main {
   width: 100%;
@@ -2617,17 +2907,19 @@ textarea:hover {
   transition: transform 140ms ease;
 }
 .tour-card-main:hover:not(:disabled) { transform: translateX(2px); }
-.tour-card-title { font-size: 0.84rem; line-height: 1.35; }
-.tour-card-move { color: var(--text-muted); font-size: 0.95rem; }
+.tour-card-main:disabled { cursor: default; }
+.tour-card-title { font-size: 0.82rem; line-height: 1.35; }
+.tour-card-move { color: var(--ember); font-size: 0.95rem; }
 .tour-card-assign select {
   width: 100%;
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.3);
   color: var(--text-muted);
-  border-radius: var(--radius-sm);
-  padding: 0.28rem 0.4rem;
-  font-size: 0.74rem;
+  border-radius: 4px;
+  padding: 0.26rem 0.4rem;
+  font-size: 0.72rem;
 }
+
 .tour-visually-hidden {
   position: absolute;
   width: 1px;
@@ -2642,8 +2934,8 @@ textarea:hover {
 .tour-tag {
   justify-self: start;
   padding: 0.12rem 0.48rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.64rem;
+  border-radius: 4px;
+  font-size: 0.6rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2656,23 +2948,77 @@ textarea:hover {
 .tour-tag--audio { background: #6fe0c8; }
 .tour-tag--polish { background: #ffb37a; }
 
+/* Team spirit bar */
+.tour-teambar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.8rem 1.4rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--tour-panel-edge);
+  background: color-mix(in srgb, var(--background-custom) 65%, #05070e 35%);
+}
+.tour-spirit { display: flex; align-items: center; gap: 0.6rem; flex: 1 1 260px; min-width: 200px; }
+.tour-spirit-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--pixel-font);
+  font-size: 0.52rem;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--ember) 50%, #fff);
+  white-space: nowrap;
+}
+.tour-spirit-bar { flex: 1 1 auto; }
+.tour-spirit-pct { font-family: var(--pixel-font); font-size: 0.52rem; color: var(--text-muted); }
+.tour-party { display: flex; align-items: center; gap: 0.6rem; }
+.tour-avatars { list-style: none; margin: 0; padding: 0; display: flex; }
+.tour-avatar-chip {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: -8px;
+  border-radius: 8px;
+  font-family: var(--pixel-font);
+  font-size: 0.55rem;
+  color: #1a0f06;
+  background: linear-gradient(135deg, #ffd08a, var(--tour-ember));
+  border: 2px solid color-mix(in srgb, var(--background-custom) 70%, #05070e 30%);
+}
+.tour-avatar-chip:first-child { margin-left: 0; }
+.tour-party-label { font-size: 0.78rem; color: var(--text-muted); }
+
+/* Win state */
 .tour-win {
   display: flex;
   align-items: center;
   gap: 0.8rem;
   padding: 0.9rem 1.1rem;
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--accent-secondary) 40%, var(--card-border));
+  border: 1px solid var(--tour-ember-deep);
   background:
-    radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--ember) 18%, transparent), transparent 55%),
-    color-mix(in srgb, var(--surface-custom) 88%, white 4%);
+    radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--ember) 22%, transparent), transparent 55%),
+    color-mix(in srgb, var(--background-custom) 78%, #05070e 22%);
+  box-shadow: 0 0 20px -8px var(--ember);
 }
-.tour-win p { margin: 0; font-weight: 600; }
-.tour-win-spark { flex: none; }
+.tour-win p { margin: 0; font-weight: 700; }
+.tour-win-spark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--background-custom) 60%, transparent);
+  border: 1px solid var(--tour-ember-deep);
+  box-shadow: 0 0 16px -4px var(--ember);
+}
+.tour-win-copy { display: grid; gap: 0.7rem; }
+.tour-win-cta { justify-self: start; }
 
-.tour-footer { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
-.tour-reset { padding: 0.55rem 0.95rem; }
-.tour-note { margin: 0; font-size: 0.82rem; }
+.tour-note { margin: 0; font-size: 0.8rem; }
 
 /* Kawaii flame-horse Gantt roadmap */
 .gantt { display: grid; gap: 0.8rem; }
@@ -2790,12 +3136,423 @@ textarea:hover {
 }
 .gantt-caption { margin: 0; font-size: 0.82rem; }
 
-@media (max-width: 720px) {
+@media (max-width: 980px) {
   .tour-stage { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .tour-rpg { padding: 0.85rem; }
   .tour-board { grid-template-columns: 1fr; }
+  .tour-hud { flex-direction: column; align-items: stretch; }
+  .tour-hud-track { order: 3; }
+  .tour-reset { margin-left: 0; align-self: flex-start; }
+  .tour-actions-row { grid-template-columns: 1fr; }
+  .tour-teambar { flex-direction: column; align-items: stretch; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hero-carousel-frame .hero-carousel-slide { transition: none; transform: none; }
   .tour-card-main,
+  .tour-xp-bar span,
   .tour-progress-fill { transition: none; }
+  .tour-btn,
+  .tour-chip,
+  .tour-reset { transition: none; }
+}
+
+/* ── Gamification: celebration toasts ── */
+.celebration-region {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: min(92vw, 320px);
+  pointer-events: none;
+}
+.celebration-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, white 8%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-custom) 82%, black 8%), color-mix(in srgb, var(--surface-custom) 92%, var(--ember) 6%));
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ember) 26%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ember) 18%, transparent);
+  color: var(--text-main);
+  animation: celebrationIn 260ms ease;
+}
+.celebration-toast.celebration-badge {
+  border-color: color-mix(in srgb, var(--accent-secondary) 55%, white 10%);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--accent-secondary) 26%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--accent-secondary) 20%, transparent);
+}
+.celebration-toast.celebration-level {
+  border-color: color-mix(in srgb, var(--accent) 55%, white 10%);
+}
+.celebration-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ember) 60%, transparent));
+}
+.celebration-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
+.celebration-title {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.celebration-detail { font-size: 0.82rem; color: color-mix(in srgb, white 72%, transparent); }
+.celebration-close {
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, white 60%, transparent);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+.celebration-close:hover { color: white; }
+@keyframes celebrationIn {
+  from { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Gamification: profile progress showcase ── */
+.gamification-panel { display: grid; gap: 1.1rem; }
+.gami-stat-row { display: flex; align-items: center; gap: 1rem; }
+.gami-level-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 64px;
+  height: 64px;
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--ember) 75%, var(--accent-secondary));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ember) 30%, transparent), inset 0 0 0 2px color-mix(in srgb, white 22%, transparent);
+  color: white;
+  flex-shrink: 0;
+}
+.gami-level-num {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 1rem;
+  line-height: 1;
+  /* The pixel font sits high in its line box; nudge down so the digit reads
+     optically centered against the LVL label below it. */
+  transform: translateY(1px);
+}
+.gami-level-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.5rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+.gami-xp-block { flex: 1; min-width: 0; display: grid; gap: 0.4rem; }
+.gami-xp-line { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; flex-wrap: wrap; }
+.gami-xp-track {
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-custom) 60%, black 20%);
+  border: 1px solid color-mix(in srgb, white 8%, transparent);
+  overflow: hidden;
+}
+.gami-xp-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ember), var(--accent-secondary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ember) 60%, transparent);
+  transition: width 320ms ease;
+}
+.gami-inventory-title { margin: 0; font-size: 0.95rem; }
+.gami-badge-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.7rem;
+}
+.gami-badge {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.7rem;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+}
+.gami-badge.is-earned {
+  border-color: color-mix(in srgb, var(--ember) 50%, white 10%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ember) 12%, transparent), color-mix(in srgb, var(--accent-secondary) 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ember) 22%, transparent), 0 8px 20px color-mix(in srgb, var(--ember) 16%, transparent);
+}
+.gami-badge.is-locked { opacity: 0.5; filter: grayscale(0.6); }
+.gami-badge-icon { font-size: 1.7rem; line-height: 1; }
+.gami-badge.is-earned .gami-badge-icon { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--ember) 65%, transparent)); }
+.gami-badge-name {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+}
+.gami-badge-desc { font-size: 0.74rem; }
+
+/* ── Guided tour: local badge preview in the win box ── */
+.tour-win-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 50%, white 10%);
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.tour-win-badge-icon { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ember) 60%, transparent)); }
+
+/* ── Daily Focus Quests panel ── */
+.focus-quests { display: grid; gap: 0.9rem; margin-bottom: 1rem; }
+.focus-quests-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.focus-quests-title { display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+.focus-quests-eyebrow {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.focus-quests-date { font-size: 0.82rem; color: var(--text-muted); }
+.focus-momentum {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, white 8%);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+  font-size: 0.78rem;
+  color: color-mix(in srgb, white 82%, var(--ember));
+}
+.focus-momentum-flame { filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ember) 60%, transparent)); }
+.focus-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.45rem; }
+.focus-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+  font-size: 0.9rem;
+}
+.focus-item-check { color: var(--text-muted); }
+.focus-item.is-done { border-color: color-mix(in srgb, var(--accent-secondary) 45%, transparent); }
+.focus-item.is-done .focus-item-check { color: var(--accent-secondary); }
+.focus-item.is-done .focus-item-title { text-decoration: line-through; opacity: 0.75; }
+.focus-quests-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.focus-progress { font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 0.62rem; letter-spacing: 0.02em; }
+.focus-reward {
+  font-size: 0.82rem;
+  color: color-mix(in srgb, white 80%, var(--ember));
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 40%, transparent);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.focus-reward.is-claimed { color: var(--accent-secondary); border-color: color-mix(in srgb, var(--accent-secondary) 40%, transparent); background: color-mix(in srgb, var(--accent-secondary) 10%, transparent); }
+.focus-empty { margin: 0; }
+.focus-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+/* ── Choose Quests modal ── */
+.focus-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  background: rgba(4, 6, 14, 0.62);
+  backdrop-filter: blur(3px);
+  animation: celebrationIn 180ms ease;
+}
+.focus-modal { width: min(520px, 100%); max-height: 84vh; overflow: auto; display: grid; gap: 0.9rem; }
+.focus-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; }
+.focus-modal-head h3 { margin: 0; }
+.focus-modal-count { font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 0.62rem; color: color-mix(in srgb, white 85%, var(--ember)); }
+.focus-modal-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; }
+.focus-option {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+}
+.focus-option:hover { border-color: color-mix(in srgb, var(--accent) 32%, var(--card-border)); }
+.focus-option.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.focus-option input { accent-color: var(--ember); width: 18px; height: 18px; flex-shrink: 0; }
+.focus-option-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus-modal-empty { margin: 0; }
+.focus-modal-actions { display: flex; justify-content: flex-end; gap: 0.6rem; }
+
+@media (max-width: 720px) {
+  .focus-quests-head { align-items: flex-start; }
+  .focus-modal-actions { flex-direction: column-reverse; }
+  .focus-modal-actions .primary-btn,
+  .focus-modal-actions .secondary-btn { width: 100%; }
+}
+
+/* ── Milestone Boss Fights ── */
+.boss-panel { display: grid; gap: 0.9rem; margin-bottom: 1rem; }
+.boss-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.boss-panel-title { display: flex; flex-direction: column; gap: 0.2rem; }
+.boss-panel-eyebrow {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.boss-panel-sub { font-size: 0.82rem; color: var(--text-muted); }
+.boss-empty { margin: 0; }
+.boss-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.8rem; }
+.boss-card {
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--ember) 34%, var(--card-border));
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--ember) 12%, transparent), transparent 60%),
+    rgba(255,255,255,0.03);
+}
+.boss-card.is-defeated {
+  border-color: color-mix(in srgb, var(--accent-secondary) 40%, transparent);
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in srgb, var(--accent-secondary) 12%, transparent), transparent 60%),
+    rgba(255,255,255,0.03);
+}
+.boss-card-top { display: flex; align-items: center; gap: 0.7rem; }
+.boss-crest {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  font-size: 1.2rem;
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, white 8%);
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ember) 40%, transparent));
+}
+.boss-card.is-defeated .boss-crest {
+  border-color: color-mix(in srgb, var(--accent-secondary) 45%, white 8%);
+  background: color-mix(in srgb, var(--accent-secondary) 14%, transparent);
+  filter: none;
+}
+.boss-card-headings { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; flex: 1; }
+.boss-name { font-size: 0.98rem; }
+.boss-phase { font-size: 0.78rem; color: var(--text-muted); }
+.boss-defeated-stamp {
+  flex-shrink: 0;
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius-sm);
+  color: var(--accent-secondary);
+  border: 2px solid color-mix(in srgb, var(--accent-secondary) 55%, transparent);
+  transform: rotate(-6deg);
+}
+.boss-hp {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--card-border);
+}
+.boss-hp-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ember), #ff5b5b);
+  transition: width 240ms ease;
+}
+.boss-card.is-defeated .boss-hp-fill { background: linear-gradient(90deg, var(--accent-secondary), var(--accent)); }
+.boss-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.boss-hp-label { font-family: 'Press Start 2P', 'Courier New', monospace; font-size: 0.58rem; letter-spacing: 0.02em; }
+.boss-reward {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, white 80%, var(--ember));
+  padding: 0.3rem 0.65rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 40%, transparent);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.boss-reward.is-claimed { color: var(--accent-secondary); border-color: color-mix(in srgb, var(--accent-secondary) 40%, transparent); background: color-mix(in srgb, var(--accent-secondary) 10%, transparent); }
+.boss-weak-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+.boss-weak-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.boss-weak { display: flex; align-items: center; gap: 0.55rem; font-size: 0.86rem; }
+.boss-weak-check { color: var(--text-muted); }
+.boss-weak.is-struck .boss-weak-check { color: var(--accent-secondary); }
+.boss-weak.is-struck .boss-weak-title { text-decoration: line-through; opacity: 0.7; }
+.boss-weak-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boss-weak-empty { margin: 0; font-size: 0.82rem; }
+.boss-card-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+/* Boss create/edit modal fields (reuses .focus-modal shell) */
+.boss-field { display: grid; gap: 0.35rem; }
+.boss-field-label { font-size: 0.82rem; color: var(--text-muted); }
+.boss-field input { width: 100%; }
+.boss-tasks-label { margin-top: 0.2rem; }
+.focus-option-title.is-done { text-decoration: line-through; opacity: 0.7; }
+
+/* Generated reward + weak-point preview in the boss modal */
+.boss-reward-panel {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.boss-reward-value {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.95rem;
+  color: var(--ember);
+}
+.boss-reward-note { font-size: 0.78rem; }
+.boss-weak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.boss-reroll-btn { padding: 0.3rem 0.75rem; font-size: 0.78rem; }
+.boss-weak-hint { margin: 0 0 0.2rem; font-size: 0.78rem; }
+.boss-weak-preview { cursor: default; }
+
+/* Non-blocking error toast (e.g. a failed boss save) */
+.celebration-error { border-color: color-mix(in srgb, #ff5b5b 55%, var(--card-border)); }
+.celebration-error .celebration-title { color: #ff8a8a; }
+
+@media (max-width: 720px) {
+  .boss-panel-head { align-items: flex-start; }
+  .boss-card-actions .chip-action { flex: 1; }
 }

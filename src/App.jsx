@@ -31,6 +31,33 @@ import {
   slugifySection,
 } from './data/defaultData'
 import { buildInviteUrl, siteUrl } from './lib/site'
+import {
+  XP_REWARDS,
+  BADGES,
+  levelForXp,
+  levelProgress,
+  normalizeBadges,
+  hasBadge,
+  newlyEarnedBadges,
+  DAILY_FOCUS_COMPLETE_XP,
+  MAX_DAILY_FOCUS,
+  getTodayKey,
+  getDailyFocus,
+  isDailyFocusExpired,
+  setDailyFocus,
+  clearDailyFocus,
+  getDailyFocusProgress,
+  shouldAwardDailyFocus,
+  awardDailyFocusCompletion,
+  updateMomentumStreak,
+  createBossFight,
+  getBossProgress,
+  shouldAwardBossReward,
+  markBossClaimed,
+  getBossRewardXp,
+  pickBossTasks,
+  computeBossRewardXp,
+} from './lib/gamification'
 
 const emptyTaskForm = {
   title: '',
@@ -386,6 +413,24 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [activeSection, setActiveSection] = useState('board')
   const [myProfile, setMyProfile] = useState(null)
+  // Gamification: XP / level / earned badges for the signed-in user, loaded
+  // separately from the core profile so a missing migration degrades to a
+  // zeroed-out (but non-crashing) progress state. `celebrations` drives the
+  // transient "Quest Complete" / level-up / badge-unlock toasts.
+  const [gamification, setGamification] = useState(null)
+  const [celebrations, setCelebrations] = useState([])
+  const celebrationSeq = useRef(0)
+  // Daily Focus Quests: the picker modal + its in-flight selection draft.
+  const [focusPickerOpen, setFocusPickerOpen] = useState(false)
+  const [focusDraft, setFocusDraft] = useState([])
+  // Milestone Boss Fights: the create/edit modal + its in-flight draft. Weak
+  // points (taskIds) and rewardXp are rolled by Inferno, not chosen by the user.
+  const [bossModalOpen, setBossModalOpen] = useState(false)
+  const [bossDraft, setBossDraft] = useState({ id: null, name: '', phase: '', taskIds: [], rewardXp: 0, defeated: false })
+  // Mirror the latest gamification snapshot in a ref so the awarding engine can
+  // read current XP/badges without stale closures and without re-creating its
+  // callbacks on every progress change.
+  const gamificationRef = useRef(null)
   const [profileForm, setProfileForm] = useState({
     display_name: '',
     gamer_tag: '',
@@ -479,6 +524,11 @@ useEffect(() => {
       '--background-custom': theme.background,
     }).forEach(([key, value]) => document.documentElement.style.setProperty(key, value))
   }, [theme])
+
+  // Keep the awarding engine's ref in sync with loaded/updated progress.
+  useEffect(() => {
+    gamificationRef.current = gamification
+  }, [gamification])
 
 useEffect(() => {
   if (!session?.user || !currentBoardId) return
@@ -779,6 +829,32 @@ setCurrentProjectId((currentId) =>
     } else {
       setMobileBoardHintSeen(Boolean(hintRow?.mobile_board_hint_seen_at))
     }
+
+    // Load gamification progress separately for the same graceful-degradation
+    // reason as theme_settings: a missing migration must not break the app. A
+    // load error leaves progress at the safe zero default.
+    const { data: gameRow, error: gameLoadError } = await supabase
+      .from('profiles')
+      .select('xp, level, badges, selected_title, gamification_settings')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (gameLoadError) {
+      console.error('Gamification load error:', formatSupabaseError(gameLoadError), gameLoadError)
+      setGamification({ xp: 0, level: 1, badges: [], selected_title: null, settings: {} })
+    } else {
+      const xp = Number.isFinite(gameRow?.xp) ? gameRow.xp : 0
+      setGamification({
+        xp,
+        level: gameRow?.level ?? levelForXp(xp),
+        badges: normalizeBadges(gameRow?.badges),
+        selected_title: gameRow?.selected_title ?? null,
+        settings:
+          gameRow?.gamification_settings && typeof gameRow.gamification_settings === 'object'
+            ? gameRow.gamification_settings
+            : {},
+      })
+    }
   }
 }
 
@@ -1063,6 +1139,7 @@ function dbToProject(row) {
     pillars: row.pillars ?? [],
     labels: row.labels ?? [],
     activity: row.activity ?? [],
+    bossFights: Array.isArray(row.boss_fights) ? row.boss_fights : [],
   }
 }
 
@@ -1099,6 +1176,7 @@ function dbToTask(row) {
   pillars: p.pillars ?? [],
   labels: p.labels ?? [],
   activity: p.activity ?? [],
+  boss_fights: Array.isArray(p.bossFights) ? p.bossFights : [],
 })
 
   const taskToDb = (t, userId, order = 0) => ({
@@ -1307,6 +1385,40 @@ function dbToInvite(row) {
     projects: projects.length,
   }), [tasks, projects])
 
+  // Daily Focus Quests view model, derived from live tasks + stored settings.
+  const todayKey = getTodayKey()
+  const storedDailyFocus = getDailyFocus(gamification?.settings)
+  const dailyFocusActive =
+    storedDailyFocus && !isDailyFocusExpired(storedDailyFocus, todayKey) ? storedDailyFocus : null
+  const focusCompletedById = useMemo(() => {
+    const map = {}
+    for (const task of tasks) map[task.id] = task.completed
+    return map
+  }, [tasks])
+  const focusProgress = dailyFocusActive
+    ? getDailyFocusProgress(dailyFocusActive, focusCompletedById)
+    : { total: 0, completed: 0, allComplete: false }
+  const focusTasks = dailyFocusActive
+    ? dailyFocusActive.task_ids.map((id) => tasks.find((t) => t.id === id)).filter(Boolean)
+    : []
+  const focusCandidates = currentProject
+    ? tasks.filter((task) => task.projectId === currentProject.id && !task.completed)
+    : []
+  const momentumStreak = gamification?.settings?.momentum_streak ?? null
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+
+  // Milestone Boss Fights view model, derived from the active project + tasks.
+  const projectBosses = currentProject && Array.isArray(currentProject.bossFights)
+    ? currentProject.bossFights
+    : []
+  const bossTaskCandidates = currentProject
+    ? tasks.filter((task) => task.projectId === currentProject.id)
+    : []
+
   // ── Project actions ──
   const logProjectActivity = (projectId, type, text) => {
     setProjects((current) =>
@@ -1391,6 +1503,378 @@ function dbToInvite(row) {
     await supabase.from('tasks').delete().eq('id', taskId)
   }
 
+  // ── Gamification awarding engine ──
+  // Side effects (persistence + toasts) live here, deliberately OUT of any
+  // setState reducer, so React StrictMode's double-invoke never double-awards.
+
+  const pushCelebration = (celebration) => {
+    celebrationSeq.current += 1
+    const id = celebrationSeq.current
+    setCelebrations((current) => [...current, { id, ...celebration }])
+    // Auto-dismiss after a beat; the toast also has a manual close button.
+    window.setTimeout(() => {
+      setCelebrations((current) => current.filter((item) => item.id !== id))
+    }, 4200)
+  }
+
+  const dismissCelebration = (id) => {
+    setCelebrations((current) => current.filter((item) => item.id !== id))
+  }
+
+  // Persist the progress snapshot. Wrapped so a failure (e.g. missing migration)
+  // is logged and swallowed rather than blocking task completion.
+  const persistGamification = async (snapshot) => {
+    if (!userId) return
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            xp: snapshot.xp,
+            level: snapshot.level,
+            badges: snapshot.badges,
+            selected_title: snapshot.selected_title ?? null,
+            gamification_settings: snapshot.settings ?? {},
+          },
+          { onConflict: 'id' },
+        )
+      if (error) console.error('Gamification persist error:', formatSupabaseError(error), error)
+    } catch (persistError) {
+      console.error('Gamification persist threw:', persistError)
+    }
+  }
+
+  // Build the stats snapshot the badge evaluator needs from live app state,
+  // allowing callers to override/augment values that are known at award time
+  // (e.g. the task just completed, or boardCount:1 right after creating one).
+  const buildBadgeStats = (overrides = {}) => {
+    const completedTasks =
+      overrides.completedTasks ??
+      tasks.filter((task) => task.completed).map((task) => ({ ...task, projectId: task.projectId }))
+    const projectTaskTotals = {}
+    for (const task of tasks) {
+      const key = task.projectId ?? 'unknown'
+      projectTaskTotals[key] = (projectTaskTotals[key] ?? 0) + 1
+    }
+    return {
+      completedTasks,
+      boardCount: overrides.boardCount ?? (currentBoardId ? 1 : 0),
+      inviteCount: overrides.inviteCount ?? invites.length,
+      level: overrides.level ?? gamificationRef.current?.level ?? 1,
+      projectTaskTotals: overrides.projectTaskTotals ?? projectTaskTotals,
+      tutorialDone: overrides.tutorialDone ?? false,
+    }
+  }
+
+  // Core award routine: apply an XP delta, mark a task rewarded (for idempotent
+  // per-task awarding), re-evaluate badges, update state + ref, fire toasts, and
+  // persist. Reads the latest snapshot from the ref to avoid stale closures.
+  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {}, mutateSettings } = {}) => {
+    if (!userId) return
+    const base = gamificationRef.current ?? {
+      xp: 0,
+      level: 1,
+      badges: [],
+      selected_title: null,
+      settings: {},
+    }
+
+    const nextXp = Math.max(0, (base.xp ?? 0) + xpDelta)
+    const prevLevel = base.level ?? 1
+    const nextLevel = levelForXp(nextXp)
+
+    // Track rewarded tasks so completing the same task twice never farms XP.
+    let settings = { ...(base.settings ?? {}) }
+    if (rewardTaskId) {
+      const rewarded = Array.isArray(settings.rewarded_tasks) ? settings.rewarded_tasks : []
+      if (!rewarded.includes(rewardTaskId)) {
+        settings.rewarded_tasks = [...rewarded, rewardTaskId]
+      }
+    }
+    // Let callers fold additional settings changes (e.g. daily-focus claim +
+    // streak) into the same atomic snapshot/persist.
+    if (typeof mutateSettings === 'function') {
+      settings = mutateSettings(settings) ?? settings
+    }
+
+    const fresh = newlyEarnedBadges(
+      buildBadgeStats({ ...extraStats, level: nextLevel }),
+      base.badges,
+    )
+    const nextBadges = fresh.length ? [...normalizeBadges(base.badges), ...fresh] : base.badges
+
+    const snapshot = {
+      xp: nextXp,
+      level: nextLevel,
+      badges: nextBadges,
+      selected_title: base.selected_title ?? null,
+      settings,
+    }
+
+    gamificationRef.current = snapshot
+    setGamification(snapshot)
+
+    if (xpDelta > 0 && reason) {
+      pushCelebration({ kind: 'xp', title: reason, detail: `+${xpDelta} XP` })
+    }
+    if (nextLevel > prevLevel) {
+      pushCelebration({ kind: 'level', title: `Level ${nextLevel}`, detail: 'Level up!' })
+    }
+    for (const badge of fresh) {
+      pushCelebration({
+        kind: 'badge',
+        title: badge.name,
+        detail: 'Badge unlocked',
+        icon: badge.icon,
+      })
+    }
+
+    persistGamification(snapshot)
+  }
+
+  // Award XP + badges for a task reaching Done for the first time.
+  const rewardTaskCompletion = (task) => {
+    if (!userId || !task) return
+    const settings = gamificationRef.current?.settings ?? {}
+    const rewarded = Array.isArray(settings.rewarded_tasks) ? settings.rewarded_tasks : []
+    if (rewarded.includes(task.id)) return // already rewarded — no farming
+
+    const isHigh = String(task.priority ?? '').toLowerCase() === 'high'
+    const xpDelta = isHigh ? XP_REWARDS.TASK_COMPLETE_HIGH : XP_REWARDS.TASK_COMPLETE
+
+    // Include the just-completed task so badge evaluation sees it even before
+    // the optimistic setTasks has flushed.
+    const completedNow = [
+      ...tasks.filter((t) => t.completed && t.id !== task.id).map((t) => ({ ...t })),
+      { ...task, completed: true },
+    ]
+    awardGamification({
+      xpDelta,
+      reason: 'Quest Complete',
+      rewardTaskId: task.id,
+      extraStats: { completedTasks: completedNow },
+    })
+  }
+
+  // Persist a settings-only change (daily focus selection / clear) without
+  // touching XP, level, or badges. Same non-blocking persistence as awards.
+  const applyGamificationSettings = (nextSettings) => {
+    if (!userId) return
+    const base = gamificationRef.current ?? {
+      xp: 0,
+      level: 1,
+      badges: [],
+      selected_title: null,
+      settings: {},
+    }
+    const snapshot = { ...base, settings: nextSettings }
+    gamificationRef.current = snapshot
+    setGamification(snapshot)
+    persistGamification(snapshot)
+  }
+
+  const saveDailyFocus = (taskIds) => {
+    const base = gamificationRef.current?.settings ?? {}
+    applyGamificationSettings(setDailyFocus(base, taskIds, getTodayKey()))
+  }
+
+  const clearDailyFocusSelection = () => {
+    const base = gamificationRef.current?.settings ?? {}
+    applyGamificationSettings(clearDailyFocus(base))
+  }
+
+  const openFocusPicker = () => {
+    const df = getDailyFocus(gamificationRef.current?.settings)
+    const active = df && !isDailyFocusExpired(df, getTodayKey()) ? df.task_ids : []
+    setFocusDraft(active)
+    setFocusPickerOpen(true)
+  }
+
+  const toggleFocusDraft = (id) => {
+    setFocusDraft((current) => {
+      if (current.includes(id)) return current.filter((value) => value !== id)
+      if (current.length >= MAX_DAILY_FOCUS) return current
+      return [...current, id]
+    })
+  }
+
+  const confirmFocusPicker = () => {
+    saveDailyFocus(focusDraft)
+    setFocusPickerOpen(false)
+  }
+
+  // After a task completes, award the one-time daily-focus bonus if today's
+  // selected tasks are now all done. `justCompletedId` compensates for the
+  // not-yet-flushed optimistic setTasks, mirroring rewardTaskCompletion.
+  const checkDailyFocusCompletion = (justCompletedId) => {
+    if (!userId) return
+    const base = gamificationRef.current
+    const todayKey = getTodayKey()
+    const dailyFocus = getDailyFocus(base?.settings)
+    if (isDailyFocusExpired(dailyFocus, todayKey) || dailyFocus.claimed) return
+
+    const completedById = {}
+    for (const t of tasks) completedById[t.id] = t.completed
+    if (justCompletedId) completedById[justCompletedId] = true
+
+    if (!shouldAwardDailyFocus(dailyFocus, completedById, todayKey)) return
+    awardGamification({
+      xpDelta: DAILY_FOCUS_COMPLETE_XP,
+      reason: 'Daily Quests Complete',
+      mutateSettings: (settings) =>
+        updateMomentumStreak(awardDailyFocusCompletion(settings, todayKey), todayKey),
+    })
+  }
+
+  // ── Milestone Boss Fights ──
+  // Bosses live on the project record. Update optimistically, then persist to
+  // the projects table; a failed write surfaces a non-blocking toast and leaves
+  // the local change in place so the board is never blocked.
+  const updateProjectBossFights = (projectId, nextBossFights) => {
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === projectId ? { ...project, bossFights: nextBossFights } : project,
+      ),
+    )
+    supabase
+      .from('projects')
+      .update({ boss_fights: nextBossFights })
+      .eq('id', projectId)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Boss fight persist error:', formatSupabaseError(error), error)
+          pushCelebration({
+            kind: 'error',
+            title: 'Boss not saved',
+            detail: 'Change kept locally only.',
+          })
+        }
+      })
+  }
+
+  // Inferno rolls the weak points and reward; the player never hand-picks them,
+  // so a boss can't be stacked with easy tasks for a big payout.
+  const rollBossDraft = () => {
+    const chosen = pickBossTasks(bossTaskCandidates, Math.random)
+    return {
+      taskIds: chosen.map((task) => task.id),
+      rewardXp: chosen.length ? computeBossRewardXp(chosen, Math.random) : 0,
+    }
+  }
+
+  const openBossCreator = () => {
+    const rolled = rollBossDraft()
+    setBossDraft({ id: null, name: '', phase: '', ...rolled, defeated: false })
+    setBossModalOpen(true)
+  }
+
+  const openBossEditor = (boss) => {
+    const progress = getBossProgress(boss, focusCompletedById)
+    setBossDraft({
+      id: boss.id,
+      name: boss.name ?? '',
+      phase: boss.phase ?? '',
+      taskIds: Array.isArray(boss.task_ids) ? [...boss.task_ids] : [],
+      rewardXp: getBossRewardXp(boss),
+      defeated: Boolean(boss.claimed) || progress.defeated,
+    })
+    setBossModalOpen(true)
+  }
+
+  // Regenerate weak points + reward for the current draft. Blocked once a boss is
+  // defeated so a claimed reward can never be re-rolled into a fresh payout.
+  const rerollBossDraft = () => {
+    setBossDraft((current) => {
+      if (current.defeated) return current
+      return { ...current, ...rollBossDraft() }
+    })
+  }
+
+  const saveBossFight = () => {
+    if (!currentProject) return
+    const name = bossDraft.name.trim()
+    // A boss must have a name and at least one rolled weak point, or it can never
+    // be fought or defeated.
+    if (!name || bossDraft.taskIds.length === 0) return
+    const existing = Array.isArray(currentProject.bossFights) ? currentProject.bossFights : []
+    let nextBosses
+    if (bossDraft.id) {
+      // Editing preserves claimed/defeated_at/created_at. A defeated boss only
+      // updates its label so a claimed reward can never be farmed by re-saving.
+      nextBosses = existing.map((boss) =>
+        boss.id === bossDraft.id
+          ? {
+              ...boss,
+              name,
+              phase: bossDraft.phase.trim(),
+              ...(bossDraft.defeated
+                ? {}
+                : {
+                    task_ids: [...new Set(bossDraft.taskIds)],
+                    reward_xp: getBossRewardXp({ reward_xp: bossDraft.rewardXp }),
+                  }),
+            }
+          : boss,
+      )
+    } else {
+      nextBosses = [
+        ...existing,
+        createBossFight({
+          name,
+          phase: bossDraft.phase.trim(),
+          projectId: currentProject.id,
+          taskIds: bossDraft.taskIds,
+          rewardXp: bossDraft.rewardXp,
+        }),
+      ]
+    }
+    updateProjectBossFights(currentProject.id, nextBosses)
+    setBossModalOpen(false)
+  }
+
+  const retireBossFight = (bossId) => {
+    if (!currentProject) return
+    const existing = Array.isArray(currentProject.bossFights) ? currentProject.bossFights : []
+    updateProjectBossFights(currentProject.id, existing.filter((boss) => boss.id !== bossId))
+  }
+
+  // After a linked task completes, award the one-time boss bonus for any boss in
+  // the task's project that just hit 0 HP. `justCompletedTask` compensates for
+  // the not-yet-flushed optimistic setTasks, mirroring rewardTaskCompletion.
+  const checkBossFights = (justCompletedTask) => {
+    if (!userId || !justCompletedTask) return
+    const project = projects.find((p) => p.id === justCompletedTask.projectId)
+    const bosses = project && Array.isArray(project.bossFights) ? project.bossFights : []
+    if (bosses.length === 0) return
+
+    const completedById = {}
+    for (const t of tasks) completedById[t.id] = t.completed
+    completedById[justCompletedTask.id] = true
+
+    const defeated = bosses.filter((boss) => shouldAwardBossReward(boss, completedById))
+    if (defeated.length === 0) return
+
+    const nowIso = new Date().toISOString()
+    const defeatedIds = new Set(defeated.map((boss) => boss.id))
+    const nextBosses = bosses.map((boss) =>
+      defeatedIds.has(boss.id) ? markBossClaimed(boss, nowIso) : boss,
+    )
+    updateProjectBossFights(project.id, nextBosses)
+
+    const completedNow = [
+      ...tasks.filter((t) => t.completed && t.id !== justCompletedTask.id).map((t) => ({ ...t })),
+      { ...justCompletedTask, completed: true },
+    ]
+    for (const boss of defeated) {
+      awardGamification({
+        xpDelta: getBossRewardXp(boss),
+        reason: 'Boss Defeated',
+        extraStats: { completedTasks: completedNow },
+      })
+    }
+  }
+
   const moveTask = async (taskId, nextStatus) => {
     setTasks((current) =>
       current.map((task) =>
@@ -1400,6 +1884,12 @@ function dbToInvite(row) {
       )
     )
     await supabase.from('tasks').update({ status: nextStatus, completed: nextStatus === 'done' }).eq('id', taskId)
+    if (nextStatus === 'done') {
+      const doneTask = tasks.find((t) => t.id === taskId)
+      if (doneTask) rewardTaskCompletion(doneTask)
+      checkDailyFocusCompletion(taskId)
+      if (doneTask) checkBossFights(doneTask)
+    }
   }
 
   const shiftTask = (taskId, direction) => {
@@ -1449,11 +1939,17 @@ function dbToInvite(row) {
   }
 
   const toggleComplete = (task) => {
+    const willComplete = !task.completed
     updateTask(task.id, {
-      completed: !task.completed,
+      completed: willComplete,
       status: task.completed ? 'todo' : 'done',
       activity: [createActivity('complete', task.completed ? 'Reopened task.' : 'Marked task complete.'), ...(task.activity || [])],
     })
+    if (willComplete) {
+      rewardTaskCompletion(task)
+      checkDailyFocusCompletion(task.id)
+      checkBossFights(task)
+    }
   }
 
   const handleEditSave = (event) => {
@@ -1614,6 +2110,16 @@ function dbToInvite(row) {
       window.alert('The board was created but we could not add you as its owner. Please try again.')
       setCreatingBoard(false)
       return
+    }
+    // Award the First Spark badge + first-board XP once. Guarded on the badge so
+    // additional boards never re-award. extraStats forces boardCount:1 because
+    // loadAllData has not refreshed currentBoardId yet.
+    if (!hasBadge(gamificationRef.current?.badges, 'first_spark')) {
+      awardGamification({
+        xpDelta: XP_REWARDS.FIRST_BOARD,
+        reason: 'First Spark',
+        extraStats: { boardCount: 1 },
+      })
     }
     await loadAllData(userId, created.id)
     setActiveSection('board')
@@ -1933,6 +2439,16 @@ const createInvite = async (event) => {
     setInvites((current) => [invite, ...current])
     setInviteEmail('')
     setInviteRole('member')
+
+    // Award Team Captain + first-invite XP once, guarded on the badge so later
+    // invites never re-award.
+    if (!hasBadge(gamificationRef.current?.badges, 'team_captain')) {
+      awardGamification({
+        xpDelta: XP_REWARDS.FIRST_INVITE,
+        reason: 'Team Captain',
+        extraStats: { inviteCount: 1 },
+      })
+    }
 
     try {
       await navigator.clipboard.writeText(acceptUrl)
@@ -2358,6 +2874,210 @@ const pendingInvitesPanel =
 return (
   <>
     {pendingInvitesPanel}
+    <div className="celebration-region" aria-live="polite" role="status" data-testid="celebration-region">
+      {celebrations.map((celebration) => (
+        <div
+          key={celebration.id}
+          className={`celebration-toast celebration-${celebration.kind}`}
+        >
+          {celebration.icon ? (
+            <span className="celebration-icon" aria-hidden="true">{celebration.icon}</span>
+          ) : null}
+          <span className="celebration-text">
+            <strong className="celebration-title">{celebration.title}</strong>
+            <span className="celebration-detail">{celebration.detail}</span>
+          </span>
+          <button
+            type="button"
+            className="celebration-close"
+            aria-label="Dismiss notification"
+            onClick={() => dismissCelebration(celebration.id)}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+    {focusPickerOpen ? (
+      <div
+        className="focus-modal-overlay"
+        data-testid="focus-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose today's focus quests"
+        onClick={() => setFocusPickerOpen(false)}
+      >
+        <div className="focus-modal panel" onClick={(event) => event.stopPropagation()}>
+          <div className="focus-modal-head">
+            <h3>Choose today&apos;s quests</h3>
+            <span className="focus-modal-count" data-testid="focus-modal-count">
+              {focusDraft.length} / {MAX_DAILY_FOCUS}
+            </span>
+          </div>
+          <p className="muted-copy">
+            Pick up to {MAX_DAILY_FOCUS} tasks from {currentProject?.name || 'this project'} to focus
+            on today. Completed tasks cannot be chosen.
+          </p>
+
+          {focusCandidates.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="focus-modal-empty">
+              No open tasks here yet. Create a task, then set your focus.
+            </p>
+          ) : (
+            <ul className="focus-modal-list">
+              {focusCandidates.map((task) => {
+                const selected = focusDraft.includes(task.id)
+                const atCap = !selected && focusDraft.length >= MAX_DAILY_FOCUS
+                return (
+                  <li key={task.id}>
+                    <label className={atCap ? 'focus-option is-disabled' : 'focus-option'}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={atCap}
+                        onChange={() => toggleFocusDraft(task.id)}
+                        data-testid="focus-option"
+                      />
+                      <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
+                        {task.discipline || 'Task'}
+                      </span>
+                      <span className="focus-option-title">{task.title}</span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className="focus-modal-actions">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => setFocusPickerOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              data-testid="focus-save"
+              onClick={confirmFocusPicker}
+            >
+              Save quests
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
+    {bossModalOpen ? (
+      <div
+        className="focus-modal-overlay"
+        data-testid="boss-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={bossDraft.id ? 'Edit boss fight' : 'Create boss fight'}
+        onClick={() => setBossModalOpen(false)}
+      >
+        <div className="focus-modal boss-modal panel" onClick={(event) => event.stopPropagation()}>
+          <div className="focus-modal-head">
+            <h3>{bossDraft.id ? 'Edit Boss Fight' : 'Create Boss Fight'}</h3>
+          </div>
+          <p className="muted-copy">Inferno rolls the weak points and reward. Name your boss and set its phase.</p>
+
+          <label className="boss-field">
+            <span className="boss-field-label">Boss name</span>
+            <input
+              type="text"
+              value={bossDraft.name}
+              maxLength={80}
+              placeholder="Vertical Slice Demon"
+              data-testid="boss-name-input"
+              onChange={(event) => setBossDraft((current) => ({ ...current, name: event.target.value }))}
+            />
+          </label>
+          <label className="boss-field">
+            <span className="boss-field-label">Milestone or phase</span>
+            <input
+              type="text"
+              value={bossDraft.phase}
+              maxLength={80}
+              placeholder="Milestone 1"
+              data-testid="boss-phase-input"
+              onChange={(event) => setBossDraft((current) => ({ ...current, phase: event.target.value }))}
+            />
+          </label>
+
+          <div className="boss-reward-panel" data-testid="boss-reward-preview">
+            <span className="boss-field-label">Boss Reward</span>
+            <span className="boss-reward-value">+{bossDraft.rewardXp} XP</span>
+            <span className="boss-reward-note muted-copy">Reward generated from task difficulty.</span>
+          </div>
+
+          <div className="boss-weak-head">
+            <div className="boss-field-label boss-tasks-label">
+              Weak Points ({bossDraft.taskIds.length})
+            </div>
+            {!bossDraft.defeated ? (
+              <button
+                type="button"
+                className="secondary-btn boss-reroll-btn"
+                data-testid="boss-reroll"
+                disabled={bossTaskCandidates.length === 0}
+                onClick={rerollBossDraft}
+              >
+                Reroll
+              </button>
+            ) : null}
+          </div>
+          {bossTaskCandidates.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="boss-modal-empty">
+              No tasks in this project yet. Create a task, then generate a boss.
+            </p>
+          ) : bossDraft.taskIds.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="boss-modal-empty">
+              No weak points rolled. Try Reroll.
+            </p>
+          ) : (
+            <>
+              <p className="boss-weak-hint muted-copy">Inferno rolled these weak points for your boss.</p>
+              <ul className="focus-modal-list">
+                {bossDraft.taskIds.map((taskId) => {
+                  const task = bossTaskCandidates.find((candidate) => candidate.id === taskId)
+                  if (!task) return null
+                  return (
+                    <li key={taskId}>
+                      <div className="focus-option boss-weak-preview" data-testid="boss-weak-point">
+                        <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
+                          {task.discipline || 'Task'}
+                        </span>
+                        <span className={task.completed ? 'focus-option-title is-done' : 'focus-option-title'}>
+                          {task.title}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
+          )}
+
+          <div className="focus-modal-actions">
+            <button type="button" className="secondary-btn" onClick={() => setBossModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              data-testid="boss-save"
+              disabled={!bossDraft.name.trim() || bossDraft.taskIds.length === 0}
+              onClick={saveBossFight}
+            >
+              {bossDraft.id ? 'Save Boss' : 'Generate Boss Fight'}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <ProjectSidebar
         stats={stats}
@@ -2436,6 +3156,208 @@ return (
               {creatingBoard ? 'Creating…' : 'New board'}
             </button>
           </div>
+        ) : null}
+
+        {activeSection === 'board' && userId ? (
+          <section className="panel focus-quests" data-testid="focus-quests">
+            <div className="focus-quests-head">
+              <div className="focus-quests-title">
+                <span className="focus-quests-eyebrow">Today&apos;s Quests</span>
+                <span className="focus-quests-date">{todayLabel}</span>
+              </div>
+              {momentumStreak && momentumStreak.current > 0 ? (
+                <span className="focus-momentum" data-testid="focus-momentum" title={`Best streak: ${momentumStreak.best} day${momentumStreak.best === 1 ? '' : 's'}`}>
+                  <span className="focus-momentum-flame" aria-hidden="true">&#128293;</span>
+                  Studio Momentum {momentumStreak.current} day{momentumStreak.current === 1 ? '' : 's'}
+                </span>
+              ) : null}
+            </div>
+
+            {dailyFocusActive && focusProgress.total > 0 ? (
+              <>
+                <ul className="focus-list" data-testid="focus-list">
+                  {focusTasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className={task.completed ? 'focus-item is-done' : 'focus-item'}
+                    >
+                      <span className="focus-item-check" aria-hidden="true">
+                        {task.completed ? '✔' : '○'}
+                      </span>
+                      <span className="focus-item-title">{task.title}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="focus-quests-meta">
+                  <span className="focus-progress" data-testid="focus-progress">
+                    {focusProgress.completed} / {focusProgress.total} complete
+                  </span>
+                  <span className={dailyFocusActive.claimed ? 'focus-reward is-claimed' : 'focus-reward'} data-testid="focus-reward">
+                    {dailyFocusActive.claimed
+                      ? `Bonus claimed +${DAILY_FOCUS_COMPLETE_XP} XP`
+                      : `+${DAILY_FOCUS_COMPLETE_XP} XP if all complete`}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="focus-empty muted-copy" data-testid="focus-empty">
+                Pick up to {MAX_DAILY_FOCUS} tasks to focus on today and earn a
+                {' '}
+                +{DAILY_FOCUS_COMPLETE_XP} XP bonus for clearing them all.
+              </p>
+            )}
+
+            <div className="focus-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="focus-choose"
+                onClick={openFocusPicker}
+              >
+                Choose Quests
+              </button>
+              {dailyFocusActive && focusProgress.total > 0 ? (
+                <button
+                  type="button"
+                  className="chip-action"
+                  data-testid="focus-clear"
+                  onClick={clearDailyFocusSelection}
+                >
+                  Clear Quests
+                </button>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
+        {activeSection === 'board' && userId ? (
+          <section className="panel boss-panel" data-testid="boss-panel">
+            <div className="boss-panel-head">
+              <div className="boss-panel-title">
+                <span className="boss-panel-eyebrow">Boss Fights</span>
+                <span className="boss-panel-sub">
+                  {currentProject?.name || 'This project'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="boss-create"
+                onClick={openBossCreator}
+              >
+                Generate Boss Fight
+              </button>
+            </div>
+
+            {projectBosses.length === 0 ? (
+              <p className="boss-empty muted-copy" data-testid="boss-empty">
+                Turn a milestone into a boss. Inferno rolls its weak points and
+                {' '}
+                reward, then defeat it for a bonus.
+              </p>
+            ) : (
+              <ul className="boss-list" data-testid="boss-list">
+                {projectBosses.map((boss) => {
+                  const progress = getBossProgress(boss, focusCompletedById)
+                  const defeated = boss.claimed || progress.defeated
+                  const weakPoints = (Array.isArray(boss.task_ids) ? boss.task_ids : [])
+                    .map((id) => tasks.find((t) => t.id === id))
+                    .filter(Boolean)
+                  return (
+                    <li
+                      key={boss.id}
+                      className={defeated ? 'boss-card is-defeated' : 'boss-card'}
+                      data-testid="boss-card"
+                    >
+                      <div className="boss-card-top">
+                        <span className="boss-crest" aria-hidden="true">
+                          {defeated ? '\u{1F6E1}' : '\u{1F525}'}
+                        </span>
+                        <div className="boss-card-headings">
+                          <strong className="boss-name">{boss.name}</strong>
+                          {boss.phase ? (
+                            <span className="boss-phase">{boss.phase}</span>
+                          ) : null}
+                        </div>
+                        {defeated ? (
+                          <span className="boss-defeated-stamp" data-testid="boss-defeated">
+                            Defeated
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div
+                        className="boss-hp"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={progress.maxHp}
+                        aria-valuenow={progress.currentHp}
+                        aria-label={`${boss.name} HP`}
+                      >
+                        <span
+                          className="boss-hp-fill"
+                          data-testid="boss-hp-fill"
+                          style={{ width: `${progress.pct}%` }}
+                        />
+                      </div>
+                      <div className="boss-card-meta">
+                        <span className="boss-hp-label" data-testid="boss-hp-label">
+                          {progress.currentHp} / {progress.maxHp} HP
+                        </span>
+                        <span className={defeated ? 'boss-reward is-claimed' : 'boss-reward'}>
+                          {defeated
+                            ? `Boss Defeated +${getBossRewardXp(boss)} XP`
+                            : `+${getBossRewardXp(boss)} XP on defeat`}
+                        </span>
+                      </div>
+
+                      {weakPoints.length > 0 ? (
+                        <>
+                          <span className="boss-weak-label">Weak Points</span>
+                          <ul className="boss-weak-list">
+                            {weakPoints.map((task) => (
+                              <li
+                                key={task.id}
+                                className={task.completed ? 'boss-weak is-struck' : 'boss-weak'}
+                              >
+                                <span className="boss-weak-check" aria-hidden="true">
+                                  {task.completed ? '✔' : '○'}
+                                </span>
+                                <span className="boss-weak-title">{task.title}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="boss-weak-empty muted-copy">
+                          No linked tasks remain. Edit this boss to link tasks.
+                        </p>
+                      )}
+
+                      <div className="boss-card-actions">
+                        <button
+                          type="button"
+                          className="chip-action"
+                          data-testid="boss-edit"
+                          onClick={() => openBossEditor(boss)}
+                        >
+                          Edit Boss
+                        </button>
+                        <button
+                          type="button"
+                          className="chip-action"
+                          data-testid="boss-retire"
+                          onClick={() => retireBossFight(boss.id)}
+                        >
+                          Retire Boss
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
         ) : null}
 
         {activeSection === 'board' ? (
@@ -3005,6 +3927,71 @@ return (
                 </button>
               </form>
             </div>
+
+            {(() => {
+              const progress = levelProgress(gamification?.xp ?? 0)
+              const earned = normalizeBadges(gamification?.badges)
+              const earnedIds = new Set(earned.map((badge) => badge.id))
+              return (
+                <div className="panel settings-panel gamification-panel" data-testid="settings-gamification">
+                  <div className="section-heading">
+                    <h2>Progress</h2>
+                  </div>
+                  <p className="muted-copy">
+                    Earn XP and unlock badges as you ship. Progress is saved to your profile.
+                  </p>
+
+                  <div className="gami-stat-row">
+                    <div className="gami-level-badge" aria-hidden="true">
+                      <span className="gami-level-num">{progress.level}</span>
+                      <span className="gami-level-label">LVL</span>
+                    </div>
+                    <div className="gami-xp-block">
+                      <div className="gami-xp-line">
+                        <span data-testid="gami-total-xp">{progress.xp} XP</span>
+                        <span className="muted-copy">
+                          {progress.intoLevel} / {progress.needed} to level {progress.level + 1}
+                        </span>
+                      </div>
+                      <div
+                        className="gami-xp-track"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress.pct}
+                        aria-label={`Level ${progress.level}, ${progress.pct}% to next level`}
+                      >
+                        <div className="gami-xp-fill" style={{ width: `${progress.pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <h3 className="gami-inventory-title">
+                    Badges <span className="muted-copy">({earned.length} / {BADGES.length})</span>
+                  </h3>
+                  <ul className="gami-badge-grid" data-testid="gami-badge-grid">
+                    {BADGES.map((badge) => {
+                      const unlocked = earnedIds.has(badge.id)
+                      return (
+                        <li
+                          key={badge.id}
+                          className={`gami-badge${unlocked ? ' is-earned' : ' is-locked'}`}
+                          data-rarity={badge.rarity}
+                          data-earned={unlocked ? 'true' : 'false'}
+                          title={`${badge.name}: ${badge.description}`}
+                        >
+                          <span className="gami-badge-icon" aria-hidden="true">
+                            {unlocked ? badge.icon : '🔒'}
+                          </span>
+                          <span className="gami-badge-name">{badge.name}</span>
+                          <span className="gami-badge-desc muted-copy">{badge.description}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })()}
 
             <div className="panel settings-panel" data-testid="settings-account">
               <div className="section-heading">
