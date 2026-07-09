@@ -187,209 +187,291 @@ export default function GuidedTour({ openSignup }) {
 
   const assignableRoster = state.roster.length > 0 ? state.roster : ROSTER_SUGGESTIONS
 
+  const total = STEPS.length
+  const pct = Math.round((completedCount / total) * 100)
+  const level = Math.min(completedCount + 1, total)
+  const assignedCount = state.tasks.filter((task) => task.assignee).length
+  const spirit = state.tasks.length ? Math.round((assignedCount / state.tasks.length) * 100) : 0
+  const studioName = state.boardName || 'New Studio'
+  const crest = (state.boardName || 'GJ').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'GJ'
+  const disciplinesOnBoard = [...new Set(state.tasks.map((task) => task.discipline))]
+  const partyMembers = ['Dante', ...state.roster]
+  const stats = [
+    { label: 'Tasks', value: state.tasks.length },
+    { label: 'In Progress', value: grouped.building.length },
+    { label: 'Shipped', value: grouped.done.length },
+    { label: 'Crew', value: state.roster.length },
+  ]
+
   return (
-    <div className="tour" data-testid="guided-tour">
-      <div className="tour-quest" aria-label="Tutorial quest">
-        <div className="tour-quest-head">
-          <span className="tour-mascot" aria-hidden="true">
-            <FlameHorse size={52} />
-          </span>
-          <div className="tour-quest-copy">
-            <p className="tour-quest-kicker">Dante the flame pony, your production buddy</p>
-            {finished ? (
-              <h3 className="tour-quest-title">Build shipped. You ran the whole pipeline.</h3>
-            ) : (
-              <h3 className="tour-quest-title">
-                Quest {activeIndex + 1} of {STEPS.length}: {activeStep.title}
-              </h3>
-            )}
-            <p className="tour-quest-hint">
-              {finished
-                ? 'That is the core Inferno loop: board, project, tasks, pipeline, team, insights, ship. Sign up to do it for real.'
-                : activeStep.hint}
-            </p>
-          </div>
-        </div>
-
-        <div
-          className="tour-progress"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={STEPS.length}
-          aria-valuenow={completedCount}
-          aria-label="Tutorial progress"
-        >
-          <span className="tour-progress-fill" style={{ width: `${(completedCount / STEPS.length) * 100}%` }} />
-        </div>
-        <p className="tour-progress-text" aria-live="polite" data-testid="tour-progress-text">
-          {completedCount} of {STEPS.length} steps complete
-          {!finished ? `. Next up: ${activeStep.objective}` : '. Nice run.'}
+    <div className="tour tour-rpg" data-testid="guided-tour">
+      <div className="tour-hud">
+        <p className="tour-hud-title">
+          <span className="tour-hud-badge" aria-hidden="true">&#9876;</span>
+          Game Jam Quest
         </p>
-
-        <ol className="tour-checklist">
-          {STEPS.map((step, index) => (
-            <li
-              key={step.id}
-              className={
-                completed[index]
-                  ? 'tour-check is-done'
-                  : index === activeIndex
-                    ? 'tour-check is-active'
-                    : 'tour-check'
-              }
-            >
-              <span className="tour-check-mark" aria-hidden="true" />
-              <span>{step.title}</span>
-            </li>
-          ))}
-        </ol>
+        <div className="tour-hud-track">
+          <ol className="tour-pips" aria-hidden="true">
+            {STEPS.map((step, index) => (
+              <li
+                key={step.id}
+                className={
+                  completed[index] ? 'tour-pip is-done' : index === activeIndex ? 'tour-pip is-active' : 'tour-pip'
+                }
+              />
+            ))}
+          </ol>
+          <div
+            className="tour-progress"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={total}
+            aria-valuenow={completedCount}
+            aria-label="Quest progress"
+          >
+            <span className="tour-progress-fill" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="tour-hud-count">{completedCount}/{total}</span>
+        </div>
+        <button type="button" className="tour-reset" onClick={reset} data-testid="tour-reset">
+          Restart
+        </button>
       </div>
 
+      <p className="tour-progress-text tour-visually-hidden" aria-live="polite" data-testid="tour-progress-text">
+        {completedCount} of {total} steps complete
+        {!finished ? `. Next up: ${activeStep.objective}` : '. Nice run.'}
+      </p>
+
       <div className="tour-stage">
-        <div className="tour-controls">
-          <form className="tour-field" onSubmit={setBoardName}>
-            <label htmlFor="tour-board">Board name</label>
-            <div className="tour-field-row">
-              <input
-                id="tour-board"
-                className="tour-input"
-                value={boardDraft}
-                onChange={(event) => setBoardDraft(event.target.value)}
-                placeholder={`e.g. ${BOARD_SUGGESTION}`}
-                maxLength={40}
-                data-testid="tour-board-input"
-              />
-              <button type="submit" className="secondary-btn tour-btn" data-testid="tour-board-save">
-                {state.boardName ? 'Rename' : 'Create'}
-              </button>
-            </div>
-            {!state.boardName ? (
-              <button
-                type="button"
-                className="tour-chip"
-                onClick={() => setBoardDraft(BOARD_SUGGESTION)}
-                data-testid="tour-board-suggestion"
-              >
-                Try: {BOARD_SUGGESTION}
-              </button>
-            ) : null}
-          </form>
-
-          <form className="tour-field" onSubmit={addProject}>
-            <label htmlFor="tour-project">Project</label>
-            <div className="tour-field-row">
-              <input
-                id="tour-project"
-                className="tour-input"
-                value={projectDraft}
-                onChange={(event) => setProjectDraft(event.target.value)}
-                placeholder={`e.g. ${PROJECT_SUGGESTION}`}
-                maxLength={40}
-                data-testid="tour-project-input"
-              />
-              <button type="submit" className="secondary-btn tour-btn" data-testid="tour-project-add">
-                Add
-              </button>
-            </div>
-            {!state.project ? (
-              <button
-                type="button"
-                className="tour-chip"
-                onClick={() => setProjectDraft(PROJECT_SUGGESTION)}
-                data-testid="tour-project-suggestion"
-              >
-                Try: {PROJECT_SUGGESTION}
-              </button>
-            ) : null}
-          </form>
-
-          <form className="tour-field" onSubmit={addTask}>
-            <label htmlFor="tour-task">New task</label>
-            <div className="tour-field-row">
-              <input
-                id="tour-task"
-                className="tour-input"
-                value={taskDraft}
-                onChange={(event) => setTaskDraft(event.target.value)}
-                placeholder="e.g. Sprite pass on the hero"
-                maxLength={60}
-                data-testid="tour-task-input"
-              />
-              <select
-                className="tour-select"
-                value={discipline}
-                onChange={(event) => setDiscipline(event.target.value)}
-                aria-label="Task discipline"
-                data-testid="tour-task-discipline"
-              >
-                {DISCIPLINES.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </select>
-              <button type="submit" className="primary-btn tour-btn" data-testid="tour-task-add">
-                Add task
-              </button>
-            </div>
-            <div className="tour-suggestions" aria-label="Quest task suggestions">
-              {TASK_SUGGESTIONS.map((suggestion) => {
-                const added = state.tasks.some((t) => t.title === suggestion.title)
-                return (
-                  <button
-                    key={suggestion.title}
-                    type="button"
-                    className="tour-chip"
-                    onClick={() => addSuggestedTask(suggestion)}
-                    disabled={added}
-                    data-testid="tour-task-suggestion"
-                  >
-                    {added ? '✓ ' : '+ '}{suggestion.title}
-                  </button>
-                )
-              })}
-            </div>
-          </form>
-
-          <form className="tour-field" onSubmit={invite}>
-            <label htmlFor="tour-invite">Invite teammate</label>
-            <div className="tour-field-row">
-              <input
-                id="tour-invite"
-                className="tour-input"
-                value={inviteDraft}
-                onChange={(event) => setInviteDraft(event.target.value)}
-                placeholder="e.g. Pixel"
-                maxLength={30}
-                data-testid="tour-invite-input"
-              />
-              <button type="submit" className="secondary-btn tour-btn" data-testid="tour-invite-add">
-                Invite
-              </button>
-            </div>
-          </form>
-
-          <div className="tour-field">
-            <span className="tour-field-label">Insights</span>
-            <button
-              type="button"
-              className="secondary-btn tour-peek-btn"
-              onClick={togglePeek}
-              aria-expanded={state.peeked}
-              data-testid="tour-peek"
-            >
-              {state.peeked ? 'Hide calendar and reports' : 'Peek at calendar and reports'}
-            </button>
+        <aside className="tour-panel tour-hero-panel" aria-label="Studio stats">
+          <div className="tour-hero-top">
+            <span className="tour-crest" aria-hidden="true">{crest}</span>
+            <span className="tour-hero-id">
+              <span className="tour-hero-name">{studioName}</span>
+              <span className="tour-hero-lvl">Lv. {level}</span>
+            </span>
           </div>
 
-          {state.roster.length > 0 ? (
-            <p className="tour-roster" data-testid="tour-roster">
-              <span className="tour-field-label">Roster</span>
-              {state.roster.join(', ')}
+          <div className="tour-xp">
+            <div className="tour-xp-bar" aria-hidden="true"><span style={{ width: `${pct}%` }} /></div>
+            <span className="tour-xp-text">{completedCount} / {total} XP</span>
+          </div>
+
+          <ul className="tour-stats">
+            {stats.map((stat) => (
+              <li key={stat.label}>
+                <span className="tour-stat-icon" aria-hidden="true" />
+                <span className="tour-stat-label">{stat.label}</span>
+                <span className="tour-stat-value">{stat.value}</span>
+              </li>
+            ))}
+          </ul>
+
+          <div className="tour-inventory">
+            <span className="tour-panel-eyebrow">Inventory</span>
+            <div className="tour-inventory-items">
+              {disciplinesOnBoard.length === 0 ? (
+                <span className="tour-inventory-empty">Empty pack</span>
+              ) : (
+                disciplinesOnBoard.map((item) => (
+                  <span key={item} className={`tour-tag tour-tag--${item.toLowerCase()}`}>{item}</span>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="tour-questlog">
+            <span className="tour-panel-eyebrow">Quest log</span>
+            <ol className="tour-checklist">
+              {STEPS.map((step, index) => (
+                <li
+                  key={step.id}
+                  className={
+                    completed[index]
+                      ? 'tour-check is-done'
+                      : index === activeIndex
+                        ? 'tour-check is-active'
+                        : 'tour-check'
+                  }
+                >
+                  <span className="tour-check-mark" aria-hidden="true" />
+                  <span>{step.title}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </aside>
+
+        <div className="tour-panel tour-quest-panel">
+          <div className="tour-quest-head">
+            <span className="tour-panel-eyebrow">Current quest</span>
+            <h3 className="tour-quest-title">
+              {finished ? 'Quest complete: the jam build shipped' : activeStep.title}
+            </h3>
+            <p className="tour-quest-obj">
+              <span className="tour-quest-obj-flag" aria-hidden="true">&#9873;</span>
+              {finished ? 'You ran the whole Inferno loop.' : activeStep.objective}
             </p>
-          ) : null}
+          </div>
+
+          <div className="tour-dante" data-testid="tour-dante">
+            <span className="tour-dante-portrait" aria-hidden="true">
+              <FlameHorse size={44} />
+            </span>
+            <div className="tour-dante-copy">
+              <span className="tour-dante-name">
+                Dante <span className="tour-dante-role">your guide</span>
+              </span>
+              <p className="tour-dante-line">
+                {finished
+                  ? 'A worthy run, hero. That is the whole Inferno loop. Sign up and light this for real.'
+                  : activeStep.hint}
+              </p>
+            </div>
+          </div>
+
+          <div className="tour-actions">
+            <form className="tour-field" onSubmit={setBoardName}>
+              <label htmlFor="tour-board">Board name</label>
+              <div className="tour-field-row">
+                <input
+                  id="tour-board"
+                  className="tour-input"
+                  value={boardDraft}
+                  onChange={(event) => setBoardDraft(event.target.value)}
+                  placeholder={`e.g. ${BOARD_SUGGESTION}`}
+                  maxLength={40}
+                  data-testid="tour-board-input"
+                />
+                <button type="submit" className="tour-btn tour-btn--ghost" data-testid="tour-board-save">
+                  {state.boardName ? 'Rename' : 'Create'}
+                </button>
+              </div>
+              {!state.boardName ? (
+                <button
+                  type="button"
+                  className="tour-chip"
+                  onClick={() => setBoardDraft(BOARD_SUGGESTION)}
+                  data-testid="tour-board-suggestion"
+                >
+                  Try: {BOARD_SUGGESTION}
+                </button>
+              ) : null}
+            </form>
+
+            <form className="tour-field" onSubmit={addProject}>
+              <label htmlFor="tour-project">Project</label>
+              <div className="tour-field-row">
+                <input
+                  id="tour-project"
+                  className="tour-input"
+                  value={projectDraft}
+                  onChange={(event) => setProjectDraft(event.target.value)}
+                  placeholder={`e.g. ${PROJECT_SUGGESTION}`}
+                  maxLength={40}
+                  data-testid="tour-project-input"
+                />
+                <button type="submit" className="tour-btn tour-btn--ghost" data-testid="tour-project-add">
+                  Add
+                </button>
+              </div>
+              {!state.project ? (
+                <button
+                  type="button"
+                  className="tour-chip"
+                  onClick={() => setProjectDraft(PROJECT_SUGGESTION)}
+                  data-testid="tour-project-suggestion"
+                >
+                  Try: {PROJECT_SUGGESTION}
+                </button>
+              ) : null}
+            </form>
+
+            <form className="tour-field" onSubmit={addTask}>
+              <label htmlFor="tour-task">New task</label>
+              <div className="tour-field-row">
+                <input
+                  id="tour-task"
+                  className="tour-input"
+                  value={taskDraft}
+                  onChange={(event) => setTaskDraft(event.target.value)}
+                  placeholder="e.g. Sprite pass on the hero"
+                  maxLength={60}
+                  data-testid="tour-task-input"
+                />
+                <select
+                  className="tour-select"
+                  value={discipline}
+                  onChange={(event) => setDiscipline(event.target.value)}
+                  aria-label="Task discipline"
+                  data-testid="tour-task-discipline"
+                >
+                  {DISCIPLINES.map((item) => (
+                    <option key={item} value={item}>{item}</option>
+                  ))}
+                </select>
+                <button type="submit" className="tour-btn tour-btn--ember" data-testid="tour-task-add">
+                  Add task
+                </button>
+              </div>
+              <div className="tour-suggestions" aria-label="Quest task suggestions">
+                {TASK_SUGGESTIONS.map((suggestion) => {
+                  const added = state.tasks.some((task) => task.title === suggestion.title)
+                  return (
+                    <button
+                      key={suggestion.title}
+                      type="button"
+                      className="tour-chip"
+                      onClick={() => addSuggestedTask(suggestion)}
+                      disabled={added}
+                      data-testid="tour-task-suggestion"
+                    >
+                      {added ? '✓ ' : '+ '}{suggestion.title}
+                    </button>
+                  )
+                })}
+              </div>
+            </form>
+
+            <div className="tour-actions-row">
+              <form className="tour-field" onSubmit={invite}>
+                <label htmlFor="tour-invite">Rally the party</label>
+                <div className="tour-field-row">
+                  <input
+                    id="tour-invite"
+                    className="tour-input"
+                    value={inviteDraft}
+                    onChange={(event) => setInviteDraft(event.target.value)}
+                    placeholder="e.g. Pixel"
+                    maxLength={30}
+                    data-testid="tour-invite-input"
+                  />
+                  <button type="submit" className="tour-btn tour-btn--ghost" data-testid="tour-invite-add">
+                    Invite
+                  </button>
+                </div>
+              </form>
+
+              <div className="tour-field">
+                <span className="tour-field-label">Scout ahead</span>
+                <button
+                  type="button"
+                  className="tour-btn tour-btn--ghost tour-peek-btn"
+                  onClick={togglePeek}
+                  aria-expanded={state.peeked}
+                  data-testid="tour-peek"
+                >
+                  {state.peeked ? 'Hide calendar and reports' : 'Peek at calendar and reports'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="tour-board-wrap">
+        <div className="tour-panel tour-board-panel">
           <div className="tour-board-bar">
+            <span className="tour-panel-eyebrow">Your board preview</span>
             <span className="tour-board-name">{state.boardName || 'Untitled board'}</span>
             {state.project ? <span className="tour-board-project">{state.project}</span> : null}
           </div>
@@ -468,6 +550,36 @@ export default function GuidedTour({ openSignup }) {
         </div>
       </div>
 
+      <div className="tour-teambar">
+        <div className="tour-spirit">
+          <span className="tour-spirit-label">
+            <span className="tour-spirit-flame" aria-hidden="true">&#128293;</span>
+            Team spirit
+          </span>
+          <div
+            className="tour-progress tour-spirit-bar"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={spirit}
+            aria-label="Team spirit"
+          >
+            <span className="tour-progress-fill" style={{ width: `${spirit}%` }} />
+          </div>
+          <span className="tour-spirit-pct">{spirit}%</span>
+        </div>
+        <div className="tour-party" data-testid="tour-roster">
+          <ul className="tour-avatars" aria-hidden="true">
+            {partyMembers.slice(0, 5).map((member) => (
+              <li key={member} className="tour-avatar-chip">{member.slice(0, 1).toUpperCase()}</li>
+            ))}
+          </ul>
+          <span className="tour-party-label">
+            {partyMembers.length} online{state.roster.length > 0 ? `: Dante, ${state.roster.join(', ')}` : ' (just Dante for now)'}
+          </span>
+        </div>
+      </div>
+
       {finished ? (
         <div className="tour-win" role="status" data-testid="tour-win">
           <span className="tour-win-spark" aria-hidden="true">
@@ -478,7 +590,7 @@ export default function GuidedTour({ openSignup }) {
             {openSignup ? (
               <button
                 type="button"
-                className="primary-btn tour-win-cta"
+                className="tour-btn tour-btn--ember tour-win-cta"
                 onClick={openSignup}
                 data-testid="tour-win-signup"
               >
@@ -489,12 +601,7 @@ export default function GuidedTour({ openSignup }) {
         </div>
       ) : null}
 
-      <div className="tour-footer">
-        <button type="button" className="secondary-btn tour-reset" onClick={reset} data-testid="tour-reset">
-          Restart quest
-        </button>
-        <p className="tour-note muted-copy">Runs entirely in your browser. Nothing here is saved.</p>
-      </div>
+      <p className="tour-note muted-copy">Runs entirely in your browser. Nothing here is saved.</p>
     </div>
   )
 }
