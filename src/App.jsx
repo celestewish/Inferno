@@ -10,6 +10,7 @@ import TasksView from './components/TasksView'
 import CalendarView from './components/CalendarView'
 import ReportsView from './components/ReportsView'
 import DatePicker from './components/DatePicker.jsx'
+import MarketingHome from './components/MarketingHome'
 import {
   createActivity,
   defaultProjects,
@@ -51,137 +52,6 @@ const emptyProjectForm = {
 
 const clampAssignee = (assignee, teamMembers) =>
   teamMembers.includes(assignee) ? assignee : 'Unassigned'
-
-function MarketingHome({ openLogin, openSignup }) {
-  return (
-    <main className="marketing-shell">
-      <section className="marketing-hero panel">
-        <div className="marketing-logo-wrap" aria-hidden="true">
-          <div className="marketing-logo-glow" />
-          <div className="marketing-logo-mark">🔥</div>
-        </div>
-
-        <p className="eyebrow">Game production, organized</p>
-        <h1 className="inferno-wordmark">Inferno</h1>
-        <p className="marketing-subcopy">
-          A free game design task board for planning features, assigning work, tracking production, and
-          keeping your team aligned from backlog to final polish.
-        </p>
-
-        <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" data-testid="hero-signup" onClick={openSignup}>
-            Sign up free
-          </button>
-          <button type="button" className="secondary-btn" data-testid="hero-login" onClick={openLogin}>
-            Log in
-          </button>
-        </div>
-
-        <p className="marketing-sample-note">
-          New accounts start with a fully seeded sample board — real projects and tasks — so you can explore
-          Inferno before adding your own.
-        </p>
-
-        <div className="marketing-proof">
-          <span>Free to use</span>
-          <span>Built for game projects</span>
-          <span>Kanban + task details + team planning</span>
-        </div>
-      </section>
-
-      <section className="marketing-hierarchy panel" aria-label="How Inferno is organized">
-        <p className="eyebrow">How it fits together</p>
-        <h2>Board → Project → Task</h2>
-        <p className="muted-copy">
-          Inferno keeps production organized with a simple, predictable hierarchy.
-        </p>
-        <div className="hierarchy-flow">
-          <article className="hierarchy-node">
-            <span className="hierarchy-step">Board</span>
-            <p>Your studio workspace — one shared home for a game or team, with chat and invites built in.</p>
-          </article>
-          <span className="hierarchy-arrow" aria-hidden="true">→</span>
-          <article className="hierarchy-node">
-            <span className="hierarchy-step">Project</span>
-            <p>A feature area, milestone, or game inside the board. Switch between projects from the sidebar.</p>
-          </article>
-          <span className="hierarchy-arrow" aria-hidden="true">→</span>
-          <article className="hierarchy-node">
-            <span className="hierarchy-step">Task</span>
-            <p>The actual work — design, art, code, audio, polish — moving across a Kanban pipeline.</p>
-          </article>
-        </div>
-      </section>
-
-      <section className="marketing-features">
-        <article className="panel marketing-feature-card">
-          <h2>Plan your pipeline</h2>
-          <p className="muted-copy">
-            Move tasks across backlog, active production, review, and done with a board designed for game workflows.
-          </p>
-        </article>
-
-        <article className="panel marketing-feature-card">
-          <h2>Track real task details</h2>
-          <p className="muted-copy">
-            Capture assignees, discipline, estimate, due dates, subtasks, and production notes without leaving the board.
-          </p>
-        </article>
-
-        <article className="panel marketing-feature-card">
-          <h2>Keep the team aligned</h2>
-          <p className="muted-copy">
-            Organize teammates, project labels, and project-level activity in one place so progress stays visible.
-          </p>
-        </article>
-      </section>
-
-      <section className="marketing-about panel" aria-label="About Inferno">
-        <p className="eyebrow">About Inferno</p>
-        <h2>A production board designed around how games actually get made</h2>
-        <p className="muted-copy">
-          Most task tools are built for generic software teams. Inferno is opinionated about game
-          development: disciplines like design, combat, audio, and polish are first-class, tasks carry
-          the estimates and sprint context producers care about, and the whole board reads like a
-          pipeline instead of a spreadsheet.
-        </p>
-        <div className="about-highlights">
-          <div className="about-highlight">
-            <h3>The problem</h3>
-            <p>Small studios juggle planning docs, chat apps, and spreadsheets — context scatters and work stalls.</p>
-          </div>
-          <div className="about-highlight">
-            <h3>The approach</h3>
-            <p>One dark, focused board that unifies tasks, discussion, and team planning around a clear Board → Project → Task model.</p>
-          </div>
-          <div className="about-highlight">
-            <h3>The outcome</h3>
-            <p>Everyone sees the same pipeline, decisions live next to the work, and momentum stays visible from backlog to ship.</p>
-          </div>
-        </div>
-      </section>
-
-      <section className="marketing-banner panel">
-        <div>
-          <p className="eyebrow">Why Inferno</p>
-          <h2>Built for indie teams, student projects, and fast-moving prototypes</h2>
-          <p className="muted-copy">
-            Inferno gives you a lightweight production board without the clutter of a giant studio toolchain.
-          </p>
-        </div>
-
-        <div className="marketing-cta-row">
-          <button type="button" className="primary-btn" data-testid="banner-signup" onClick={openSignup}>
-            Create free account
-          </button>
-          <button type="button" className="secondary-btn" data-testid="banner-login" onClick={openLogin}>
-            I already have an account
-          </button>
-        </div>
-      </section>
-    </main>
-  )
-}
 
 function OnboardingGuide({
   boardName,
