@@ -10,6 +10,7 @@ import TasksView from './components/TasksView'
 import CalendarView from './components/CalendarView'
 import ReportsView from './components/ReportsView'
 import DocsView from './components/DocsView'
+import CodeForgeView from './components/CodeForgeView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -78,6 +79,7 @@ import {
   renderMessageSegments,
 } from './lib/campfire'
 import { validateDocInput } from './lib/docs'
+import { validateRepoInput } from './lib/codeforge'
 
 const emptyTaskForm = {
   title: '',
@@ -421,6 +423,8 @@ function App() {
   const [savingChannel, setSavingChannel] = useState(false)
   const [docs, setDocs] = useState([])
   const [docsMigrationMissing, setDocsMigrationMissing] = useState(false)
+  const [repos, setRepos] = useState([])
+  const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -541,6 +545,8 @@ useEffect(() => {
       setCampfireChannel(BOARD_CHANNEL_KEY)
       setDocs([])
       setDocsMigrationMissing(false)
+      setRepos([])
+      setReposMigrationMissing(false)
     }
   })
 
@@ -717,6 +723,8 @@ setCurrentBoardId(activeBoardId)
         setCustomChannels([])
         setDocs([])
         setDocsMigrationMissing(false)
+        setRepos([])
+        setReposMigrationMissing(false)
   return
 }
 
@@ -729,6 +737,7 @@ setCurrentBoardId(activeBoardId)
   { data: inviteData },
   { data: channelData },
   { data: docData, error: docError },
+  { data: repoData, error: repoError },
 ] = await Promise.all([
   supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
   supabase
@@ -762,6 +771,14 @@ setCurrentBoardId(activeBoardId)
   // the rest of the app keeps working.
   supabase
     .from('board_docs')
+    .select('*')
+    .eq('board_id', activeBoardId)
+    .order('created_at', { ascending: false }),
+  // Code Forge repositories; resolves with an error if the migration is not yet
+  // pushed, in which case Code Forge shows a non-blocking note and the rest of
+  // the app keeps working.
+  supabase
+    .from('board_repositories')
     .select('*')
     .eq('board_id', activeBoardId)
     .order('created_at', { ascending: false }),
@@ -816,6 +833,8 @@ setCurrentProjectId((currentId) =>
   setCustomChannels(channelData?.length ? channelData.map(dbToChannel) : [])
   setDocsMigrationMissing(Boolean(docError))
   setDocs(docData?.length ? docData.map(dbToDoc) : [])
+  setReposMigrationMissing(Boolean(repoError))
+  setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
@@ -1307,6 +1326,24 @@ function dbToDoc(row) {
     title: row.title,
     url: row.url,
     docType: row.doc_type,
+    description: row.description ?? '',
+    archivedAt: row.archived_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
+  }
+}
+
+function dbToRepo(row) {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    projectId: row.project_id ?? null,
+    userId: row.user_id,
+    provider: row.provider ?? 'github',
+    displayName: row.display_name,
+    repoUrl: row.repo_url,
+    owner: row.owner ?? null,
+    repo: row.repo ?? null,
     description: row.description ?? '',
     archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
@@ -2729,6 +2766,99 @@ const archiveDoc = async (doc) => {
   return { ok: true }
 }
 
+// ── Code Forge handlers ──────────────────────────────────────────────────────
+// Repos are metadata-only links (GitHub URL + parsed owner/repo), never
+// credentials or code. Deletion is a soft archive so a link is never lost. Each
+// handler validates input and returns { ok, message? } for inline errors.
+const createRepo = async (value) => {
+  const result = validateRepoInput(value)
+  if (!result.ok) return { ok: false, message: 'Check the highlighted fields.' }
+  if (!currentBoardId || !userId) return { ok: false, message: 'No active board.' }
+
+  const { data, error } = await supabase
+    .from('board_repositories')
+    .insert({
+      board_id: currentBoardId,
+      project_id: result.value.projectId,
+      user_id: userId,
+      provider: result.value.provider,
+      display_name: result.value.displayName,
+      repo_url: result.value.repoUrl,
+      owner: result.value.owner,
+      repo: result.value.repo,
+      description: result.value.description,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Create repo error:', formatSupabaseError(error), error)
+    return {
+      ok: false,
+      message: isMissingColumnError(error)
+        ? 'Run the Code Forge migration first.'
+        : 'Could not link repo. Please try again.',
+    }
+  }
+
+  const repo = dbToRepo(data)
+  setRepos((current) => [repo, ...current])
+  pushCelebration({ kind: 'xp', title: 'Repo linked', detail: repo.displayName })
+  return { ok: true }
+}
+
+const updateRepo = async (id, value) => {
+  const result = validateRepoInput(value)
+  if (!result.ok) return { ok: false, message: 'Check the highlighted fields.' }
+
+  const { data, error } = await supabase
+    .from('board_repositories')
+    .update({
+      project_id: result.value.projectId,
+      provider: result.value.provider,
+      display_name: result.value.displayName,
+      repo_url: result.value.repoUrl,
+      owner: result.value.owner,
+      repo: result.value.repo,
+      description: result.value.description,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Update repo error:', formatSupabaseError(error), error)
+    return { ok: false, message: 'Could not save changes. Please try again.' }
+  }
+
+  const repo = dbToRepo(data)
+  setRepos((current) => current.map((item) => (item.id === repo.id ? repo : item)))
+  return { ok: true }
+}
+
+// Archive (soft delete) a repo. The row stays in the database with archived_at
+// set so the link is recoverable; it just drops out of the active list.
+const archiveRepo = async (repo) => {
+  if (!repo?.id) return { ok: false }
+
+  const previous = repos
+  setRepos((current) => current.filter((item) => item.id !== repo.id))
+
+  const { error } = await supabase
+    .from('board_repositories')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', repo.id)
+
+  if (error) {
+    console.error('Archive repo error:', formatSupabaseError(error), error)
+    setRepos(previous)
+    pushCelebration({ kind: 'error', title: 'Repo not archived', detail: 'Please try again.' })
+    return { ok: false }
+  }
+  return { ok: true }
+}
+
 // Render a message body from safe parsed segments (no dangerouslySetInnerHTML).
 // Bold/code become styled spans; URLs become external links with rel guards.
 const renderMessageBody = (text) =>
@@ -4014,6 +4144,17 @@ return (
             onUpdateDoc={updateDoc}
             onArchiveDoc={archiveDoc}
             migrationMissing={docsMigrationMissing}
+          />
+        ) : null}
+
+        {activeSection === 'codeforge' ? (
+          <CodeForgeView
+            repos={repos}
+            projects={projects}
+            onCreateRepo={createRepo}
+            onUpdateRepo={updateRepo}
+            onArchiveRepo={archiveRepo}
+            migrationMissing={reposMigrationMissing}
           />
         ) : null}
 

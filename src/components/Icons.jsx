@@ -171,3 +171,39 @@ export function CloseIcon(props) {
     </Svg>
   )
 }
+
+// Code Forge glyph: angle brackets over a forge/anvil base, used for the Code
+// Forge nav item and headers.
+export function ForgeIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 6 4 10l4.5 4" />
+      <path d="M15.5 6 20 10l-4.5 4" />
+      <path d="M4 19h16" />
+      <path d="M7 19l2-3h6l2 3" />
+    </Svg>
+  )
+}
+
+// Git branch glyph, used for branch/PR badges on code links.
+export function GitBranchIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="7" r="2.5" />
+      <path d="M6 8.5v7" />
+      <path d="M18 9.5c0 4-4 3.5-6 6.5" />
+    </Svg>
+  )
+}
+
+// Copy-to-clipboard glyph, used for the clone command snippet button.
+export function CopyIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </Svg>
+  )
+}
