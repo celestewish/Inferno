@@ -334,3 +334,96 @@ export function updateMomentumStreak(settings, todayKey = getTodayKey()) {
   const best = Math.max(streak.best ?? 0, current)
   return { ...base, momentum_streak: { current, best, last_completed_date: todayKey } }
 }
+
+// ── Milestone Boss Fights ──
+// A boss turns a project milestone into an encounter: link tasks as "weak
+// points", and the boss loses HP as those tasks are completed. When every
+// linked task is done the boss is defeated and awards a one-time XP bonus.
+// Bosses live on the project record (projects.boss_fights jsonb), so these are
+// pure transforms over a single boss object plus a task id -> completed map.
+
+// Each linked task is worth this much boss HP. maxHp = task_ids.length * 25.
+export const BOSS_HP_PER_TASK = 25
+// Default reward when the creator does not set a custom value.
+export const DEFAULT_BOSS_REWARD_XP = 50
+
+// Best-effort unique id that works in the browser and in the Node test runner.
+function makeBossId() {
+  if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID()
+  }
+  return `boss_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+function cleanTaskIds(taskIds) {
+  const out = []
+  const seen = new Set()
+  for (const id of Array.isArray(taskIds) ? taskIds : []) {
+    if (typeof id !== 'string' || seen.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+// Normalize a reward value to a positive integer, falling back to the default.
+export function getBossRewardXp(boss) {
+  const raw = boss && typeof boss === 'object' ? boss.reward_xp : boss
+  return Number.isFinite(raw) && raw > 0 ? Math.floor(raw) : DEFAULT_BOSS_REWARD_XP
+}
+
+// Build a fresh boss record. Returns a plain object ready to store on the
+// project. Task ids are de-duplicated; a caller must supply at least one (the
+// UI enforces this) or the boss can never be defeated.
+export function createBossFight(input = {}, createdAt = new Date().toISOString()) {
+  return {
+    id: typeof input.id === 'string' && input.id ? input.id : makeBossId(),
+    name: String(input.name ?? '').trim(),
+    phase: String(input.phase ?? '').trim(),
+    project_id: input.projectId ?? input.project_id ?? null,
+    task_ids: cleanTaskIds(input.taskIds ?? input.task_ids),
+    reward_xp: getBossRewardXp({ reward_xp: input.rewardXp ?? input.reward_xp }),
+    created_at: createdAt,
+    defeated_at: null,
+    claimed: false,
+  }
+}
+
+// Total HP for a boss: one chunk per linked task.
+export function getBossMaxHp(boss) {
+  const ids = boss && Array.isArray(boss.task_ids) ? boss.task_ids : []
+  return ids.length * BOSS_HP_PER_TASK
+}
+
+// HP/progress snapshot for the UI. `completedById` maps task id -> completed.
+// Deleted tasks are simply absent from the map, so they contribute no damage
+// (the boss stays alive) but never crash the panel. defeated is true only when
+// there is at least one linked task and every one is complete (HP hits 0).
+export function getBossProgress(boss, completedById = {}) {
+  const ids = boss && Array.isArray(boss.task_ids) ? boss.task_ids : []
+  const total = ids.length
+  const completed = ids.filter((id) => completedById[id]).length
+  const maxHp = total * BOSS_HP_PER_TASK
+  const currentHp = Math.max(0, maxHp - completed * BOSS_HP_PER_TASK)
+  const pct = maxHp > 0 ? Math.round((currentHp / maxHp) * 100) : 0
+  return { total, completed, remaining: total - completed, maxHp, currentHp, pct, defeated: total > 0 && currentHp === 0 }
+}
+
+// True when the boss's HP has reached zero (all linked tasks complete).
+export function isBossDefeated(boss, completedById = {}) {
+  return getBossProgress(boss, completedById).defeated
+}
+
+// Whether the one-time reward should fire now: the boss is defeated and has not
+// already been claimed. Editing/reopening tasks after a claim never re-awards.
+export function shouldAwardBossReward(boss, completedById = {}) {
+  if (!boss || boss.claimed) return false
+  return isBossDefeated(boss, completedById)
+}
+
+// Stamp a boss as claimed + defeated. Idempotent: an already-claimed boss keeps
+// its original defeated_at so re-running never changes the record's history.
+export function markBossClaimed(boss, defeatedAt = new Date().toISOString()) {
+  if (!boss || typeof boss !== 'object') return boss
+  return { ...boss, claimed: true, defeated_at: boss.defeated_at ?? defeatedAt }
+}

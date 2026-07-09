@@ -22,6 +22,15 @@ import {
   shouldAwardDailyFocus,
   awardDailyFocusCompletion,
   updateMomentumStreak,
+  BOSS_HP_PER_TASK,
+  DEFAULT_BOSS_REWARD_XP,
+  createBossFight,
+  getBossMaxHp,
+  getBossProgress,
+  isBossDefeated,
+  shouldAwardBossReward,
+  markBossClaimed,
+  getBossRewardXp,
 } from '../src/lib/gamification.js'
 
 let failures = 0
@@ -164,6 +173,50 @@ assert(s2again.momentum_streak.current === 2, 'same-day streak update is a no-op
 const s3 = updateMomentumStreak(s2, '2026-07-13')
 assert(s3.momentum_streak.current === 1, 'a gap resets current to 1')
 assert(s3.momentum_streak.best === 2, 'best is retained across a reset')
+
+// ── Milestone Boss Fights ──
+assert(BOSS_HP_PER_TASK === 25, 'boss HP per task is 25')
+assert(DEFAULT_BOSS_REWARD_XP === 50, 'default boss reward is 50 XP')
+
+// create: shape, defaults, dedupe
+const boss = createBossFight(
+  { id: 'b1', name: '  Vertical Slice  ', phase: 'Milestone 1', projectId: 'p1', taskIds: ['t1', 't2', 't1', 't3'] },
+  '2026-07-09T00:00:00.000Z',
+)
+assert(boss.id === 'b1', 'createBossFight keeps a provided id')
+assert(boss.name === 'Vertical Slice', 'createBossFight trims the name')
+assert(boss.project_id === 'p1', 'createBossFight records the project id')
+assert(boss.task_ids.join(',') === 't1,t2,t3', 'createBossFight dedupes linked task ids')
+assert(boss.reward_xp === DEFAULT_BOSS_REWARD_XP, 'createBossFight defaults reward to 50 XP')
+assert(boss.claimed === false && boss.defeated_at === null, 'new boss starts unclaimed')
+const customXpBoss = createBossFight({ name: 'X', taskIds: ['t1'], rewardXp: 120 })
+assert(customXpBoss.reward_xp === 120, 'createBossFight honors a custom reward')
+assert(getBossRewardXp({ reward_xp: 0 }) === DEFAULT_BOSS_REWARD_XP, 'getBossRewardXp falls back for non-positive values')
+assert(typeof createBossFight({ name: 'Y', taskIds: ['t1'] }).id === 'string', 'createBossFight generates an id when none is given')
+
+// HP + progress
+assert(getBossMaxHp(boss) === 75, 'maxHp is task count times 25')
+const p0 = getBossProgress(boss, { t1: false, t2: false, t3: false })
+assert(p0.currentHp === 75 && p0.pct === 100 && p0.defeated === false, 'full HP when nothing is done')
+const p1 = getBossProgress(boss, { t1: true, t2: false, t3: false })
+assert(p1.currentHp === 50 && p1.completed === 1 && p1.remaining === 2, 'one weak point struck removes 25 HP')
+const pAll = getBossProgress(boss, { t1: true, t2: true, t3: true })
+assert(pAll.currentHp === 0 && pAll.pct === 0 && pAll.defeated === true, 'boss defeated at 0 HP')
+const pDeleted = getBossProgress(boss, { t1: true, t2: true })
+assert(pDeleted.currentHp === 25 && pDeleted.defeated === false, 'deleted linked task keeps the boss alive, no crash')
+assert(getBossProgress({ task_ids: [] }, {}).defeated === false, 'a boss with no tasks is never defeated')
+
+// award gating + claim
+assert(isBossDefeated(boss, { t1: true, t2: true, t3: true }) === true, 'isBossDefeated true when all done')
+assert(shouldAwardBossReward(boss, { t1: true, t2: true, t3: true }) === true, 'should award a fresh defeated boss')
+assert(shouldAwardBossReward(boss, { t1: true, t2: false, t3: true }) === false, 'should not award while a weak point stands')
+const claimed = markBossClaimed(boss, '2026-07-09T12:00:00.000Z')
+assert(claimed.claimed === true && claimed.defeated_at === '2026-07-09T12:00:00.000Z', 'markBossClaimed stamps claimed + defeated_at')
+assert(shouldAwardBossReward(claimed, { t1: true, t2: true, t3: true }) === false, 'claimed boss never re-awards (no farming)')
+const reclaimed = markBossClaimed(claimed, '2026-07-10T00:00:00.000Z')
+assert(reclaimed.defeated_at === '2026-07-09T12:00:00.000Z', 'markBossClaimed keeps the original defeated_at')
+// reopening a task after a claim must not revoke the reward
+assert(shouldAwardBossReward(claimed, { t1: true, t2: false, t3: true }) === false, 'reopening a task after defeat does not re-trigger an award')
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)

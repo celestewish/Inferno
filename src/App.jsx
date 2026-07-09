@@ -50,6 +50,12 @@ import {
   shouldAwardDailyFocus,
   awardDailyFocusCompletion,
   updateMomentumStreak,
+  DEFAULT_BOSS_REWARD_XP,
+  createBossFight,
+  getBossProgress,
+  shouldAwardBossReward,
+  markBossClaimed,
+  getBossRewardXp,
 } from './lib/gamification'
 
 const emptyTaskForm = {
@@ -416,6 +422,9 @@ function App() {
   // Daily Focus Quests: the picker modal + its in-flight selection draft.
   const [focusPickerOpen, setFocusPickerOpen] = useState(false)
   const [focusDraft, setFocusDraft] = useState([])
+  // Milestone Boss Fights: the create/edit modal + its in-flight draft.
+  const [bossModalOpen, setBossModalOpen] = useState(false)
+  const [bossDraft, setBossDraft] = useState({ id: null, name: '', phase: '', taskIds: [], rewardXp: DEFAULT_BOSS_REWARD_XP })
   // Mirror the latest gamification snapshot in a ref so the awarding engine can
   // read current XP/badges without stale closures and without re-creating its
   // callbacks on every progress change.
@@ -1128,6 +1137,7 @@ function dbToProject(row) {
     pillars: row.pillars ?? [],
     labels: row.labels ?? [],
     activity: row.activity ?? [],
+    bossFights: Array.isArray(row.boss_fights) ? row.boss_fights : [],
   }
 }
 
@@ -1164,6 +1174,7 @@ function dbToTask(row) {
   pillars: p.pillars ?? [],
   labels: p.labels ?? [],
   activity: p.activity ?? [],
+  boss_fights: Array.isArray(p.bossFights) ? p.bossFights : [],
 })
 
   const taskToDb = (t, userId, order = 0) => ({
@@ -1397,6 +1408,14 @@ function dbToInvite(row) {
     month: 'short',
     day: 'numeric',
   })
+
+  // Milestone Boss Fights view model, derived from the active project + tasks.
+  const projectBosses = currentProject && Array.isArray(currentProject.bossFights)
+    ? currentProject.bossFights
+    : []
+  const bossTaskCandidates = currentProject
+    ? tasks.filter((task) => task.projectId === currentProject.id)
+    : []
 
   // ── Project actions ──
   const logProjectActivity = (projectId, type, text) => {
@@ -1706,6 +1725,137 @@ function dbToInvite(row) {
     })
   }
 
+  // ── Milestone Boss Fights ──
+  // Bosses live on the project record. Update optimistically, then persist to
+  // the projects table; a failed write surfaces a non-blocking toast and leaves
+  // the local change in place so the board is never blocked.
+  const updateProjectBossFights = (projectId, nextBossFights) => {
+    setProjects((current) =>
+      current.map((project) =>
+        project.id === projectId ? { ...project, bossFights: nextBossFights } : project,
+      ),
+    )
+    supabase
+      .from('projects')
+      .update({ boss_fights: nextBossFights })
+      .eq('id', projectId)
+      .then(({ error }) => {
+        if (error) {
+          console.error('Boss fight persist error:', formatSupabaseError(error), error)
+          pushCelebration({
+            kind: 'error',
+            title: 'Boss not saved',
+            detail: 'Change kept locally only.',
+          })
+        }
+      })
+  }
+
+  const openBossCreator = () => {
+    setBossDraft({ id: null, name: '', phase: '', taskIds: [], rewardXp: DEFAULT_BOSS_REWARD_XP })
+    setBossModalOpen(true)
+  }
+
+  const openBossEditor = (boss) => {
+    setBossDraft({
+      id: boss.id,
+      name: boss.name ?? '',
+      phase: boss.phase ?? '',
+      taskIds: Array.isArray(boss.task_ids) ? [...boss.task_ids] : [],
+      rewardXp: getBossRewardXp(boss),
+    })
+    setBossModalOpen(true)
+  }
+
+  const toggleBossDraftTask = (id) => {
+    setBossDraft((current) => {
+      const taskIds = current.taskIds.includes(id)
+        ? current.taskIds.filter((value) => value !== id)
+        : [...current.taskIds, id]
+      return { ...current, taskIds }
+    })
+  }
+
+  const saveBossFight = () => {
+    if (!currentProject) return
+    const name = bossDraft.name.trim()
+    // A boss must have a name and at least one linked task, or it can never be
+    // fought or defeated.
+    if (!name || bossDraft.taskIds.length === 0) return
+    const existing = Array.isArray(currentProject.bossFights) ? currentProject.bossFights : []
+    let nextBosses
+    if (bossDraft.id) {
+      // Editing preserves claimed/defeated_at/created_at so a defeated boss can
+      // never be farmed by re-saving it.
+      nextBosses = existing.map((boss) =>
+        boss.id === bossDraft.id
+          ? {
+              ...boss,
+              name,
+              phase: bossDraft.phase.trim(),
+              task_ids: [...new Set(bossDraft.taskIds)],
+              reward_xp: getBossRewardXp({ reward_xp: bossDraft.rewardXp }),
+            }
+          : boss,
+      )
+    } else {
+      nextBosses = [
+        ...existing,
+        createBossFight({
+          name,
+          phase: bossDraft.phase.trim(),
+          projectId: currentProject.id,
+          taskIds: bossDraft.taskIds,
+          rewardXp: bossDraft.rewardXp,
+        }),
+      ]
+    }
+    updateProjectBossFights(currentProject.id, nextBosses)
+    setBossModalOpen(false)
+  }
+
+  const retireBossFight = (bossId) => {
+    if (!currentProject) return
+    const existing = Array.isArray(currentProject.bossFights) ? currentProject.bossFights : []
+    updateProjectBossFights(currentProject.id, existing.filter((boss) => boss.id !== bossId))
+  }
+
+  // After a linked task completes, award the one-time boss bonus for any boss in
+  // the task's project that just hit 0 HP. `justCompletedTask` compensates for
+  // the not-yet-flushed optimistic setTasks, mirroring rewardTaskCompletion.
+  const checkBossFights = (justCompletedTask) => {
+    if (!userId || !justCompletedTask) return
+    const project = projects.find((p) => p.id === justCompletedTask.projectId)
+    const bosses = project && Array.isArray(project.bossFights) ? project.bossFights : []
+    if (bosses.length === 0) return
+
+    const completedById = {}
+    for (const t of tasks) completedById[t.id] = t.completed
+    completedById[justCompletedTask.id] = true
+
+    const defeated = bosses.filter((boss) => shouldAwardBossReward(boss, completedById))
+    if (defeated.length === 0) return
+
+    const nowIso = new Date().toISOString()
+    const defeatedIds = new Set(defeated.map((boss) => boss.id))
+    const nextBosses = bosses.map((boss) =>
+      defeatedIds.has(boss.id) ? markBossClaimed(boss, nowIso) : boss,
+    )
+    updateProjectBossFights(project.id, nextBosses)
+
+    const completedNow = [
+      ...tasks.filter((t) => t.completed && t.id !== justCompletedTask.id).map((t) => ({ ...t })),
+      { ...justCompletedTask, completed: true },
+    ]
+    for (const boss of defeated) {
+      awardGamification({
+        xpDelta: getBossRewardXp(boss),
+        reason: 'Boss Defeated',
+        extraStats: { completedTasks: completedNow },
+      })
+    }
+  }
+
   const moveTask = async (taskId, nextStatus) => {
     setTasks((current) =>
       current.map((task) =>
@@ -1719,6 +1869,7 @@ function dbToInvite(row) {
       const doneTask = tasks.find((t) => t.id === taskId)
       if (doneTask) rewardTaskCompletion(doneTask)
       checkDailyFocusCompletion(taskId)
+      if (doneTask) checkBossFights(doneTask)
     }
   }
 
@@ -1778,6 +1929,7 @@ function dbToInvite(row) {
     if (willComplete) {
       rewardTaskCompletion(task)
       checkDailyFocusCompletion(task.id)
+      checkBossFights(task)
     }
   }
 
@@ -2798,6 +2950,106 @@ return (
         </div>
       </div>
     ) : null}
+    {bossModalOpen ? (
+      <div
+        className="focus-modal-overlay"
+        data-testid="boss-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={bossDraft.id ? 'Edit boss fight' : 'Create boss fight'}
+        onClick={() => setBossModalOpen(false)}
+      >
+        <div className="focus-modal boss-modal panel" onClick={(event) => event.stopPropagation()}>
+          <div className="focus-modal-head">
+            <h3>{bossDraft.id ? 'Edit Boss Fight' : 'Create Boss Fight'}</h3>
+          </div>
+          <p className="muted-copy">Link tasks to weaken this boss. Defeat it by completing them all.</p>
+
+          <label className="boss-field">
+            <span className="boss-field-label">Boss name</span>
+            <input
+              type="text"
+              value={bossDraft.name}
+              maxLength={80}
+              placeholder="Vertical Slice Demon"
+              data-testid="boss-name-input"
+              onChange={(event) => setBossDraft((current) => ({ ...current, name: event.target.value }))}
+            />
+          </label>
+          <label className="boss-field">
+            <span className="boss-field-label">Milestone or phase</span>
+            <input
+              type="text"
+              value={bossDraft.phase}
+              maxLength={80}
+              placeholder="Milestone 1"
+              data-testid="boss-phase-input"
+              onChange={(event) => setBossDraft((current) => ({ ...current, phase: event.target.value }))}
+            />
+          </label>
+          <label className="boss-field">
+            <span className="boss-field-label">Reward XP</span>
+            <input
+              type="number"
+              min={1}
+              value={bossDraft.rewardXp}
+              data-testid="boss-reward-input"
+              onChange={(event) =>
+                setBossDraft((current) => ({ ...current, rewardXp: Number(event.target.value) }))
+              }
+            />
+          </label>
+
+          <div className="boss-field-label boss-tasks-label">
+            Weak Points ({bossDraft.taskIds.length} linked)
+          </div>
+          {bossTaskCandidates.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="boss-modal-empty">
+              No tasks in this project yet. Create a task, then link it to a boss.
+            </p>
+          ) : (
+            <ul className="focus-modal-list">
+              {bossTaskCandidates.map((task) => {
+                const selected = bossDraft.taskIds.includes(task.id)
+                return (
+                  <li key={task.id}>
+                    <label className="focus-option">
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleBossDraftTask(task.id)}
+                        data-testid="boss-option"
+                      />
+                      <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
+                        {task.discipline || 'Task'}
+                      </span>
+                      <span className={task.completed ? 'focus-option-title is-done' : 'focus-option-title'}>
+                        {task.title}
+                      </span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className="focus-modal-actions">
+            <button type="button" className="secondary-btn" onClick={() => setBossModalOpen(false)}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              data-testid="boss-save"
+              disabled={!bossDraft.name.trim() || bossDraft.taskIds.length === 0}
+              onClick={saveBossFight}
+            >
+              {bossDraft.id ? 'Save Boss' : 'Create Boss'}
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <ProjectSidebar
         stats={stats}
@@ -2947,6 +3199,136 @@ return (
                 </button>
               ) : null}
             </div>
+          </section>
+        ) : null}
+
+        {activeSection === 'board' && userId ? (
+          <section className="panel boss-panel" data-testid="boss-panel">
+            <div className="boss-panel-head">
+              <div className="boss-panel-title">
+                <span className="boss-panel-eyebrow">Boss Fights</span>
+                <span className="boss-panel-sub">
+                  {currentProject?.name || 'This project'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="boss-create"
+                onClick={openBossCreator}
+              >
+                Create Boss Fight
+              </button>
+            </div>
+
+            {projectBosses.length === 0 ? (
+              <p className="boss-empty muted-copy" data-testid="boss-empty">
+                Turn a milestone into a boss. Link tasks to weaken this boss and
+                {' '}
+                defeat it for a +{DEFAULT_BOSS_REWARD_XP} XP bonus.
+              </p>
+            ) : (
+              <ul className="boss-list" data-testid="boss-list">
+                {projectBosses.map((boss) => {
+                  const progress = getBossProgress(boss, focusCompletedById)
+                  const defeated = boss.claimed || progress.defeated
+                  const weakPoints = (Array.isArray(boss.task_ids) ? boss.task_ids : [])
+                    .map((id) => tasks.find((t) => t.id === id))
+                    .filter(Boolean)
+                  return (
+                    <li
+                      key={boss.id}
+                      className={defeated ? 'boss-card is-defeated' : 'boss-card'}
+                      data-testid="boss-card"
+                    >
+                      <div className="boss-card-top">
+                        <span className="boss-crest" aria-hidden="true">
+                          {defeated ? '\u{1F6E1}' : '\u{1F525}'}
+                        </span>
+                        <div className="boss-card-headings">
+                          <strong className="boss-name">{boss.name}</strong>
+                          {boss.phase ? (
+                            <span className="boss-phase">{boss.phase}</span>
+                          ) : null}
+                        </div>
+                        {defeated ? (
+                          <span className="boss-defeated-stamp" data-testid="boss-defeated">
+                            Defeated
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <div
+                        className="boss-hp"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={progress.maxHp}
+                        aria-valuenow={progress.currentHp}
+                        aria-label={`${boss.name} HP`}
+                      >
+                        <span
+                          className="boss-hp-fill"
+                          data-testid="boss-hp-fill"
+                          style={{ width: `${progress.pct}%` }}
+                        />
+                      </div>
+                      <div className="boss-card-meta">
+                        <span className="boss-hp-label" data-testid="boss-hp-label">
+                          {progress.currentHp} / {progress.maxHp} HP
+                        </span>
+                        <span className={defeated ? 'boss-reward is-claimed' : 'boss-reward'}>
+                          {defeated
+                            ? `Boss Defeated +${getBossRewardXp(boss)} XP`
+                            : `+${getBossRewardXp(boss)} XP on defeat`}
+                        </span>
+                      </div>
+
+                      {weakPoints.length > 0 ? (
+                        <>
+                          <span className="boss-weak-label">Weak Points</span>
+                          <ul className="boss-weak-list">
+                            {weakPoints.map((task) => (
+                              <li
+                                key={task.id}
+                                className={task.completed ? 'boss-weak is-struck' : 'boss-weak'}
+                              >
+                                <span className="boss-weak-check" aria-hidden="true">
+                                  {task.completed ? '✔' : '○'}
+                                </span>
+                                <span className="boss-weak-title">{task.title}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="boss-weak-empty muted-copy">
+                          No linked tasks remain. Edit this boss to link tasks.
+                        </p>
+                      )}
+
+                      <div className="boss-card-actions">
+                        <button
+                          type="button"
+                          className="chip-action"
+                          data-testid="boss-edit"
+                          onClick={() => openBossEditor(boss)}
+                        >
+                          Edit Boss
+                        </button>
+                        <button
+                          type="button"
+                          className="chip-action"
+                          data-testid="boss-retire"
+                          onClick={() => retireBossFight(boss.id)}
+                        >
+                          Retire Boss
+                        </button>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </section>
         ) : null}
 
