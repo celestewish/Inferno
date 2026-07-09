@@ -1,11 +1,11 @@
-// Inferno brand mark. Renders the Logo-1 artwork from the social media kit
-// (served from public/brand). Height drives the size; width scales to keep the
-// native 3:2 aspect ratio.
+// Inferno brand mark. Renders the cropped, textless logo artwork (served from
+// public/brand). Height drives the size; width scales to keep the native aspect
+// ratio.
 export default function InfernoLogo({ size = 28 }) {
   return (
     <img
       className="inferno-logo"
-      src="/brand/logo-1.png"
+      src="/brand/logo-cropped.png"
       alt="Inferno logo"
       height={size}
       style={{ height: size, width: 'auto' }}

@@ -88,6 +88,14 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   overflow-x: hidden;
 }
 
+/* Mobile-only navigation chrome. Hidden on desktop; the media query below
+   turns the sidebar into an off-canvas drawer and reveals these controls. */
+.mobile-topbar,
+.mobile-nav-backdrop,
+.app-nav-close {
+  display: none;
+}
+
 /* ── Sidebar ── */
 .sidebar {
   border-right: 1px solid var(--card-border);
@@ -1125,91 +1133,98 @@ textarea:hover {
 @media (max-width: 900px) {
   .app-shell {
     grid-template-columns: minmax(0, 1fr);
-    /* Sidebar becomes a fixed bottom bar, so it leaves the grid flow entirely. */
+    /* Sidebar becomes an off-canvas drawer, so it leaves the grid flow entirely. */
     --sidebar-width: 0px;
   }
 
-  /* ── Mobile: sidebar → fixed bottom tab bar ──
-     Pulling the nav out of flow drops the section content to the very top of
-     the screen, so the onboarding guide (first child of .board-area) is the
-     first thing a first-time user sees on mobile, no scrolling past nav. */
-  .sidebar.app-nav {
-    position: fixed;
-    inset: auto 0 0 0;
-    z-index: 30;
-    flex-direction: row;
-    align-items: stretch;
-    min-height: unset;
-    gap: 0;
-    padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
-    border-right: none;
-    border-top: 1px solid var(--card-border);
-    border-bottom: none;
-    background: color-mix(in srgb, var(--surface-custom) 92%, #05070f);
-    box-shadow: 0 -12px 30px rgba(4, 6, 14, 0.4);
-    overflow: visible;
-  }
-
-  /* Only the section links live in the bar; the rest is reachable via the
-     Projects, Reports and Settings pages. */
-  .app-nav .brand,
-  .app-nav-heading,
-  .app-nav .stats-panel,
-  .app-nav .board-switcher,
-  .app-nav .project-switcher,
-  .app-nav-account {
-    display: none;
-  }
-
-  .app-nav-menu {
-    flex: 1 1 auto;
+  /* ── Mobile: fixed top bar with a menu trigger ──
+     Always present on authenticated pages. Sits above content so the menu is
+     reachable without scrolling; the board area reserves matching top padding. */
+  .mobile-topbar {
     display: flex;
-    gap: 0.15rem;
-    min-width: 0;
+    align-items: center;
+    gap: 0.75rem;
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 40;
+    height: calc(56px + env(safe-area-inset-top, 0px));
+    padding: env(safe-area-inset-top, 0px) 1rem 0;
+    border-bottom: 1px solid var(--card-border);
+    background: color-mix(in srgb, var(--surface-custom) 94%, #05070f);
+    backdrop-filter: blur(16px);
   }
-
-  /* Flatten both grouped lists into one evenly spaced tab row. */
-  .app-nav-list { display: contents; }
-  .app-nav-list li { flex: 1 1 0; min-width: 0; }
-
-  .app-nav-item {
-    flex-direction: column;
+  .mobile-nav-trigger {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.2rem;
-    padding: 0.4rem 0.15rem;
-    min-height: 52px;
-    border-radius: var(--radius-sm);
-    text-align: center;
-    font-size: 0.66rem;
-    font-weight: 600;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--card-border);
+    background: color-mix(in srgb, var(--surface-custom) 70%, transparent);
+    color: var(--text-main);
+    cursor: pointer;
+  }
+  .mobile-nav-trigger:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+  .mobile-topbar-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: var(--text-main);
   }
 
-  .app-nav-item.active {
-    background: transparent;
-    border-color: transparent;
-    box-shadow: none;
-    color: var(--accent);
+  /* Backdrop covers the main screen while the drawer is open. */
+  .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    border: none;
+    padding: 0;
+    background: rgba(4, 6, 14, 0.6);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
   }
+  .app-shell.mobile-nav-open .mobile-nav-backdrop { opacity: 1; visibility: visible; }
 
-  .app-nav-item.active .app-nav-icon {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 34%, transparent), color-mix(in srgb, var(--accent-secondary) 22%, transparent));
-    color: white;
-  }
-
-  .app-nav-icon { width: 1.7rem; height: 1.7rem; font-size: 1rem; }
-
-  .app-nav-label {
-    flex: 0 0 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  /* ── Mobile: sidebar → off-canvas drawer ──
+     Closed by default (slid off the left edge), covering the screen when open.
+     Keeps the full desktop drawer contents (brand, sections, boards, projects,
+     account) so every page is reachable from one place. */
+  .sidebar.app-nav {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(90vw, 380px);
     max-width: 100%;
-    line-height: 1.1;
+    min-height: 100vh;
+    border-right: 1px solid var(--card-border);
+    box-shadow: 12px 0 40px rgba(4, 6, 14, 0.5);
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
   }
+  .sidebar.app-nav.is-mobile-open { transform: translateX(0); }
 
-  /* Reserve space so the fixed bar never covers content or primary actions. */
-  .board-area { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+  .app-nav-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: auto;
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--card-border);
+    background: color-mix(in srgb, var(--surface-custom) 70%, transparent);
+    color: var(--text-main);
+    cursor: pointer;
+  }
+  .app-nav-close:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+
+  /* Reserve space so the fixed top bar never covers content or onboarding. */
+  .board-area { padding-top: calc(56px + env(safe-area-inset-top, 0px) + 0.5rem); }
 
   /* Board switching moves onto the Board page on mobile, since the sidebar's
      board switcher is hidden from the bottom bar. Sits below onboarding. */

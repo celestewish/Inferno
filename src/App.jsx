@@ -21,7 +21,8 @@ import RecapView from './components/RecapView'
 import PortfolioView from './components/PortfolioView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
-import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
+import { FlameIcon, PlusIcon, CloseIcon, MenuIcon } from './components/Icons'
+import InfernoLogo from './components/InfernoLogo'
 import {
   createActivity,
   defaultProjects,
@@ -497,6 +498,7 @@ function App() {
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
   const [memberRoles, setMemberRoles] = useState({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [newBoardSetting, setNewBoardSetting] = useState({ tags: '', categories: '', roles: '' })
   const [boardInfoForm, setBoardInfoForm] = useState({ name: '', description: '' })
   const [savingBoardInfo, setSavingBoardInfo] = useState(false)
@@ -599,6 +601,16 @@ useEffect(() => {
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [session?.user])
+
+  // Escape closes the mobile navigation drawer.
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setMobileNavOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [mobileNavOpen])
 
 useEffect(() => {
   if (!session?.user || !currentBoardId) return
@@ -3964,7 +3976,32 @@ return (
         </div>
       </div>
     ) : null}
-    <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
+    <div className={`${sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}${mobileNavOpen ? ' mobile-nav-open' : ''}`}>
+      <div className="mobile-topbar" data-testid="mobile-topbar">
+        <button
+          type="button"
+          className="mobile-nav-trigger"
+          data-testid="mobile-nav-trigger"
+          aria-label="Open menu"
+          aria-expanded={mobileNavOpen}
+          aria-controls="app-primary-nav"
+          onClick={() => setMobileNavOpen(true)}
+        >
+          <MenuIcon size={22} />
+        </button>
+        <div className="mobile-topbar-brand">
+          <InfernoLogo size={24} />
+          <span>Inferno</span>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="mobile-nav-backdrop"
+        data-testid="mobile-nav-backdrop"
+        aria-label="Close menu"
+        tabIndex={mobileNavOpen ? 0 : -1}
+        onClick={() => setMobileNavOpen(false)}
+      />
       <ProjectSidebar
         stats={stats}
         project={currentProject}
@@ -3984,6 +4021,8 @@ return (
         onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
         unreadCount={unreadNotifications}
         onOpenSearch={() => setCommandPaletteOpen(true)}
+        mobileOpen={mobileNavOpen}
+        onRequestClose={() => setMobileNavOpen(false)}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
         {activeSection === 'home' ? (
