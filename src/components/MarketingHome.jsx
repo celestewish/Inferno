@@ -4,7 +4,6 @@ import FeatureIcon from './FeatureIcon'
 import HeroCarousel from './HeroCarousel'
 import GuidedTour from './GuidedTour'
 import RoadmapGantt from './RoadmapGantt'
-import GallopingHorse from './GallopingHorse'
 
 const NAV_LINKS = [
   { href: '#features', label: 'Features' },
@@ -349,7 +348,15 @@ export default function MarketingHome({ openLogin, openSignup }) {
 
         <section className="landing-section landing-final-cta" aria-label="Get started">
           <div className="landing-gallop" data-testid="landing-gallop">
-            <GallopingHorse size={280} />
+            <img
+              className="landing-gallop-img"
+              src="/marketing/dante-gallop.webp"
+              width="360"
+              height="239"
+              loading="lazy"
+              decoding="async"
+              alt="Dante, Inferno's flame-maned horse mascot, galloping"
+            />
           </div>
           <h2>Start planning your game today</h2>
           <p className="muted-copy">
