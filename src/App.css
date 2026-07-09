@@ -4502,3 +4502,161 @@ textarea:hover {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* Command palette / global search */
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 12vh 16px 16px;
+  background: color-mix(in srgb, #05080f 72%, transparent);
+  backdrop-filter: blur(4px);
+}
+.cmdk-panel {
+  width: min(640px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--surface-custom) 92%, #05080f);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.cmdk-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--card-border);
+}
+.cmdk-search-icon {
+  display: inline-flex;
+  color: var(--text-muted);
+}
+.cmdk-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main);
+  font-size: 1rem;
+}
+.cmdk-input::placeholder {
+  color: var(--text-muted);
+}
+.cmdk-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.cmdk-close:hover { color: var(--text-main); }
+.cmdk-results {
+  overflow-y: auto;
+  padding: 8px;
+}
+.cmdk-group + .cmdk-group { margin-top: 6px; }
+.cmdk-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.cmdk-group-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 8px;
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.cmdk-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-main);
+  text-align: left;
+  cursor: pointer;
+}
+.cmdk-row.is-active,
+.cmdk-row:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+.cmdk-row-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  color: var(--accent-secondary);
+}
+.cmdk-row-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.cmdk-row-body strong {
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-row-body span {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmdk-row-tag {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--card-border);
+  color: var(--text-muted);
+}
+.cmdk-empty {
+  margin: 0;
+  padding: 24px 12px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+.cmdk-footer {
+  display: flex;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+}
+.cmdk-footer kbd {
+  font-size: 0.66rem;
+  padding: 1px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--surface-custom) 60%, #05080f);
+}
+@media (max-width: 720px) {
+  .cmdk-backdrop { padding: 6vh 10px 10px; }
+  .cmdk-footer { display: none; }
+}

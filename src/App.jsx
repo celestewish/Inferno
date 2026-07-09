@@ -14,6 +14,7 @@ import CodeForgeView from './components/CodeForgeView'
 import WarRoomView from './components/WarRoomView'
 import StudioHomeView from './components/StudioHomeView'
 import NotificationsView from './components/NotificationsView'
+import CommandPalette from './components/CommandPalette'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -581,6 +582,19 @@ useEffect(() => {
   useEffect(() => {
     gamificationRef.current = gamification
   }, [gamification])
+
+  // Global command palette shortcut (Ctrl/Cmd+K), available whenever signed in.
+  useEffect(() => {
+    if (!session?.user) return undefined
+    const onKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'K')) {
+        event.preventDefault()
+        setCommandPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [session?.user])
 
 useEffect(() => {
   if (!session?.user || !currentBoardId) return
@@ -2463,6 +2477,33 @@ const goToCampfire = () => setActiveSection('campfire')
 const openTaskById = (taskId) => {
   const task = tasks.find((t) => t.id === taskId)
   if (task) setEditingTask(task)
+}
+
+// Dispatch a command-palette quick action to the matching handler.
+const runQuickAction = (id) => {
+  switch (id) {
+    case 'create-task':
+      goToCreateTask()
+      break
+    case 'link-doc':
+      handleSelectSection('docs')
+      break
+    case 'link-repo':
+      handleSelectSection('codeforge')
+      break
+    case 'open-campfire':
+      goToCampfire()
+      break
+    case 'open-warroom':
+      handleSelectSection('warroom')
+      break
+    case 'create-boss':
+      handleSelectSection('projects')
+      openBossCreator()
+      break
+    default:
+      break
+  }
 }
 
 // Persist a single notification as read. Optimistically updates local state so
@@ -5495,6 +5536,15 @@ return (
       projects={projects}
       deleteTask={deleteTask}
       addSubtaskToEditing={addSubtaskToEditing}
+    />
+
+    <CommandPalette
+      open={commandPaletteOpen}
+      onClose={() => setCommandPaletteOpen(false)}
+      data={{ tasks, projects, docs, repos, messages, boardMembers, profiles, meetingNotes }}
+      onSelectSection={handleSelectSection}
+      onOpenTask={openTaskById}
+      onQuickAction={runQuickAction}
     />
   </>
 )

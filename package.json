@@ -15,6 +15,7 @@
     "test:warroom": "node scripts/warroom-sanity.mjs",
     "test:studio": "node scripts/studio-sanity.mjs",
     "test:notifications": "node scripts/notifications-sanity.mjs",
+    "test:search": "node scripts/search-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
