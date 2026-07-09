@@ -113,6 +113,12 @@ Current migrations:
   swatches (accent, glow, surface, background) persist per user. A null value
   means "use the default theme". The existing update RLS policy already covers
   it, so no policy change is needed.
+- `20260713000000_add_mobile_board_hint.sql` — adds a nullable
+  `mobile_board_hint_seen_at` `timestamptz` column to `profiles` so the one-time
+  mobile "swipe through the board" hint stays dismissed per user. A null value
+  means "hint not yet dismissed". The existing update RLS policy already covers
+  it, so no policy change is needed. If the migration has not been applied, the
+  hint is simply hidden rather than repeatedly shown.
 
 > **"Your profile database is missing the new profile columns."**
 > This message in **Settings → Profile** means the profile columns are absent

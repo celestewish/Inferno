@@ -336,7 +336,7 @@ textarea:hover {
 .board-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(320px, 360px);
+  grid-auto-columns: minmax(260px, 300px);
   gap: 1rem;
   align-items: start;
   overflow-x: auto;
@@ -377,8 +377,8 @@ textarea:hover {
 /* ── Columns ── */
 .column {
   width: 100%;
-  min-width: 320px;
-  max-width: 360px;
+  min-width: 260px;
+  max-width: 300px;
   overflow: visible;
   padding: 1rem;
   border-radius: var(--radius-xl);
@@ -435,7 +435,94 @@ textarea:hover {
 .task-title-inline, .task-body-inline { overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
 .task-card.completed { opacity: 0.82; border-color: rgba(63,220,156,0.3); }
 .task-card.completed .task-title-inline { text-decoration: line-through; }
-.card-topline { display: flex; justify-content: space-between; gap: 0.5rem; align-items: start; }
+.card-topline { display: flex; justify-content: space-between; gap: 0.5rem; align-items: center; }
+
+/* ── Compact cards ── */
+.task-card.compact {
+  gap: 0.6rem;
+  padding: 0.85rem 0.95rem;
+  cursor: pointer;
+}
+.task-card.compact:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.card-discipline-chip {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: #b9c3ef;
+  white-space: nowrap;
+}
+.task-card-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 650;
+  line-height: 1.32;
+  color: #eef1ff;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.task-card.completed .task-card-title { text-decoration: line-through; }
+.task-card-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.6rem;
+  font-size: 0.78rem;
+  color: #8f9bc7;
+}
+.task-card-meta-item { white-space: nowrap; }
+.task-card-meta-item + .task-card-meta-item::before {
+  content: '·';
+  margin-right: 0.6rem;
+  color: #5b648f;
+}
+.task-card.compact .manipulation-row { margin-top: 0.15rem; }
+
+/* ── Mobile swipe hint ── */
+.mobile-board-hint { display: none; }
+@media (max-width: 760px) {
+  .mobile-board-hint {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.75rem 0.9rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--card-border));
+    background:
+      radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
+      color-mix(in srgb, var(--surface-custom) 90%, white 3%);
+  }
+  .mobile-board-hint-icon {
+    font-size: 1.15rem;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .mobile-board-hint-copy {
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    color: #dbe3ff;
+  }
+  .mobile-board-hint-dismiss {
+    flex: 0 0 auto;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.06);
+    color: #dbe3ff;
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .mobile-board-hint-dismiss:hover { background: rgba(255,255,255,0.12); }
+}
 
 /* ── Priority badges ── */
 .priority-badge { border-radius: 999px; padding: 0.38rem 0.65rem; font-size: 0.78rem; font-weight: 700; }
