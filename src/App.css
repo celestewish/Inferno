@@ -208,6 +208,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   }
 }
 
+/* Board switching lives in the sidebar on desktop; this on-page switcher is
+   mobile-only (revealed in the max-width: 900px media query). */
+.mobile-board-switcher { display: none; }
+
 /* ── Typography ── */
 .eyebrow { margin: 0 0 0.5rem; text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.78rem; color: color-mix(in srgb, white 70%, var(--accent)); }
 h1, h2, h3, h4, p { margin: 0; }
@@ -1247,6 +1251,7 @@ textarea:hover {
   .app-nav .brand,
   .app-nav-heading,
   .app-nav .stats-panel,
+  .app-nav .board-switcher,
   .app-nav .project-switcher,
   .app-nav-account {
     display: none;
@@ -1301,6 +1306,32 @@ textarea:hover {
 
   /* Reserve space so the fixed bar never covers content or primary actions. */
   .board-area { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Board switching moves onto the Board page on mobile, since the sidebar's
+     board switcher is hidden from the bottom bar. Sits below onboarding. */
+  .mobile-board-switcher {
+    display: flex;
+    align-items: flex-end;
+    gap: 0.6rem;
+  }
+  .mobile-board-switcher-field {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: grid;
+    gap: 0.3rem;
+  }
+  .mobile-board-switcher-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #98a4d3;
+  }
+  .mobile-board-select {
+    width: 100%;
+    min-width: 0;
+  }
+  .mobile-board-create { flex: 0 0 auto; white-space: nowrap; }
 
   .details-grid,
   .hero-panel {
