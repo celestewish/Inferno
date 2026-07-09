@@ -34,6 +34,7 @@ export default function DocsView({
   onUpdateDoc,
   onArchiveDoc,
   migrationMissing = false,
+  accessError = false,
 }) {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
@@ -134,6 +135,13 @@ export default function DocsView({
         <div className="docs-migration-note" role="status" data-testid="docs-migration-note">
           Docs Hub needs its database migration. Run <code className="chat-code">supabase db push</code> to
           start linking docs. The rest of Inferno keeps working.
+        </div>
+      ) : null}
+
+      {accessError ? (
+        <div className="docs-migration-note" role="status" data-testid="docs-access-note">
+          Docs Hub could not load. You may need to sign in again, or you do not have access to this
+          board's docs. The rest of Inferno keeps working.
         </div>
       ) : null}
 
