@@ -17,6 +17,7 @@ export default function HeroCarousel() {
   const [index, setIndex] = useState(0)
   const [paused, setPaused] = useState(false)
   const [reducedMotion, setReducedMotion] = useState(false)
+  const [failed, setFailed] = useState({})
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -55,15 +56,22 @@ export default function HeroCarousel() {
         {SLIDES.map((slide, slideIndex) => (
           <img
             key={slide.src}
-            className={slideIndex === index ? 'landing-shot hero-carousel-slide is-active' : 'landing-shot hero-carousel-slide'}
+            className={slideIndex === index ? 'hero-carousel-slide is-active' : 'hero-carousel-slide'}
             src={slide.src}
             width={1280}
             height={720}
             alt={slide.alt}
             aria-hidden={slideIndex === index ? undefined : true}
             loading={slideIndex === 0 ? 'eager' : 'lazy'}
+            onError={() => setFailed((prev) => (prev[slide.src] ? prev : { ...prev, [slide.src]: true }))}
           />
         ))}
+
+        {failed[active.src] ? (
+          <div className="hero-carousel-fallback" role="img" aria-label={active.alt}>
+            <span>{active.label}</span>
+          </div>
+        ) : null}
 
         <button
           type="button"

@@ -4,6 +4,7 @@ import FeatureIcon from './FeatureIcon'
 import HeroCarousel from './HeroCarousel'
 import GuidedTour from './GuidedTour'
 import RoadmapGantt from './RoadmapGantt'
+import GallopingHorse from './GallopingHorse'
 
 const NAV_LINKS = [
   { href: '#features', label: 'Features' },
@@ -347,6 +348,9 @@ export default function MarketingHome({ openLogin, openSignup }) {
         </section>
 
         <section className="landing-section landing-final-cta" aria-label="Get started">
+          <div className="landing-gallop" data-testid="landing-gallop">
+            <GallopingHorse size={280} />
+          </div>
           <h2>Start planning your game today</h2>
           <p className="muted-copy">
             Create a free account and explore a fully seeded sample board in seconds.

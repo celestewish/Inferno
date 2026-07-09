@@ -1,4 +1,10 @@
+let logoUid = 0
+
+// Inferno brand mark: Blaze the flame horse in profile. Shares the mascot
+// silhouette used across the site so the horse is the single brand motif.
 export default function InfernoLogo({ size = 28 }) {
+  const gid = `inferno-logo-${(logoUid += 1)}`
+
   return (
     <svg
       width={size}
@@ -6,25 +12,38 @@ export default function InfernoLogo({ size = 28 }) {
       viewBox="0 0 64 64"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
+      role="img"
       aria-label="Inferno logo"
     >
       <defs>
-        <linearGradient id="infernoFlame" x1="12" y1="8" x2="50" y2="56" gradientUnits="userSpaceOnUse">
+        <linearGradient id={`${gid}-mane`} x1="16" y1="6" x2="40" y2="40" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="var(--accent-secondary)" />
-          <stop offset="55%" stopColor="var(--accent)" />
-          <stop offset="100%" stopColor="#FF8A5B" />
+          <stop offset="45%" stopColor="var(--accent)" />
+          <stop offset="100%" stopColor="var(--ember)" />
+        </linearGradient>
+        <linearGradient id={`${gid}-face`} x1="30" y1="20" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#2a2350" />
+          <stop offset="100%" stopColor="#171233" />
         </linearGradient>
       </defs>
 
-      <path
-        d="M34.5 6C36 14 30 18 30 24c0 3.2 2.2 5.6 5.3 6.4-1.2-4.1 1.3-7.1 4.7-9.8C44.8 17 48 22.7 48 29.5 48 42 40.2 52 28.5 52 18.2 52 10 43.8 10 33.5c0-8.2 4.9-14.1 10.8-19.3 1.6 5.9 5.2 8.7 8.6 10.2-.9-6.9 1.3-12.3 5.1-18.4Z"
-        fill="url(#infernoFlame)"
-      />
+      <g fill={`url(#${gid}-mane)`}>
+        <path d="M20 40c-7-3-11-11-8-19 2 5 6 6 8 4-3-8 1-15 8-19-2 7 1 10 4 11-1-6 2-11 7-14-3 9 2 13 6 16 2 8-2 17-10 21-8 3-16 3-23 0Z" />
+      </g>
 
       <path
-        d="M31 28c5.8 3.2 9 8.1 9 13.6C40 47.9 35 52 28.9 52 23.4 52 19 47.9 19 42.8c0-5.2 3.4-9.6 7.9-12.8-.2 4.8 1.7 8.2 5.8 10.5-1.4-3.2-.7-7.6-1.7-12.5Z"
-        fill="rgba(255,255,255,0.18)"
+        d="M33 20c9 0 16 6 16 15 0 6-3 10-3 14 0 2-2 3-4 3h-3c-2 0-3-1-3-3l-1-4c-5-1-9-5-9-12 0-8 5-13 10-13Z"
+        fill={`url(#${gid}-face)`}
+        stroke="var(--accent)"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
       />
+      <path d="M31 21c-2-2-2-5-1-7 3 1 5 3 6 6Z" fill={`url(#${gid}-mane)`} />
+      <path d="M44 40c3 0 5 2 5 4s-2 3-4 3" stroke="var(--ember)" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="46" cy="45" r="1.4" fill="var(--ember)" />
+      <circle cx="39" cy="33" r="2.3" fill="#fef6ff" />
+      <circle cx="39.6" cy="33.4" r="1.1" fill="#171233" />
+      <path d="M52 24l1.4 3.4L57 29l-3.6 1.6L52 34l-1.4-3.4L47 29l3.6-1.6Z" fill="var(--accent-secondary)" />
     </svg>
   )
 }
