@@ -38,6 +38,11 @@ import {
   bossResult,
   getStudioTask,
   getMember,
+  ROOM_GAMES,
+  getRoomGame,
+  roomGameAssigned,
+  roomGameScore,
+  roomGameSolved,
 } from '../src/lib/questGame.js'
 
 let failures = 0
@@ -266,6 +271,74 @@ const failResult = bossResult({ ...failState, meters: computeMeters(failState) }
 assert(failResult.tier === 'missed', 'barely any work is a miss')
 assert(failResult.cta.length > 0, 'even a miss offers a friendly next step')
 assert(failResult.win === false, 'a miss is not a win')
+
+// ===========================================================================
+// Room mini-games: forgiving puzzles that gate each room reward
+// ===========================================================================
+
+// Shape: one game per room action, and every room action has a game.
+assert(
+  ['docs', 'campfire', 'forge'].every((id) => Boolean(getRoomGame(id))),
+  'every studio room has a mini-game',
+)
+assert(getRoomGame('nope') === null, 'getRoomGame returns null for an unknown room')
+assert(
+  ROOM_ACTIONS.every((action) => Boolean(ROOM_GAMES[action.id])),
+  'each room action id maps to a mini-game',
+)
+assert(getRoomGame('docs').kind === 'select', 'docs shrine is a select game')
+assert(getRoomGame('campfire').kind === 'match', 'campfire is a match game')
+assert(getRoomGame('forge').kind === 'match', 'forge is a match game')
+
+// Every select item answer is one of its own options; every match item answer
+// is one of the game targets. Guards against typos in the data.
+assert(
+  getRoomGame('docs').items.every((item) => item.options.some((o) => o.id === item.answer)),
+  'each docs row answer is one of its options',
+)
+for (const gameId of ['campfire', 'forge']) {
+  const game = getRoomGame(gameId)
+  const targetIds = new Set(game.targets.map((t) => t.id))
+  assert(
+    game.items.every((item) => targetIds.has(item.answer)),
+    `each ${gameId} item answer is a real target`,
+  )
+}
+
+// Assignment counting
+assert(roomGameAssigned('docs', {}) === 0, 'no choices means nothing assigned')
+assert(
+  roomGameAssigned('docs', { pillar: 'pillar-all' }) === 1,
+  'a single choice counts as one assigned',
+)
+assert(roomGameAssigned('nope', {}) === 0, 'unknown game assigns nothing')
+
+// Scoring: empty, partial, wrong, and solved
+const docsEmpty = roomGameScore('docs', {})
+assert(docsEmpty.correct === 0 && docsEmpty.total === 3, 'empty docs game scores zero of three')
+assert(docsEmpty.complete === false && docsEmpty.solved === false, 'empty docs game is neither complete nor solved')
+
+const docsWrong = roomGameScore('docs', { pillar: 'pillar-all', loop: 'loop-menus', scope: 'scope-mmo' })
+assert(docsWrong.complete === true, 'all rows chosen makes the game complete')
+assert(docsWrong.correct === 0 && docsWrong.solved === false, 'all wrong choices is complete but not solved')
+
+const docsPartial = roomGameScore('docs', { pillar: 'pillar-focus', loop: 'loop-menus' })
+assert(docsPartial.correct === 1, 'one right choice scores one correct')
+assert(docsPartial.complete === false && docsPartial.solved === false, 'a missing row is not complete')
+
+const docsAnswers = Object.fromEntries(getRoomGame('docs').items.map((i) => [i.id, i.answer]))
+assert(roomGameScore('docs', docsAnswers).solved === true, 'all correct docs choices solve the game')
+assert(roomGameSolved('docs', docsAnswers) === true, 'roomGameSolved agrees with score.solved')
+
+const campfireAnswers = Object.fromEntries(getRoomGame('campfire').items.map((i) => [i.id, i.answer]))
+assert(roomGameSolved('campfire', campfireAnswers) === true, 'routing every message correctly solves campfire')
+assert(
+  roomGameSolved('campfire', { 'msg-jump': 'ch-art', 'msg-palette': 'ch-build', 'msg-drop': 'ch-audio' }) === false,
+  'swapping two channels does not solve campfire',
+)
+
+const forgeAnswers = Object.fromEntries(getRoomGame('forge').items.map((i) => [i.id, i.answer]))
+assert(roomGameSolved('forge', forgeAnswers) === true, 'matching every issue to its branch solves forge')
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)
