@@ -2596,11 +2596,12 @@ const markNotificationRead = async (key) => {
     .from('notification_reads')
     .upsert(
       { board_id: currentBoardId, user_id: userId, notification_key: key },
-      { onConflict: 'board_id,user_id,notification_key' }
+      { onConflict: 'board_id,user_id,notification_key', ignoreDuplicates: true }
     )
   if (error) {
     console.error('Mark notification read error:', formatSupabaseError(error), error)
-    setNotificationsMigrationMissing(true)
+    setNotificationsMigrationMissing(isMissingTableError(error) || isMissingColumnError(error))
+    setNotificationsAccessError(isAccessError(error))
   }
 }
 
@@ -2622,10 +2623,11 @@ const markAllNotificationsRead = async () => {
   }))
   const { error } = await supabase
     .from('notification_reads')
-    .upsert(rows, { onConflict: 'board_id,user_id,notification_key' })
+    .upsert(rows, { onConflict: 'board_id,user_id,notification_key', ignoreDuplicates: true })
   if (error) {
     console.error('Mark all notifications read error:', formatSupabaseError(error), error)
-    setNotificationsMigrationMissing(true)
+    setNotificationsMigrationMissing(isMissingTableError(error) || isMissingColumnError(error))
+    setNotificationsAccessError(isAccessError(error))
   }
 }
 
