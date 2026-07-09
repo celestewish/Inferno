@@ -24,6 +24,7 @@ export default function NotificationsView({
   notifications = [],
   unread = 0,
   migrationMissing = false,
+  accessError = false,
   onMarkRead,
   onMarkAllRead,
 }) {
@@ -51,6 +52,12 @@ export default function NotificationsView({
       {migrationMissing ? (
         <p className="notif-note" role="status">
           Apply the notifications migration (supabase db push) to remember which alerts you have read.
+        </p>
+      ) : null}
+
+      {accessError ? (
+        <p className="notif-note" role="status" data-testid="notif-access-note">
+          Read state could not load. You may need to sign in again. The rest of Inferno keeps working.
         </p>
       ) : null}
 
