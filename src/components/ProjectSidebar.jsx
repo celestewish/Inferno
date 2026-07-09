@@ -6,6 +6,7 @@ const PRIMARY_NAV = [
   { id: 'board', label: 'Board', icon: '▦' },
   { id: 'tasks', label: 'Tasks', icon: '✎' },
   { id: 'projects', label: 'Projects', icon: '◆' },
+  { id: 'campfire', label: 'Campfire', icon: '🔥' },
   { id: 'team', label: 'Team', icon: '◍' },
 ]
 
