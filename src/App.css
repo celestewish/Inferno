@@ -602,6 +602,24 @@ textarea:hover {
   filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--accent) 24%, transparent));
 }
 
+/* Brand logo image (Logo-1 from the social media kit). Height is set inline via
+   the size prop; width tracks the native aspect ratio. */
+.inferno-logo {
+  display: block;
+  flex: 0 0 auto;
+  max-width: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 24px color-mix(in srgb, var(--accent) 24%, transparent));
+}
+
+/* The empty-board icon is a fixed square; let the logo fit inside it by width. */
+.board-empty-icon .inferno-logo {
+  height: auto;
+  max-height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
 /* ── App nav (desktop left rail) ── */
 .app-nav .brand { padding-bottom: 0.25rem; }
 
