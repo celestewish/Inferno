@@ -3222,10 +3222,14 @@ textarea:hover {
 .gamification-panel { display: grid; gap: 1.1rem; }
 .gami-stat-row { display: flex; align-items: center; gap: 1rem; }
 .gami-level-badge {
-  display: grid;
-  place-items: center;
-  width: 62px;
-  height: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  width: 64px;
+  height: 64px;
+  padding: 0.35rem;
   border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--accent), var(--ember) 75%, var(--accent-secondary));
   box-shadow: 0 10px 24px color-mix(in srgb, var(--ember) 30%, transparent), inset 0 0 0 2px color-mix(in srgb, white 22%, transparent);
@@ -3234,10 +3238,19 @@ textarea:hover {
 }
 .gami-level-num {
   font-family: 'Press Start 2P', 'Courier New', monospace;
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
+  /* The pixel font sits high in its line box; nudge down so the digit reads
+     optically centered against the LVL label below it. */
+  transform: translateY(1px);
 }
-.gami-level-label { font-size: 0.6rem; letter-spacing: 0.16em; opacity: 0.85; margin-top: 0.25rem; }
+.gami-level-label {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.5rem;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
 .gami-xp-block { flex: 1; min-width: 0; display: grid; gap: 0.4rem; }
 .gami-xp-line { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; flex-wrap: wrap; }
 .gami-xp-track {
