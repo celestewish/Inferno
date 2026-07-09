@@ -39,6 +39,17 @@ import {
   normalizeBadges,
   hasBadge,
   newlyEarnedBadges,
+  DAILY_FOCUS_COMPLETE_XP,
+  MAX_DAILY_FOCUS,
+  getTodayKey,
+  getDailyFocus,
+  isDailyFocusExpired,
+  setDailyFocus,
+  clearDailyFocus,
+  getDailyFocusProgress,
+  shouldAwardDailyFocus,
+  awardDailyFocusCompletion,
+  updateMomentumStreak,
 } from './lib/gamification'
 
 const emptyTaskForm = {
@@ -402,6 +413,9 @@ function App() {
   const [gamification, setGamification] = useState(null)
   const [celebrations, setCelebrations] = useState([])
   const celebrationSeq = useRef(0)
+  // Daily Focus Quests: the picker modal + its in-flight selection draft.
+  const [focusPickerOpen, setFocusPickerOpen] = useState(false)
+  const [focusDraft, setFocusDraft] = useState([])
   // Mirror the latest gamification snapshot in a ref so the awarding engine can
   // read current XP/badges without stale closures and without re-creating its
   // callbacks on every progress change.
@@ -1358,6 +1372,32 @@ function dbToInvite(row) {
     projects: projects.length,
   }), [tasks, projects])
 
+  // Daily Focus Quests view model, derived from live tasks + stored settings.
+  const todayKey = getTodayKey()
+  const storedDailyFocus = getDailyFocus(gamification?.settings)
+  const dailyFocusActive =
+    storedDailyFocus && !isDailyFocusExpired(storedDailyFocus, todayKey) ? storedDailyFocus : null
+  const focusCompletedById = useMemo(() => {
+    const map = {}
+    for (const task of tasks) map[task.id] = task.completed
+    return map
+  }, [tasks])
+  const focusProgress = dailyFocusActive
+    ? getDailyFocusProgress(dailyFocusActive, focusCompletedById)
+    : { total: 0, completed: 0, allComplete: false }
+  const focusTasks = dailyFocusActive
+    ? dailyFocusActive.task_ids.map((id) => tasks.find((t) => t.id === id)).filter(Boolean)
+    : []
+  const focusCandidates = currentProject
+    ? tasks.filter((task) => task.projectId === currentProject.id && !task.completed)
+    : []
+  const momentumStreak = gamification?.settings?.momentum_streak ?? null
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  })
+
   // ── Project actions ──
   const logProjectActivity = (projectId, type, text) => {
     setProjects((current) =>
@@ -1509,7 +1549,7 @@ function dbToInvite(row) {
   // Core award routine: apply an XP delta, mark a task rewarded (for idempotent
   // per-task awarding), re-evaluate badges, update state + ref, fire toasts, and
   // persist. Reads the latest snapshot from the ref to avoid stale closures.
-  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {} } = {}) => {
+  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {}, mutateSettings } = {}) => {
     if (!userId) return
     const base = gamificationRef.current ?? {
       xp: 0,
@@ -1524,12 +1564,17 @@ function dbToInvite(row) {
     const nextLevel = levelForXp(nextXp)
 
     // Track rewarded tasks so completing the same task twice never farms XP.
-    const settings = { ...(base.settings ?? {}) }
+    let settings = { ...(base.settings ?? {}) }
     if (rewardTaskId) {
       const rewarded = Array.isArray(settings.rewarded_tasks) ? settings.rewarded_tasks : []
       if (!rewarded.includes(rewardTaskId)) {
         settings.rewarded_tasks = [...rewarded, rewardTaskId]
       }
+    }
+    // Let callers fold additional settings changes (e.g. daily-focus claim +
+    // streak) into the same atomic snapshot/persist.
+    if (typeof mutateSettings === 'function') {
+      settings = mutateSettings(settings) ?? settings
     }
 
     const fresh = newlyEarnedBadges(
@@ -1591,6 +1636,76 @@ function dbToInvite(row) {
     })
   }
 
+  // Persist a settings-only change (daily focus selection / clear) without
+  // touching XP, level, or badges. Same non-blocking persistence as awards.
+  const applyGamificationSettings = (nextSettings) => {
+    if (!userId) return
+    const base = gamificationRef.current ?? {
+      xp: 0,
+      level: 1,
+      badges: [],
+      selected_title: null,
+      settings: {},
+    }
+    const snapshot = { ...base, settings: nextSettings }
+    gamificationRef.current = snapshot
+    setGamification(snapshot)
+    persistGamification(snapshot)
+  }
+
+  const saveDailyFocus = (taskIds) => {
+    const base = gamificationRef.current?.settings ?? {}
+    applyGamificationSettings(setDailyFocus(base, taskIds, getTodayKey()))
+  }
+
+  const clearDailyFocusSelection = () => {
+    const base = gamificationRef.current?.settings ?? {}
+    applyGamificationSettings(clearDailyFocus(base))
+  }
+
+  const openFocusPicker = () => {
+    const df = getDailyFocus(gamificationRef.current?.settings)
+    const active = df && !isDailyFocusExpired(df, getTodayKey()) ? df.task_ids : []
+    setFocusDraft(active)
+    setFocusPickerOpen(true)
+  }
+
+  const toggleFocusDraft = (id) => {
+    setFocusDraft((current) => {
+      if (current.includes(id)) return current.filter((value) => value !== id)
+      if (current.length >= MAX_DAILY_FOCUS) return current
+      return [...current, id]
+    })
+  }
+
+  const confirmFocusPicker = () => {
+    saveDailyFocus(focusDraft)
+    setFocusPickerOpen(false)
+  }
+
+  // After a task completes, award the one-time daily-focus bonus if today's
+  // selected tasks are now all done. `justCompletedId` compensates for the
+  // not-yet-flushed optimistic setTasks, mirroring rewardTaskCompletion.
+  const checkDailyFocusCompletion = (justCompletedId) => {
+    if (!userId) return
+    const base = gamificationRef.current
+    const todayKey = getTodayKey()
+    const dailyFocus = getDailyFocus(base?.settings)
+    if (isDailyFocusExpired(dailyFocus, todayKey) || dailyFocus.claimed) return
+
+    const completedById = {}
+    for (const t of tasks) completedById[t.id] = t.completed
+    if (justCompletedId) completedById[justCompletedId] = true
+
+    if (!shouldAwardDailyFocus(dailyFocus, completedById, todayKey)) return
+    awardGamification({
+      xpDelta: DAILY_FOCUS_COMPLETE_XP,
+      reason: 'Daily Quests Complete',
+      mutateSettings: (settings) =>
+        updateMomentumStreak(awardDailyFocusCompletion(settings, todayKey), todayKey),
+    })
+  }
+
   const moveTask = async (taskId, nextStatus) => {
     setTasks((current) =>
       current.map((task) =>
@@ -1603,6 +1718,7 @@ function dbToInvite(row) {
     if (nextStatus === 'done') {
       const doneTask = tasks.find((t) => t.id === taskId)
       if (doneTask) rewardTaskCompletion(doneTask)
+      checkDailyFocusCompletion(taskId)
     }
   }
 
@@ -1659,7 +1775,10 @@ function dbToInvite(row) {
       status: task.completed ? 'todo' : 'done',
       activity: [createActivity('complete', task.completed ? 'Reopened task.' : 'Marked task complete.'), ...(task.activity || [])],
     })
-    if (willComplete) rewardTaskCompletion(task)
+    if (willComplete) {
+      rewardTaskCompletion(task)
+      checkDailyFocusCompletion(task.id)
+    }
   }
 
   const handleEditSave = (event) => {
@@ -2608,6 +2727,77 @@ return (
         </div>
       ))}
     </div>
+    {focusPickerOpen ? (
+      <div
+        className="focus-modal-overlay"
+        data-testid="focus-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Choose today's focus quests"
+        onClick={() => setFocusPickerOpen(false)}
+      >
+        <div className="focus-modal panel" onClick={(event) => event.stopPropagation()}>
+          <div className="focus-modal-head">
+            <h3>Choose today&apos;s quests</h3>
+            <span className="focus-modal-count" data-testid="focus-modal-count">
+              {focusDraft.length} / {MAX_DAILY_FOCUS}
+            </span>
+          </div>
+          <p className="muted-copy">
+            Pick up to {MAX_DAILY_FOCUS} tasks from {currentProject?.name || 'this project'} to focus
+            on today. Completed tasks cannot be chosen.
+          </p>
+
+          {focusCandidates.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="focus-modal-empty">
+              No open tasks here yet. Create a task, then set your focus.
+            </p>
+          ) : (
+            <ul className="focus-modal-list">
+              {focusCandidates.map((task) => {
+                const selected = focusDraft.includes(task.id)
+                const atCap = !selected && focusDraft.length >= MAX_DAILY_FOCUS
+                return (
+                  <li key={task.id}>
+                    <label className={atCap ? 'focus-option is-disabled' : 'focus-option'}>
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        disabled={atCap}
+                        onChange={() => toggleFocusDraft(task.id)}
+                        data-testid="focus-option"
+                      />
+                      <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
+                        {task.discipline || 'Task'}
+                      </span>
+                      <span className="focus-option-title">{task.title}</span>
+                    </label>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          <div className="focus-modal-actions">
+            <button
+              type="button"
+              className="secondary-btn"
+              onClick={() => setFocusPickerOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="primary-btn"
+              data-testid="focus-save"
+              onClick={confirmFocusPicker}
+            >
+              Save quests
+            </button>
+          </div>
+        </div>
+      </div>
+    ) : null}
     <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <ProjectSidebar
         stats={stats}
@@ -2686,6 +2876,78 @@ return (
               {creatingBoard ? 'Creating…' : 'New board'}
             </button>
           </div>
+        ) : null}
+
+        {activeSection === 'board' && userId ? (
+          <section className="panel focus-quests" data-testid="focus-quests">
+            <div className="focus-quests-head">
+              <div className="focus-quests-title">
+                <span className="focus-quests-eyebrow">Today&apos;s Quests</span>
+                <span className="focus-quests-date">{todayLabel}</span>
+              </div>
+              {momentumStreak && momentumStreak.current > 0 ? (
+                <span className="focus-momentum" data-testid="focus-momentum" title={`Best streak: ${momentumStreak.best} day${momentumStreak.best === 1 ? '' : 's'}`}>
+                  <span className="focus-momentum-flame" aria-hidden="true">&#128293;</span>
+                  Studio Momentum {momentumStreak.current} day{momentumStreak.current === 1 ? '' : 's'}
+                </span>
+              ) : null}
+            </div>
+
+            {dailyFocusActive && focusProgress.total > 0 ? (
+              <>
+                <ul className="focus-list" data-testid="focus-list">
+                  {focusTasks.map((task) => (
+                    <li
+                      key={task.id}
+                      className={task.completed ? 'focus-item is-done' : 'focus-item'}
+                    >
+                      <span className="focus-item-check" aria-hidden="true">
+                        {task.completed ? '✔' : '○'}
+                      </span>
+                      <span className="focus-item-title">{task.title}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="focus-quests-meta">
+                  <span className="focus-progress" data-testid="focus-progress">
+                    {focusProgress.completed} / {focusProgress.total} complete
+                  </span>
+                  <span className={dailyFocusActive.claimed ? 'focus-reward is-claimed' : 'focus-reward'} data-testid="focus-reward">
+                    {dailyFocusActive.claimed
+                      ? `Bonus claimed +${DAILY_FOCUS_COMPLETE_XP} XP`
+                      : `+${DAILY_FOCUS_COMPLETE_XP} XP if all complete`}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <p className="focus-empty muted-copy" data-testid="focus-empty">
+                Pick up to {MAX_DAILY_FOCUS} tasks to focus on today and earn a
+                {' '}
+                +{DAILY_FOCUS_COMPLETE_XP} XP bonus for clearing them all.
+              </p>
+            )}
+
+            <div className="focus-actions">
+              <button
+                type="button"
+                className="secondary-btn"
+                data-testid="focus-choose"
+                onClick={openFocusPicker}
+              >
+                Choose Quests
+              </button>
+              {dailyFocusActive && focusProgress.total > 0 ? (
+                <button
+                  type="button"
+                  className="chip-action"
+                  data-testid="focus-clear"
+                  onClick={clearDailyFocusSelection}
+                >
+                  Clear Quests
+                </button>
+              ) : null}
+            </div>
+          </section>
         ) : null}
 
         {activeSection === 'board' ? (

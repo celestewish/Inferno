@@ -201,3 +201,136 @@ export function newlyEarnedBadges(stats, currentBadges) {
   const now = new Date().toISOString()
   return satisfied.filter((id) => !already.has(id)).map((id) => makeBadge(id, now))
 }
+
+// ── Daily Focus Quests ──
+// A healthy, non-punishing daily loop: pick up to 3 focus tasks for the local
+// day, and earn a one-time bonus when they are all done. State lives entirely
+// inside `gamification_settings` (no new columns), so these helpers are pure
+// transforms over that settings object.
+
+export const DAILY_FOCUS_COMPLETE_XP = 25
+export const MAX_DAILY_FOCUS = 3
+
+// Local-day key as YYYY-MM-DD. Uses the local calendar date (not UTC) so the
+// quest resets at the player's midnight, matching how the date is displayed.
+export function getTodayKey(date = new Date()) {
+  const d = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// The calendar day before a YYYY-MM-DD key. Used for streak continuity.
+function previousDayKey(todayKey) {
+  const [y, m, d] = String(todayKey).split('-').map(Number)
+  if (!y || !m || !d) return null
+  const date = new Date(y, m - 1, d)
+  date.setDate(date.getDate() - 1)
+  return getTodayKey(date)
+}
+
+// Read the stored daily-focus record (or null). Coerces task_ids to a clean,
+// capped, de-duplicated array of strings so callers never handle garbage.
+export function getDailyFocus(settings) {
+  const raw = settings && typeof settings === 'object' ? settings.daily_focus : null
+  if (!raw || typeof raw !== 'object' || typeof raw.date !== 'string') return null
+  const ids = Array.isArray(raw.task_ids) ? raw.task_ids : []
+  const cleaned = []
+  const seen = new Set()
+  for (const id of ids) {
+    if (typeof id !== 'string' || seen.has(id)) continue
+    seen.add(id)
+    cleaned.push(id)
+    if (cleaned.length >= MAX_DAILY_FOCUS) break
+  }
+  return {
+    date: raw.date,
+    task_ids: cleaned,
+    completed: Boolean(raw.completed),
+    claimed: Boolean(raw.claimed),
+  }
+}
+
+// True when there is no focus for today (missing or from an earlier day).
+export function isDailyFocusExpired(dailyFocus, todayKey = getTodayKey()) {
+  return !dailyFocus || dailyFocus.date !== todayKey
+}
+
+// Store a fresh focus for `todayKey`, replacing any prior day. Resets the
+// completed/claimed flags so a new day always starts unclaimed.
+export function setDailyFocus(settings, taskIds, todayKey = getTodayKey()) {
+  const base = settings && typeof settings === 'object' ? settings : {}
+  const ids = Array.isArray(taskIds) ? taskIds : []
+  const cleaned = []
+  const seen = new Set()
+  for (const id of ids) {
+    if (typeof id !== 'string' || seen.has(id)) continue
+    seen.add(id)
+    cleaned.push(id)
+    if (cleaned.length >= MAX_DAILY_FOCUS) break
+  }
+  return {
+    ...base,
+    daily_focus: { date: todayKey, task_ids: cleaned, completed: false, claimed: false },
+  }
+}
+
+// Remove today's focus selection.
+export function clearDailyFocus(settings) {
+  const base = settings && typeof settings === 'object' ? settings : {}
+  return { ...base, daily_focus: null }
+}
+
+// Progress over the *currently existing* selected tasks. Deleted tasks are
+// ignored gracefully (dropped from the total) so a removed card never leaves an
+// unreachable "1 / 3". `completedById` maps task id -> boolean completed.
+export function getDailyFocusProgress(dailyFocus, completedById = {}) {
+  const ids = dailyFocus && Array.isArray(dailyFocus.task_ids) ? dailyFocus.task_ids : []
+  const present = ids.filter((id) => Object.prototype.hasOwnProperty.call(completedById, id))
+  const completed = present.filter((id) => completedById[id]).length
+  const total = present.length
+  return { total, completed, allComplete: total > 0 && completed === total }
+}
+
+// Whether the bonus should fire now: focus is for today, not yet claimed, and
+// every existing selected task is complete.
+export function shouldAwardDailyFocus(dailyFocus, completedById = {}, todayKey = getTodayKey()) {
+  if (isDailyFocusExpired(dailyFocus, todayKey)) return false
+  if (dailyFocus.claimed) return false
+  return getDailyFocusProgress(dailyFocus, completedById).allComplete
+}
+
+// Mark today's focus complete + claimed and append a history entry. Idempotent
+// per date: re-running replaces (does not duplicate) today's history row.
+export function awardDailyFocusCompletion(settings, todayKey = getTodayKey(), xp = DAILY_FOCUS_COMPLETE_XP) {
+  const base = settings && typeof settings === 'object' ? settings : {}
+  const df = getDailyFocus(base)
+  if (!df) return base
+  const updatedFocus = { ...df, completed: true, claimed: true }
+  const history = Array.isArray(base.daily_focus_history) ? base.daily_focus_history : []
+  const withoutToday = history.filter((entry) => entry && entry.date !== todayKey)
+  const entry = {
+    date: todayKey,
+    task_ids: df.task_ids,
+    completed: true,
+    claimed: true,
+    xp_awarded: xp,
+  }
+  return { ...base, daily_focus: updatedFocus, daily_focus_history: [...withoutToday, entry] }
+}
+
+// Advance the momentum streak by one for `todayKey`. Consecutive days increment
+// current; a gap resets it to 1. Recording the same day twice is a no-op, so
+// this is safe to call alongside the idempotent award.
+export function updateMomentumStreak(settings, todayKey = getTodayKey()) {
+  const base = settings && typeof settings === 'object' ? settings : {}
+  const streak =
+    base.momentum_streak && typeof base.momentum_streak === 'object'
+      ? base.momentum_streak
+      : { current: 0, best: 0, last_completed_date: null }
+  if (streak.last_completed_date === todayKey) return base
+  const current = streak.last_completed_date === previousDayKey(todayKey) ? (streak.current ?? 0) + 1 : 1
+  const best = Math.max(streak.best ?? 0, current)
+  return { ...base, momentum_streak: { current, best, last_completed_date: todayKey } }
+}
