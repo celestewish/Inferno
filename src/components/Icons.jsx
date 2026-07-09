@@ -207,3 +207,50 @@ export function CopyIcon(props) {
     </Svg>
   )
 }
+
+// Headset glyph, used for the War Room nav item and huddle affordances.
+export function HeadsetIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 13v-1a8 8 0 0 1 16 0v1" />
+      <rect x="3" y="13" width="4" height="6" rx="1.4" />
+      <rect x="17" y="13" width="4" height="6" rx="1.4" />
+      <path d="M20 19v1a3 3 0 0 1-3 3h-3" />
+    </Svg>
+  )
+}
+
+// Microphone (active) glyph, used for the Mic On control.
+export function MicIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M6 11a6 6 0 0 0 12 0" />
+      <path d="M12 17v4" />
+      <path d="M9 21h6" />
+    </Svg>
+  )
+}
+
+// Muted microphone glyph (mic with a slash), used for the Muted state.
+export function MicOffIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M9 5a3 3 0 0 1 6 0v4" />
+      <path d="M15 12.5a3 3 0 0 1-4.5 1.4" />
+      <path d="M6 11a6 6 0 0 0 9 5.2" />
+      <path d="M12 17v4" />
+      <path d="M9 21h6" />
+      <path d="M4 4l16 16" />
+    </Svg>
+  )
+}
+
+// Leave/hang-up glyph (down-tilted handset), used for the Leave Huddle control.
+export function LeaveCallIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M3 10.5c5-4 13-4 18 0l-2.5 2.5-3-1v-2.2a12 12 0 0 0-7 0V12l-3 1z" />
+    </Svg>
+  )
+}
