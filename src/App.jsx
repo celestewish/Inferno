@@ -536,6 +536,12 @@ function App() {
   const [memberRoles, setMemberRoles] = useState({})
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [newBoardSetting, setNewBoardSetting] = useState({ tags: '', categories: '', roles: '' })
+  const [boardInfoForm, setBoardInfoForm] = useState({ name: '', description: '' })
+  const [savingBoardInfo, setSavingBoardInfo] = useState(false)
+  const [boardInfoSaved, setBoardInfoSaved] = useState(false)
+  const [boardInfoError, setBoardInfoError] = useState('')
+  const [creatingBoard, setCreatingBoard] = useState(false)
+  const [deletingBoard, setDeletingBoard] = useState(false)
   // Password recovery (from the emailed reset link) shows a dedicated
   // update-password panel instead of dropping the user onto the board.
   const [recoveryMode, setRecoveryMode] = useState(false)
@@ -1310,6 +1316,17 @@ function dbToInvite(row) {
   // which entries are removable (only user-added ones can be removed).
   const settingDefaults = { tags: labelPool, categories: gameCategories, roles: defaultRoles }
 
+  // Keep the editable board name/description form in sync with the active board
+  // so switching boards loads that board's details rather than stale values.
+  useEffect(() => {
+    setBoardInfoForm({
+      name: currentBoard?.name ?? '',
+      description: currentBoard?.description ?? '',
+    })
+    setBoardInfoError('')
+    setBoardInfoSaved(false)
+  }, [currentBoardId, currentBoard?.name, currentBoard?.description])
+
   const persistBoardSettings = async (nextSettings) => {
     if (!currentBoardId) return
     setBoards((current) =>
@@ -1690,6 +1707,116 @@ function dbToInvite(row) {
       return
     }
     await loadAllData(userId, currentBoardId)
+  }
+
+  // ── Board management (create / switch / rename / delete) ──
+  const switchBoard = async (boardId) => {
+    if (!boardId || boardId === currentBoardId) return
+    await loadAllData(userId, boardId)
+    setActiveSection('board')
+  }
+
+  const createBoard = async () => {
+    if (creatingBoard) return
+    const name = (window.prompt('Name your new board', 'New Board') || '').trim()
+    if (!name) return
+    if (name.length > 100) {
+      window.alert('Board names must be 100 characters or fewer.')
+      return
+    }
+    setCreatingBoard(true)
+    const { data: created, error } = await supabase
+      .from('boards')
+      .insert({ owner_id: userId, name, description: '' })
+      .select()
+      .single()
+    if (error || !created) {
+      console.error('Create board error:', formatSupabaseError(error), error)
+      window.alert('We could not create the board. Please try again.')
+      setCreatingBoard(false)
+      return
+    }
+    const { error: memberError } = await supabase
+      .from('board_members')
+      .insert([{ board_id: created.id, user_id: userId, role: 'owner' }])
+    if (memberError) {
+      console.error('Create board membership error:', formatSupabaseError(memberError), memberError)
+      window.alert('The board was created but we could not add you as its owner. Please try again.')
+      setCreatingBoard(false)
+      return
+    }
+    await loadAllData(userId, created.id)
+    setActiveSection('board')
+    setCreatingBoard(false)
+  }
+
+  const saveBoardInfo = async (event) => {
+    event?.preventDefault?.()
+    if (!currentBoardId || savingBoardInfo) return
+    const name = boardInfoForm.name.trim()
+    const description = boardInfoForm.description.trim()
+    if (!name) {
+      setBoardInfoError('Board name is required.')
+      return
+    }
+    if (name.length > 100) {
+      setBoardInfoError('Board name must be 100 characters or fewer.')
+      return
+    }
+    setSavingBoardInfo(true)
+    setBoardInfoError('')
+    setBoardInfoSaved(false)
+    const { error } = await supabase
+      .from('boards')
+      .update({ name, description })
+      .eq('id', currentBoardId)
+    if (error) {
+      console.error('Save board info error:', formatSupabaseError(error), error)
+      setBoardInfoError(error.message || 'We could not save the board details. Please try again.')
+      setSavingBoardInfo(false)
+      return
+    }
+    setBoards((current) =>
+      current.map((board) =>
+        board.id === currentBoardId ? { ...board, name, description } : board
+      )
+    )
+    setSavingBoardInfo(false)
+    setBoardInfoSaved(true)
+    window.setTimeout(() => setBoardInfoSaved(false), 2500)
+  }
+
+  const deleteBoard = async () => {
+    if (!currentBoardId || deletingBoard || !isBoardOwner) return
+    const name = currentBoard?.name ?? ''
+    const typed = window.prompt(
+      `This permanently deletes "${name}" and all of its projects, tasks, messages, invites, and members. This cannot be undone.\n\nType the board name to confirm:`
+    )
+    if (typed === null) return
+    if (typed.trim() !== name.trim()) {
+      window.alert('That did not match the board name. Deletion cancelled.')
+      return
+    }
+    setDeletingBoard(true)
+    const { error } = await supabase.rpc('delete_board', { p_board_id: currentBoardId })
+    if (error) {
+      console.error('Delete board error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not delete the board. Please try again.')
+      setDeletingBoard(false)
+      return
+    }
+    const remaining = boards.filter((board) => board.id !== currentBoardId)
+    setBoards(remaining)
+    if (remaining[0]) {
+      await loadAllData(userId, remaining[0].id)
+      setActiveSection('board')
+    } else {
+      // No boards left — loadAllData bootstraps a fresh starter board.
+      setCurrentBoardId(null)
+      await loadAllData(userId)
+      setActiveSection('board')
+    }
+    setDeletingBoard(false)
   }
 
   const focusQuickCreate = () => {
@@ -2367,6 +2494,11 @@ return (
         project={currentProject}
         projects={projects}
         setCurrentProjectId={setCurrentProjectId}
+        boards={boards}
+        currentBoardId={currentBoardId}
+        onSelectBoard={switchBoard}
+        onCreateBoard={createBoard}
+        creatingBoard={creatingBoard}
         onSignOut={() => supabase.auth.signOut()}
         activeSection={activeSection}
         onSelectSection={handleSelectSection}
@@ -2662,11 +2794,53 @@ return (
               <div className="section-heading">
                 <h2>Board</h2>
               </div>
+              <p className="muted-copy">
+                Rename this board and update its description. Changes apply for everyone on the board.
+              </p>
+              <form className="profile-form" onSubmit={saveBoardInfo}>
+                <label className="profile-field">
+                  Board name
+                  <input
+                    type="text"
+                    value={boardInfoForm.name}
+                    data-testid="board-name-input"
+                    maxLength={100}
+                    placeholder="e.g. Studio Production Board"
+                    onChange={(e) =>
+                      setBoardInfoForm((current) => ({ ...current, name: e.target.value }))
+                    }
+                  />
+                </label>
+                <label className="profile-field">
+                  Description
+                  <input
+                    type="text"
+                    value={boardInfoForm.description}
+                    data-testid="board-description-input"
+                    maxLength={280}
+                    placeholder="What is this board for?"
+                    onChange={(e) =>
+                      setBoardInfoForm((current) => ({ ...current, description: e.target.value }))
+                    }
+                  />
+                </label>
+
+                {boardInfoError ? <p className="auth-error">{boardInfoError}</p> : null}
+                {boardInfoSaved ? (
+                  <p className="auth-success" data-testid="board-info-saved">Board details saved.</p>
+                ) : null}
+
+                <button
+                  type="submit"
+                  className="primary-btn"
+                  data-testid="settings-save-board"
+                  disabled={savingBoardInfo}
+                >
+                  {savingBoardInfo ? 'Saving…' : 'Save board details'}
+                </button>
+              </form>
+
               <dl className="settings-list">
-                <div>
-                  <dt>Board name</dt>
-                  <dd>{currentBoard?.name ?? '—'}</dd>
-                </div>
                 <div>
                   <dt>Projects</dt>
                   <dd>{projects.length}</dd>
@@ -2680,6 +2854,31 @@ return (
                 Pipeline sections are managed from the Board page. Add or remove columns there and they
                 apply across every project on this board.
               </p>
+
+              <div className="settings-security">
+                <h3>Delete board</h3>
+                {isBoardOwner ? (
+                  <>
+                    <p className="muted-copy">
+                      Permanently delete this board and all of its projects, tasks, messages, invites,
+                      and members. This cannot be undone.
+                    </p>
+                    <button
+                      type="button"
+                      className="danger-btn"
+                      data-testid="settings-delete-board"
+                      onClick={deleteBoard}
+                      disabled={deletingBoard}
+                    >
+                      {deletingBoard ? 'Deleting…' : 'Delete this board'}
+                    </button>
+                  </>
+                ) : (
+                  <p className="muted-copy" data-testid="settings-delete-board-locked">
+                    Only the board owner can delete this board.
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="panel settings-panel" data-testid="settings-customization">
