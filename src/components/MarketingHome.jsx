@@ -2,7 +2,8 @@ import { useState } from 'react'
 import InfernoLogo from './InfernoLogo'
 import FeatureIcon from './FeatureIcon'
 import HeroCarousel from './HeroCarousel'
-import SandboxDemo from './SandboxDemo'
+import GuidedTour from './GuidedTour'
+import RoadmapGantt from './RoadmapGantt'
 
 const NAV_LINKS = [
   { href: '#features', label: 'Features' },
@@ -118,14 +119,6 @@ const STEPS = [
     title: 'Ship together',
     body: 'Invite the team, assign work, track due dates on the calendar, and watch progress in live reports.',
   },
-]
-
-const ROADMAP = [
-  { tag: 'Next', title: 'Mobile app-style experience', body: 'A dedicated touch-first layout with a bottom nav for planning on the go.' },
-  { tag: 'Planned', title: 'Board templates', body: 'Start from ready-made pipelines for jams, prototypes, and full productions.' },
-  { tag: 'Planned', title: 'Task attachments', body: 'Attach references, art, and docs directly to the cards they belong to.' },
-  { tag: 'Exploring', title: 'Integrations', body: 'Connect the tools your studio already lives in, from chat to source control.' },
-  { tag: 'Exploring', title: 'Exports', body: 'Export boards and reports to share progress with stakeholders and publishers.' },
 ]
 
 export default function MarketingHome({ openLogin, openSignup }) {
@@ -245,17 +238,18 @@ export default function MarketingHome({ openLogin, openSignup }) {
 
         <div className="landing-divider landing-divider--cool" aria-hidden="true" />
 
-        <section className="landing-section landing-sandbox" id="sandbox" aria-label="Interactive demo">
+        <section className="landing-section landing-sandbox" id="sandbox" aria-label="Interactive tutorial">
           <div className="landing-section-head">
             <p className="eyebrow">Try it, no signup</p>
-            <h2>Play with a live pipeline</h2>
+            <h2>Run a game jam in eight steps</h2>
             <p className="muted-copy">
-              This is a tiny sandbox version of an Inferno board. Add your own tasks and move cards
-              across the pipeline to feel how production flows. It runs entirely in your browser.
+              Blaze the flame pony walks you through the whole Inferno loop, from naming a board to
+              shipping a milestone. Complete each quest step on a live mini board. It runs entirely
+              in your browser and nothing is saved.
             </p>
           </div>
 
-          <SandboxDemo />
+          <GuidedTour />
         </section>
 
         <div className="landing-divider landing-divider--ember" aria-hidden="true" />
@@ -346,18 +340,10 @@ export default function MarketingHome({ openLogin, openSignup }) {
           <div className="landing-section-head">
             <p className="eyebrow">Roadmap</p>
             <h2>What is coming next</h2>
-            <p className="muted-copy">Inferno is actively evolving. Here is where it is headed.</p>
+            <p className="muted-copy">Inferno is actively evolving. Here is the track ahead.</p>
           </div>
 
-          <div className="landing-roadmap-grid">
-            {ROADMAP.map((item) => (
-              <article key={item.title} className="landing-roadmap-card">
-                <span className="landing-roadmap-tag">{item.tag}</span>
-                <h3>{item.title}</h3>
-                <p>{item.body}</p>
-              </article>
-            ))}
-          </div>
+          <RoadmapGantt />
         </section>
 
         <section className="landing-section landing-final-cta" aria-label="Get started">
