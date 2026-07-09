@@ -1,5 +1,6 @@
 import InfernoLogo from './InfernoLogo'
 import {
+  HomeIcon,
   BoardIcon,
   TasksIcon,
   ProjectsIcon,
@@ -7,9 +8,14 @@ import {
   BookIcon,
   ForgeIcon,
   HeadsetIcon,
+  TemplateIcon,
   TeamIcon,
   CalendarIcon,
   ReportsIcon,
+  RecapIcon,
+  PortfolioIcon,
+  BellIcon,
+  SearchIcon,
   SettingsIcon,
 } from './Icons'
 
@@ -17,6 +23,7 @@ import {
 // scrolling one long board. All items are real, navigable pages. Icons are
 // inline SVG components (no emoji) so they render consistently everywhere.
 const PRIMARY_NAV = [
+  { id: 'home', label: 'Studio Home', Icon: HomeIcon },
   { id: 'board', label: 'Board', Icon: BoardIcon },
   { id: 'tasks', label: 'Tasks', Icon: TasksIcon },
   { id: 'projects', label: 'Projects', Icon: ProjectsIcon },
@@ -24,12 +31,16 @@ const PRIMARY_NAV = [
   { id: 'docs', label: 'Docs Hub', Icon: BookIcon },
   { id: 'codeforge', label: 'Code Forge', Icon: ForgeIcon },
   { id: 'warroom', label: 'War Room', Icon: HeadsetIcon },
+  { id: 'templates', label: 'Templates', Icon: TemplateIcon },
   { id: 'team', label: 'Team', Icon: TeamIcon },
 ]
 
 const SECONDARY_NAV = [
   { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
   { id: 'reports', label: 'Reports', Icon: ReportsIcon },
+  { id: 'recaps', label: 'Recaps', Icon: RecapIcon },
+  { id: 'portfolio', label: 'Portfolio', Icon: PortfolioIcon },
+  { id: 'notifications', label: 'Notifications', Icon: BellIcon },
   { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ]
 
@@ -46,6 +57,8 @@ export default function ProjectSidebar({
   onSignOut,
   activeSection = 'board',
   onSelectSection,
+  onOpenSearch,
+  unreadCount = 0,
   userEmail,
   profile,
   collapsed = false,
@@ -62,6 +75,7 @@ export default function ProjectSidebar({
 
   const renderNavItem = (item) => {
     const { Icon } = item
+    const showBadge = item.id === 'notifications' && unreadCount > 0
     return (
       <li key={item.id}>
         <button
@@ -73,6 +87,11 @@ export default function ProjectSidebar({
         >
           <span className="app-nav-icon" aria-hidden="true"><Icon size={18} /></span>
           <span className="app-nav-label">{item.label}</span>
+          {showBadge ? (
+            <span className="app-nav-badge" data-testid="nav-unread-badge">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          ) : null}
         </button>
       </li>
     )
@@ -101,6 +120,17 @@ export default function ProjectSidebar({
           <p className="muted-copy">The game design task board</p>
         </div>
       </div>
+
+      <button
+        type="button"
+        className="app-nav-search"
+        data-testid="sidebar-search"
+        onClick={() => onOpenSearch?.()}
+      >
+        <span className="app-nav-icon" aria-hidden="true"><SearchIcon size={16} /></span>
+        <span className="app-nav-search-label">Search</span>
+        <kbd className="app-nav-kbd" aria-hidden="true">Ctrl K</kbd>
+      </button>
 
       <nav className="app-nav-menu" aria-label="Sections">
         <p className="app-nav-heading">Workspace</p>

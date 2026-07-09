@@ -12,6 +12,13 @@ import ReportsView from './components/ReportsView'
 import DocsView from './components/DocsView'
 import CodeForgeView from './components/CodeForgeView'
 import WarRoomView from './components/WarRoomView'
+import StudioHomeView from './components/StudioHomeView'
+import NotificationsView from './components/NotificationsView'
+import CommandPalette from './components/CommandPalette'
+import TemplatesView from './components/TemplatesView'
+import { getTemplate, buildTemplateTasks, templateTaskCount } from './lib/templates'
+import RecapView from './components/RecapView'
+import PortfolioView from './components/PortfolioView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -82,6 +89,7 @@ import {
 import { validateDocInput } from './lib/docs'
 import { validateRepoInput } from './lib/codeforge'
 import { validateMeetingNote } from './lib/warroom'
+import { buildNotifications, applyReadState, unreadCount as countUnread, allKeys } from './lib/notifications'
 
 const emptyTaskForm = {
   title: '',
@@ -429,6 +437,9 @@ function App() {
   const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
   const [meetingNotes, setMeetingNotes] = useState([])
   const [meetingNotesMigrationMissing, setMeetingNotesMigrationMissing] = useState(false)
+  const [notificationReads, setNotificationReads] = useState(() => new Set())
+  const [notificationsMigrationMissing, setNotificationsMigrationMissing] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -553,6 +564,8 @@ useEffect(() => {
       setReposMigrationMissing(false)
       setMeetingNotes([])
       setMeetingNotesMigrationMissing(false)
+      setNotificationReads(new Set())
+      setNotificationsMigrationMissing(false)
     }
   })
 
@@ -573,6 +586,19 @@ useEffect(() => {
   useEffect(() => {
     gamificationRef.current = gamification
   }, [gamification])
+
+  // Global command palette shortcut (Ctrl/Cmd+K), available whenever signed in.
+  useEffect(() => {
+    if (!session?.user) return undefined
+    const onKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && (event.key === 'k' || event.key === 'K')) {
+        event.preventDefault()
+        setCommandPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [session?.user])
 
 useEffect(() => {
   if (!session?.user || !currentBoardId) return
@@ -733,6 +759,8 @@ setCurrentBoardId(activeBoardId)
         setReposMigrationMissing(false)
         setMeetingNotes([])
         setMeetingNotesMigrationMissing(false)
+        setNotificationReads(new Set())
+        setNotificationsMigrationMissing(false)
   return
 }
 
@@ -747,6 +775,7 @@ setCurrentBoardId(activeBoardId)
   { data: docData, error: docError },
   { data: repoData, error: repoError },
   { data: meetingData, error: meetingError },
+  { data: notifReadData, error: notifReadError },
 ] = await Promise.all([
   supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
   supabase
@@ -800,6 +829,14 @@ setCurrentBoardId(activeBoardId)
     .eq('board_id', activeBoardId)
     .is('archived_at', null)
     .order('created_at', { ascending: false }),
+  // Notifications center read state; resolves with an error if the migration is
+  // not yet pushed, in which case the feed still renders but "read" does not
+  // persist across reloads (a non-blocking note is shown).
+  supabase
+    .from('notification_reads')
+    .select('notification_key')
+    .eq('board_id', activeBoardId)
+    .eq('user_id', userId),
 ])
 
 
@@ -855,6 +892,8 @@ setCurrentProjectId((currentId) =>
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
   setMeetingNotesMigrationMissing(Boolean(meetingError))
   setMeetingNotes(meetingData?.length ? meetingData.map(dbToMeetingNote) : [])
+  setNotificationsMigrationMissing(Boolean(notifReadError))
+  setNotificationReads(new Set((notifReadData ?? []).map((row) => row.notification_key)))
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
@@ -1269,6 +1308,8 @@ function dbToTask(row) {
     labels: row.labels ?? [],
     subtasks: row.subtasks ?? [],
     activity: row.activity ?? [],
+    codeRefs: Array.isArray(row.code_refs) ? row.code_refs : [],
+    docRefs: Array.isArray(row.doc_refs) ? row.doc_refs : [],
   }
 }
 
@@ -1583,6 +1624,23 @@ function dbToInvite(row) {
   const focusCandidates = currentProject
     ? tasks.filter((task) => task.projectId === currentProject.id && !task.completed)
     : []
+
+  // Notifications center feed: derived deterministically from board data, then
+  // annotated with per-user read state loaded from notification_reads.
+  const notifications = useMemo(() => {
+    const feed = buildNotifications({
+      projects,
+      meetingNotes,
+      messages,
+      boardMembers,
+      profiles,
+      invites,
+      dailyFocusClaimed: Boolean(dailyFocusActive?.claimed),
+      dailyFocusDate: dailyFocusActive ? todayKey : '',
+    })
+    return applyReadState(feed, notificationReads)
+  }, [projects, meetingNotes, messages, boardMembers, profiles, invites, dailyFocusActive, todayKey, notificationReads])
+  const unreadNotifications = countUnread(notifications)
   const momentumStreak = gamification?.settings?.momentum_streak ?? null
   const todayLabel = new Date().toLocaleDateString(undefined, {
     weekday: 'short',
@@ -1686,14 +1744,25 @@ function dbToInvite(row) {
         return next
       })
     )
-    const { subtasks, labels, activity, projectId, ...rest } = updates
-    await supabase.from('tasks').update({
+    const { subtasks, labels, activity, projectId, codeRefs, docRefs, ...rest } = updates
+    const patch = {
       ...rest,
       ...(subtasks !== undefined && { subtasks }),
       ...(labels !== undefined && { labels }),
       ...(activity !== undefined && { activity }),
       ...(projectId !== undefined && { project_id: projectId }),
-    }).eq('id', taskId)
+      ...(codeRefs !== undefined && { code_refs: codeRefs }),
+      ...(docRefs !== undefined && { doc_refs: docRefs }),
+    }
+    const { error } = await supabase.from('tasks').update(patch).eq('id', taskId)
+    // If the task-links migration has not been applied yet, the code_refs/doc_refs
+    // columns are missing. Retry without them so the rest of the edit still saves.
+    if (error && isMissingColumnError(error) && (codeRefs !== undefined || docRefs !== undefined)) {
+      const { code_refs, doc_refs, ...fallback } = patch
+      await supabase.from('tasks').update(fallback).eq('id', taskId)
+    } else if (error) {
+      console.error('Update task error:', formatSupabaseError(error), error)
+    }
   }
 
   const deleteTask = async (taskId) => {
@@ -2420,6 +2489,121 @@ const goToCreateTask = () => {
 
 const goToTeam = () => setActiveSection('team')
 const goToCampfire = () => setActiveSection('campfire')
+
+// Open a task's detail modal by id from anywhere (Studio Home, search, etc.).
+const openTaskById = (taskId) => {
+  const task = tasks.find((t) => t.id === taskId)
+  if (task) setEditingTask(task)
+}
+
+// Dispatch a command-palette quick action to the matching handler.
+const runQuickAction = (id) => {
+  switch (id) {
+    case 'create-task':
+      goToCreateTask()
+      break
+    case 'link-doc':
+      handleSelectSection('docs')
+      break
+    case 'link-repo':
+      handleSelectSection('codeforge')
+      break
+    case 'open-campfire':
+      goToCampfire()
+      break
+    case 'open-warroom':
+      handleSelectSection('warroom')
+      break
+    case 'create-boss':
+      handleSelectSection('projects')
+      openBossCreator()
+      break
+    default:
+      break
+  }
+}
+
+// Apply a Templates library starter pack to the current project. Creates many
+// tasks at once, so it confirms first. Persists via the standard task path.
+const applyTemplate = async (templateId) => {
+  const template = getTemplate(templateId)
+  if (!template) return
+  if (!userId || !currentProject) {
+    pushCelebration({ kind: 'error', title: 'No project selected', detail: 'Pick a project first, then apply a template.' })
+    return
+  }
+  const count = templateTaskCount(template)
+  const confirmed = window.confirm(
+    `Apply "${template.name}" to ${currentProject.name}? This adds ${count} tasks to your backlog.`
+  )
+  if (!confirmed) return
+
+  const newTasks = buildTemplateTasks(template, {
+    projectId: currentProject.id,
+    sprint: currentProject.phase || '',
+    makeId: () => crypto.randomUUID(),
+    makeActivity: (type, note) => createActivity(type, note),
+  })
+  if (!newTasks.length) return
+
+  setTasks((current) => [...newTasks, ...current])
+  logProjectActivity(currentProject.id, 'task', `Applied the ${template.name} template (${count} tasks).`)
+  const { error } = await supabase.from('tasks').insert(newTasks.map((task) => taskToDb(task, userId)))
+  if (error) {
+    console.error('Apply template error:', formatSupabaseError(error), error)
+    const ids = new Set(newTasks.map((task) => task.id))
+    setTasks((current) => current.filter((task) => !ids.has(task.id)))
+    pushCelebration({ kind: 'error', title: 'Template not applied', detail: 'Please try again.' })
+    return
+  }
+  pushCelebration({ kind: 'xp', title: 'Template applied', detail: `${count} tasks added to ${currentProject.name}.`, icon: '✦' })
+  handleSelectSection('board')
+}
+
+// Persist a single notification as read. Optimistically updates local state so
+// the badge/list respond immediately; a missing migration is non-fatal (the
+// note in NotificationsView explains read state will not survive a reload).
+const markNotificationRead = async (key) => {
+  if (!key) return
+  const userId = session?.user?.id
+  if (!userId || !currentBoardId) return
+  setNotificationReads((prev) => new Set(prev).add(key))
+  const { error } = await supabase
+    .from('notification_reads')
+    .upsert(
+      { board_id: currentBoardId, user_id: userId, notification_key: key },
+      { onConflict: 'board_id,user_id,notification_key' }
+    )
+  if (error) {
+    console.error('Mark notification read error:', formatSupabaseError(error), error)
+    setNotificationsMigrationMissing(true)
+  }
+}
+
+// Persist every notification currently in the feed as read.
+const markAllNotificationsRead = async () => {
+  const userId = session?.user?.id
+  if (!userId || !currentBoardId) return
+  const keys = allKeys(notifications)
+  if (!keys.length) return
+  setNotificationReads((prev) => {
+    const next = new Set(prev)
+    for (const key of keys) next.add(key)
+    return next
+  })
+  const rows = keys.map((key) => ({
+    board_id: currentBoardId,
+    user_id: userId,
+    notification_key: key,
+  }))
+  const { error } = await supabase
+    .from('notification_reads')
+    .upsert(rows, { onConflict: 'board_id,user_id,notification_key' })
+  if (error) {
+    console.error('Mark all notifications read error:', formatSupabaseError(error), error)
+    setNotificationsMigrationMissing(true)
+  }
+}
 
 const openLogin = () => {
   setAuthError('')
@@ -3798,8 +3982,69 @@ return (
         profile={myProfile}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
+        unreadCount={unreadNotifications}
+        onOpenSearch={() => setCommandPaletteOpen(true)}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
+        {activeSection === 'home' ? (
+          <StudioHomeView
+            projects={projects}
+            tasks={tasks}
+            messages={messages}
+            docs={docs}
+            repos={repos}
+            meetingNotes={meetingNotes}
+            focusTasks={focusTasks}
+            focusProgress={focusProgress}
+            completedById={focusCompletedById}
+            profiles={profiles}
+            displayName={myProfile?.display_name?.trim() || ''}
+            onSelectSection={handleSelectSection}
+            onOpenTask={openTaskById}
+          />
+        ) : null}
+
+        {activeSection === 'notifications' ? (
+          <NotificationsView
+            notifications={notifications}
+            unread={unreadNotifications}
+            migrationMissing={notificationsMigrationMissing}
+            onMarkRead={markNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
+          />
+        ) : null}
+
+        {activeSection === 'templates' ? (
+          <TemplatesView
+            currentProjectName={currentProject?.name || ''}
+            onApply={applyTemplate}
+          />
+        ) : null}
+
+        {activeSection === 'recaps' ? (
+          <RecapView
+            projects={projects}
+            tasks={tasks}
+            docs={docs}
+            repos={repos}
+            messages={messages}
+            meetingNotes={meetingNotes}
+            profiles={profiles}
+          />
+        ) : null}
+
+        {activeSection === 'portfolio' ? (
+          <PortfolioView
+            projects={projects}
+            tasks={tasks}
+            docs={docs}
+            repos={repos}
+            meetingNotes={meetingNotes}
+            messages={messages}
+            profiles={profiles}
+          />
+        ) : null}
+
         {activeSection === 'board' ? (
           showOnboarding ? (
             <OnboardingGuide
@@ -5376,6 +5621,15 @@ return (
       projects={projects}
       deleteTask={deleteTask}
       addSubtaskToEditing={addSubtaskToEditing}
+    />
+
+    <CommandPalette
+      open={commandPaletteOpen}
+      onClose={() => setCommandPaletteOpen(false)}
+      data={{ tasks, projects, docs, repos, messages, boardMembers, profiles, meetingNotes }}
+      onSelectSection={handleSelectSection}
+      onOpenTask={openTaskById}
+      onQuickAction={runQuickAction}
     />
   </>
 )
