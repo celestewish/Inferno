@@ -23,9 +23,11 @@ import {
   studioProgress,
   bossResult,
   formatCountdown,
+  getRoomGame,
+  roomGameScore,
+  roomGameSolved,
 } from '../lib/questGame'
 import InfernoLogo from './InfernoLogo'
-import FlameHorse from './FlameHorse'
 import {
   BoardIcon,
   BookIcon,
@@ -125,6 +127,10 @@ export default function QuestLanding({ openLogin, openSignup }) {
   const [tasks, setTasks] = useState(initialTasks)
   const [assignments, setAssignments] = useState({})
   const [rooms, setRooms] = useState([])
+  const [openRoom, setOpenRoom] = useState(null)
+  const [roomSel, setRoomSel] = useState({ docs: {}, campfire: {}, forge: {} })
+  const [pickedCard, setPickedCard] = useState(null)
+  const [roomTried, setRoomTried] = useState({})
   const [selectedMember, setSelectedMember] = useState(null)
   const [secondsLeft, setSecondsLeft] = useState(DEFAULT_DEADLINE_SECONDS)
   const [started, setStarted] = useState(false)
@@ -189,10 +195,62 @@ export default function QuestLanding({ openLogin, openSignup }) {
     })
   }, [])
 
-  const triggerRoom = useCallback((actionId) => {
-    setShipped(false)
-    setRooms((current) => (current.includes(actionId) ? current : [...current, actionId]))
+  const openRoomGame = useCallback((roomId) => {
+    setPickedCard(null)
+    setOpenRoom((current) => (current === roomId ? null : roomId))
   }, [])
+
+  const chooseOption = useCallback((gameId, itemId, choiceId) => {
+    setRoomSel((current) => ({
+      ...current,
+      [gameId]: { ...current[gameId], [itemId]: choiceId },
+    }))
+  }, [])
+
+  const pickCard = useCallback((gameId, cardId) => {
+    setPickedCard((current) =>
+      current && current.gameId === gameId && current.cardId === cardId
+        ? null
+        : { gameId, cardId },
+    )
+  }, [])
+
+  const placeCard = useCallback(
+    (gameId, targetId) => {
+      if (!pickedCard || pickedCard.gameId !== gameId) return
+      const { cardId } = pickedCard
+      setRoomSel((current) => ({
+        ...current,
+        [gameId]: { ...current[gameId], [cardId]: targetId },
+      }))
+      setPickedCard(null)
+    },
+    [pickedCard],
+  )
+
+  const unplaceCard = useCallback((gameId, cardId) => {
+    setPickedCard(null)
+    setRoomSel((current) => {
+      const next = { ...current[gameId] }
+      delete next[cardId]
+      return { ...current, [gameId]: next }
+    })
+  }, [])
+
+  const claimRoom = useCallback(
+    (gameId) => {
+      setShipped(false)
+      if (roomGameSolved(gameId, roomSel[gameId])) {
+        setRooms((current) => (current.includes(gameId) ? current : [...current, gameId]))
+        setOpenRoom(null)
+        setPickedCard(null)
+        setRoomTried((current) => ({ ...current, [gameId]: false }))
+      } else {
+        setRoomTried((current) => ({ ...current, [gameId]: true }))
+      }
+    },
+    [roomSel],
+  )
 
   const handleDrop = useCallback(
     (kind, id, x, y) => {
@@ -226,6 +284,10 @@ export default function QuestLanding({ openLogin, openSignup }) {
     setTasks(initialTasks())
     setAssignments({})
     setRooms([])
+    setOpenRoom(null)
+    setRoomSel({ docs: {}, campfire: {}, forge: {} })
+    setPickedCard(null)
+    setRoomTried({})
     setSelectedMember(null)
     setShipped(false)
   }
@@ -301,7 +363,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
           </div>
         </div>
         <div className="quest-dante">
-          <span className="quest-dante-avatar" aria-hidden="true"><FlameHorse size={48} /></span>
+          <span className="quest-dante-avatar"><InfernoLogo size={44} /></span>
           <div>
             <p className="quest-dante-name">Dante, studio lead</p>
             <p className="quest-dante-line">{danteLine}</p>
@@ -454,26 +516,150 @@ export default function QuestLanding({ openLogin, openSignup }) {
               <span className="studio-station-icon" aria-hidden="true"><FlameIcon size={16} /></span>
               <h2 className="studio-station-title">Studio rooms</h2>
             </div>
+            <p className="studio-crew-hint">Each room is a quick puzzle. Solve it to boost your meters.</p>
             <ul className="studio-room-row">
               {ROOM_ACTIONS.map((action) => {
                 const Icon = ROOM_ICONS[action.icon] || FlameIcon
-                const usedUp = rooms.includes(action.id)
+                const game = getRoomGame(action.id)
+                const done = rooms.includes(action.id)
+                const isOpen = openRoom === action.id
+                const sel = roomSel[action.id] || {}
+                const score = roomGameScore(action.id, sel)
                 return (
-                  <li key={action.id}>
+                  <li key={action.id} className={`studio-room-item${isOpen ? ' is-open' : ''}`}>
                     <button
                       type="button"
-                      className={`studio-room${usedUp ? ' is-used' : ''}`}
+                      className={`studio-room${done ? ' is-used' : ''}`}
                       data-testid={`studio-room-${action.id}`}
-                      disabled={usedUp}
-                      onClick={() => triggerRoom(action.id)}
+                      disabled={done}
+                      aria-expanded={isOpen}
+                      onClick={() => openRoomGame(action.id)}
                     >
                       <span className="studio-room-icon" aria-hidden="true"><Icon size={16} /></span>
                       <span className="studio-room-body">
                         <span className="studio-room-name">{action.label}</span>
-                        <span className="studio-room-hint">{usedUp ? 'Done' : action.hint}</span>
+                        <span className="studio-room-hint">{done ? 'Solved' : action.hint}</span>
                       </span>
-                      {usedUp ? <span className="studio-room-check"><CheckIcon size={13} /></span> : <span className="studio-room-xp">+{action.xp}</span>}
+                      {done ? (
+                        <span className="studio-room-check"><CheckIcon size={13} /></span>
+                      ) : (
+                        <span className="studio-room-xp">{isOpen ? 'Close' : `+${action.xp}`}</span>
+                      )}
                     </button>
+
+                    {isOpen && !done && game ? (
+                      <div className="studio-minigame" data-testid={`studio-minigame-${action.id}`}>
+                        <p className="studio-minigame-title">{game.title}</p>
+                        <p className="studio-minigame-hint">{game.hint}</p>
+
+                        {game.kind === 'select' ? (
+                          <ul className="studio-doc-rows">
+                            {game.items.map((row) => (
+                              <li key={row.id} className="studio-doc-row">
+                                <span className="studio-doc-label">{row.label}</span>
+                                <div className="studio-doc-options">
+                                  {row.options.map((opt) => {
+                                    const picked = sel[row.id] === opt.id
+                                    return (
+                                      <button
+                                        key={opt.id}
+                                        type="button"
+                                        className={`studio-doc-option${picked ? ' is-picked' : ''}`}
+                                        aria-pressed={picked}
+                                        data-testid={`studio-doc-${row.id}-${opt.id}`}
+                                        onClick={() => chooseOption(action.id, row.id, opt.id)}
+                                      >
+                                        {opt.text}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="studio-match">
+                            <ul className="studio-match-tray" aria-label="Cards to route">
+                              {game.items.filter((card) => !sel[card.id]).length === 0 ? (
+                                <li className="studio-match-empty">All routed. Confirm below.</li>
+                              ) : (
+                                game.items
+                                  .filter((card) => !sel[card.id])
+                                  .map((card) => {
+                                    const held =
+                                      pickedCard &&
+                                      pickedCard.gameId === action.id &&
+                                      pickedCard.cardId === card.id
+                                    return (
+                                      <li key={card.id}>
+                                        <button
+                                          type="button"
+                                          className={`studio-msg-card${held ? ' is-picked' : ''}`}
+                                          aria-pressed={held}
+                                          data-testid={`studio-card-${card.id}`}
+                                          onClick={() => pickCard(action.id, card.id)}
+                                        >
+                                          {card.text}
+                                        </button>
+                                      </li>
+                                    )
+                                  })
+                              )}
+                            </ul>
+                            <ul className="studio-match-targets">
+                              {game.targets.map((target) => {
+                                const here = game.items.filter((card) => sel[card.id] === target.id)
+                                const armed = Boolean(pickedCard && pickedCard.gameId === action.id)
+                                return (
+                                  <li key={target.id} className="studio-match-target">
+                                    <button
+                                      type="button"
+                                      className={`studio-target-zone${armed ? ' is-armed' : ''}`}
+                                      disabled={!armed}
+                                      data-testid={`studio-target-${target.id}`}
+                                      onClick={() => placeCard(action.id, target.id)}
+                                    >
+                                      <span className="studio-target-label">{target.label}</span>
+                                      {armed ? <span className="studio-target-hint">Place here</span> : null}
+                                    </button>
+                                    <ul className="studio-target-cards">
+                                      {here.map((card) => (
+                                        <li key={card.id}>
+                                          <button
+                                            type="button"
+                                            className="studio-placed-card"
+                                            aria-label={`Move ${card.text} back to the tray`}
+                                            onClick={() => unplaceCard(action.id, card.id)}
+                                          >
+                                            {card.text}
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </li>
+                                )
+                              })}
+                            </ul>
+                          </div>
+                        )}
+
+                        <div className="studio-minigame-foot">
+                          <span className="studio-minigame-score">{score.correct} / {score.total} right</span>
+                          <button
+                            type="button"
+                            className="quest-primary-btn studio-minigame-claim"
+                            data-testid={`studio-claim-${action.id}`}
+                            disabled={!score.complete}
+                            onClick={() => claimRoom(action.id)}
+                          >
+                            {game.action}
+                          </button>
+                        </div>
+                        {roomTried[action.id] && !score.solved ? (
+                          <p className="studio-minigame-retry">Not quite. Adjust your picks and try again.</p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </li>
                 )
               })}

@@ -469,3 +469,121 @@ export function bossResult({ tasks = [], assignments = {}, meters = INITIAL_METE
     ...copy[tier],
   }
 }
+
+// ===========================================================================
+// Room mini-games
+// ---------------------------------------------------------------------------
+// Each studio room is a short, forgiving puzzle instead of a one-shot click.
+// Two shapes share one scoring model: every game has a list of `items`, each
+// with a single correct `answer`. The player records a choice per item in a
+// selections map ({ itemId: choiceId }). The game is solved when every item's
+// choice matches its answer. Solving a room grants that room's ROOM_ACTIONS
+// reward, so the meter/XP wiring in computeMeters and studioXp is unchanged.
+//   kind 'select' - choose the best option per row (Docs Shrine)
+//   kind 'match'  - route each card to a target (Campfire channels, Forge branches)
+// ===========================================================================
+
+export const ROOM_GAMES = {
+  docs: {
+    id: 'docs',
+    kind: 'select',
+    title: 'Assemble the design doc',
+    hint: 'Pick the strongest option on each line, then seal the scroll.',
+    action: 'Seal the scroll',
+    items: [
+      {
+        id: 'pillar',
+        label: 'Design pillar',
+        answer: 'pillar-focus',
+        options: [
+          { id: 'pillar-focus', text: 'One clear fantasy' },
+          { id: 'pillar-all', text: 'Ten genres at once' },
+          { id: 'pillar-trend', text: 'Whatever trends this week' },
+        ],
+      },
+      {
+        id: 'loop',
+        label: 'Core loop',
+        answer: 'loop-tight',
+        options: [
+          { id: 'loop-tight', text: 'A short, tight loop' },
+          { id: 'loop-cutscene', text: 'A long intro cutscene' },
+          { id: 'loop-menus', text: 'Menus inside menus' },
+        ],
+      },
+      {
+        id: 'scope',
+        label: 'Scope',
+        answer: 'scope-slice',
+        options: [
+          { id: 'scope-slice', text: 'One polished slice' },
+          { id: 'scope-open', text: 'A giant open world' },
+          { id: 'scope-mmo', text: 'An online MMO' },
+        ],
+      },
+    ],
+  },
+  campfire: {
+    id: 'campfire',
+    kind: 'match',
+    title: 'Sort the crew chatter',
+    hint: 'Send each message to the channel where it belongs.',
+    action: 'Send the messages',
+    targetLabel: 'Channels',
+    targets: [
+      { id: 'ch-build', label: '#build' },
+      { id: 'ch-art', label: '#art' },
+      { id: 'ch-audio', label: '#audio' },
+    ],
+    items: [
+      { id: 'msg-jump', text: 'Player jump feels floaty', answer: 'ch-build' },
+      { id: 'msg-palette', text: 'Hero sprite palette is ready', answer: 'ch-art' },
+      { id: 'msg-drop', text: 'Boss theme needs a louder drop', answer: 'ch-audio' },
+    ],
+  },
+  forge: {
+    id: 'forge',
+    kind: 'match',
+    title: 'Wire up the repo',
+    hint: 'Connect each open issue to the branch that fixes it.',
+    action: 'Open the pull requests',
+    targetLabel: 'Branches',
+    targets: [
+      { id: 'br-collision', label: 'fix/collision' },
+      { id: 'br-sprite', label: 'feat/sprite-swap' },
+      { id: 'br-ci', label: 'chore/build-ci' },
+    ],
+    items: [
+      { id: 'iss-clip', text: 'Player clips through walls', answer: 'br-collision' },
+      { id: 'iss-art', text: 'Swap in the new hero art', answer: 'br-sprite' },
+      { id: 'iss-build', text: 'Builds fail on main', answer: 'br-ci' },
+    ],
+  },
+}
+
+export function getRoomGame(gameId) {
+  return ROOM_GAMES[gameId] || null
+}
+
+// How many item choices are filled in, regardless of correctness.
+export function roomGameAssigned(gameId, selections = {}) {
+  const game = getRoomGame(gameId)
+  if (!game) return 0
+  return game.items.filter((item) => Boolean(selections[item.id])).length
+}
+
+// Score a set of selections for a room game. `correct` counts item choices that
+// match the answer; `complete` is true once every item has a choice; `solved`
+// is true only when every item is correct.
+export function roomGameScore(gameId, selections = {}) {
+  const game = getRoomGame(gameId)
+  if (!game) return { correct: 0, total: 0, complete: false, solved: false }
+  const total = game.items.length
+  const correct = game.items.filter((item) => selections[item.id] === item.answer).length
+  const assigned = roomGameAssigned(gameId, selections)
+  return { correct, total, complete: assigned === total, solved: correct === total }
+}
+
+export function roomGameSolved(gameId, selections = {}) {
+  return roomGameScore(gameId, selections).solved
+}
