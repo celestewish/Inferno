@@ -4,6 +4,7 @@ import {
   TasksIcon,
   ProjectsIcon,
   FlameIcon,
+  BookIcon,
   TeamIcon,
   CalendarIcon,
   ReportsIcon,
@@ -18,6 +19,7 @@ const PRIMARY_NAV = [
   { id: 'tasks', label: 'Tasks', Icon: TasksIcon },
   { id: 'projects', label: 'Projects', Icon: ProjectsIcon },
   { id: 'campfire', label: 'Campfire', Icon: FlameIcon },
+  { id: 'docs', label: 'Docs Hub', Icon: BookIcon },
   { id: 'team', label: 'Team', Icon: TeamIcon },
 ]
 

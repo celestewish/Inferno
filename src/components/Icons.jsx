@@ -105,6 +105,55 @@ export function SettingsIcon(props) {
   )
 }
 
+// Grimoire / docs book, used for the Docs Hub nav item and headers.
+export function BookIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5a2.5 2.5 0 0 0-2.5 2.5z" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M9 7h7" />
+    </Svg>
+  )
+}
+
+export function ExternalLinkIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10 14" />
+      <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </Svg>
+  )
+}
+
+export function EditIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </Svg>
+  )
+}
+
+export function ArchiveIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
+    </Svg>
+  )
+}
+
+export function SearchIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </Svg>
+  )
+}
+
 export function PlusIcon(props) {
   return (
     <Svg {...props}>
