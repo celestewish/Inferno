@@ -24,6 +24,28 @@
 -- the cycle. search_path is pinned to keep the definer context safe.
 -- ─────────────────────────────────────────────────────────────────────────────
 
+-- Drop all app-owned helper/RPC functions before (re)creating them. An earlier
+-- iteration of this feature shipped these functions with different input
+-- parameter names (e.g. target_board_id instead of p_board_id). CREATE OR
+-- REPLACE cannot rename a function's input parameters and fails with
+-- "cannot change name of input parameter" (SQLSTATE 42P13), so a plain
+-- drop-and-recreate is required to converge. A function's identity for DROP is
+-- its (name, argument types) — parameter *names* are irrelevant — so these
+-- drops match the old definitions regardless of what the parameters were called.
+--
+-- The two membership helpers are referenced by the RLS policies created further
+-- down, so they are dropped with CASCADE. That also removes those dependent
+-- policies, every one of which is recreated (drop-if-exists + create) below, so
+-- the net effect is idempotent and touches only objects this migration owns.
+-- No data is deleted and no columns are dropped.
+drop function if exists public.accept_board_invite(text);
+drop function if exists public.remove_board_member(uuid, uuid);
+drop function if exists public.transfer_board_ownership(uuid, uuid);
+drop function if exists public.set_board_member_role(uuid, uuid, text);
+drop function if exists public.invite_role_to_member_role(text);
+drop function if exists public.is_board_member(uuid) cascade;
+drop function if exists public.is_board_owner(uuid) cascade;
+
 create or replace function public.is_board_member(p_board_id uuid)
 returns boolean
 language sql
