@@ -31,10 +31,6 @@ import {
 } from './data/defaultData'
 import { buildInviteUrl, siteUrl } from './lib/site'
 
-// board_invites uses owner/admin/member; board_members uses owner/editor/viewer.
-const inviteRoleToMemberRole = (role) =>
-  ({ owner: 'owner', admin: 'editor', member: 'viewer' })[role] ?? 'viewer'
-
 const emptyTaskForm = {
   title: '',
   description: '',
@@ -1030,50 +1026,22 @@ useEffect(() => {
     const token = url.searchParams.get('invite')
     if (!token) return
 
-    const { data: invite, error } = await supabase
-      .from('board_invites')
-      .select('*')
-      .eq('token', token)
-      .is('accepted_at', null)
-      .single()
+    // Accept through the SECURITY DEFINER RPC, which validates the token,
+    // email match and expiry server-side and joins only the invited board.
+    const { data: joinedBoardId, error } = await supabase.rpc('accept_board_invite', {
+      p_token: token,
+    })
 
-    if (error || !invite) return
-
-    const inviteEmail = invite.email.trim().toLowerCase()
-    const userEmail = session.user.email?.trim().toLowerCase()
-
-    if (!userEmail || inviteEmail !== userEmail) {
-      window.alert('This invite was sent to a different email address.')
+    if (error) {
+      console.error('Accept invite error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'This invite could not be accepted.')
       return
     }
-
-    if (new Date(invite.expires_at).getTime() < Date.now()) {
-      window.alert('This invite has expired.')
-      return
-    }
-
-    const { error: memberError } = await supabase
-      .from('board_members')
-      .insert([{
-        board_id: invite.board_id,
-        user_id: session.user.id,
-        role: inviteRoleToMemberRole(invite.role),
-      }])
-
-    if (memberError && !memberError.message.toLowerCase().includes('duplicate')) {
-      console.error('Accept invite membership error:', memberError)
-      return
-    }
-
-    await supabase
-      .from('board_invites')
-      .update({ accepted_at: new Date().toISOString() })
-      .eq('id', invite.id)
 
     url.searchParams.delete('invite')
     window.history.replaceState({}, '', url.toString())
 
-    loadAllData(session.user.id, invite.board_id)
+    loadAllData(session.user.id, joinedBoardId)
   }
 
   acceptInviteFromUrl()
@@ -1123,40 +1091,22 @@ const acceptInvite = async (invite) => {
 
   setAcceptingInviteId(invite.id)
 
-  const { error: memberError } = await supabase
-    .from('board_members')
-    .upsert(
-      [{
-        board_id: invite.boardId,
-        user_id: session.user.id,
-        role: inviteRoleToMemberRole(invite.role),
-      }],
-      { onConflict: 'board_id,user_id' }
-    )
+  // Acceptance is done through a SECURITY DEFINER RPC so membership is created
+  // for exactly the invited board (and no other), even under strict RLS that
+  // forbids arbitrary self-insertion into board_members.
+  const { data: joinedBoardId, error: acceptError } = await supabase.rpc('accept_board_invite', {
+    p_token: invite.token,
+  })
 
-  if (memberError) {
-    console.error('Accept invite membership error:', memberError)
-    setAcceptingInviteId(null)
-    return
-  }
-
-  const { error: inviteError } = await supabase
-    .from('board_invites')
-    .update({
-      accepted_at: new Date().toISOString(),
-      accepted_by: session.user.id,
-    })
-    .eq('id', invite.id)
-    .is('accepted_at', null)
-
-  if (inviteError) {
-    console.error('Accept invite update error:', inviteError)
+  if (acceptError) {
+    console.error('Accept invite error:', formatSupabaseError(acceptError), acceptError)
+    window.alert(acceptError.message || 'We could not accept this invite. Please try again.')
     setAcceptingInviteId(null)
     return
   }
 
   setMyInvites((current) => current.filter((item) => item.id !== invite.id))
-  await loadAllData(session.user.id, invite.boardId)
+  await loadAllData(session.user.id, joinedBoardId ?? invite.boardId)
   setAcceptingInviteId(null)
 }
 
@@ -1321,6 +1271,14 @@ function dbToInvite(row) {
 }
   const currentProject = projects.find((p) => p.id === currentProjectId) || projects[0]
   const userId = session?.user?.id
+
+  // ── Board permissions (real accounts, not the team_members name roster) ──
+  // Ownership is authoritative from boards.owner_id; board_members.role gives
+  // the collaboration role. These gate the owner-only management controls.
+  const isBoardOwner = Boolean(currentBoard && userId && currentBoard.owner_id === userId)
+  const myBoardRole =
+    boardMembers.find((row) => row.user_id === userId)?.role ??
+    (isBoardOwner ? 'owner' : null)
 
   // Heuristic: the seeded starter board still contains its original sample
   // projects. Used to clearly label seeded data as an example board.
@@ -1676,6 +1634,62 @@ function dbToInvite(row) {
       .eq('board_id', currentBoardId)
       .eq('name', member)
     if (error) console.error('Update member role error:', formatSupabaseError(error), error)
+  }
+
+  // ── Board access (real accounts / permissions) ──
+  // Remove (kick) a collaborator from the active board. Owner-only and enforced
+  // server-side by the remove_board_member RPC.
+  const removeBoardMember = async (member) => {
+    if (!currentBoardId || !member?.user_id) return
+    if (member.user_id === userId) return
+    const label = profiles[member.user_id] || `${member.user_id.slice(0, 8)}…`
+    if (!window.confirm(`Remove ${label} from this board? They will lose access to its projects, tasks, and chat.`)) return
+
+    const { error } = await supabase.rpc('remove_board_member', {
+      p_board_id: currentBoardId,
+      p_user_id: member.user_id,
+    })
+    if (error) {
+      console.error('Remove board member error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not remove that member. Please try again.')
+      return
+    }
+    await loadAllData(userId, currentBoardId)
+  }
+
+  // Transfer ownership to another member. Owner-only; the RPC demotes the
+  // previous owner to editor and promotes the target to owner atomically.
+  const transferBoardOwnership = async (member) => {
+    if (!currentBoardId || !member?.user_id || member.user_id === userId) return
+    const label = profiles[member.user_id] || `${member.user_id.slice(0, 8)}…`
+    if (!window.confirm(`Make ${label} the owner of this board? You will become an editor and lose owner controls.`)) return
+
+    const { error } = await supabase.rpc('transfer_board_ownership', {
+      p_board_id: currentBoardId,
+      p_new_owner_id: member.user_id,
+    })
+    if (error) {
+      console.error('Transfer ownership error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not transfer ownership. Please try again.')
+      return
+    }
+    await loadAllData(userId, currentBoardId)
+  }
+
+  // Change a member's collaboration role (editor/viewer). Owner-only.
+  const changeBoardMemberRole = async (member, role) => {
+    if (!currentBoardId || !member?.user_id || member.user_id === userId) return
+    const { error } = await supabase.rpc('set_board_member_role', {
+      p_board_id: currentBoardId,
+      p_user_id: member.user_id,
+      p_role: role,
+    })
+    if (error) {
+      console.error('Set board member role error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not update that role. Please try again.')
+      return
+    }
+    await loadAllData(userId, currentBoardId)
   }
 
   const focusQuickCreate = () => {
@@ -2953,9 +2967,13 @@ return (
 
             <div className="panel team-manage-panel" data-testid="team-manage">
               <div className="section-heading">
-                <h2>Members</h2>
+                <h2>Assignable names</h2>
                 <span>{teamMembers.length}</span>
               </div>
+              <p className="muted-copy">
+                A per-board roster of names you can assign tasks to. These labels are specific to this
+                board and are separate from the people who can sign in and access it.
+              </p>
               <form onSubmit={addTeamMember} className="team-form">
                 <input
                   value={newMember}
@@ -2993,6 +3011,76 @@ return (
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="panel team-manage-panel" data-testid="board-access-panel">
+              <div className="section-heading">
+                <h2>Members for this board</h2>
+                <span>{boardMembers.length}</span>
+              </div>
+              <p className="muted-copy">
+                People who can sign in and access <strong>{currentBoard?.name ?? 'this board'}</strong>.
+                Access is board-specific — removing someone here does not affect your other boards.
+                {isBoardOwner ? (
+                  <> As the owner you can change roles, remove members, or transfer ownership.</>
+                ) : (
+                  <> Only the board owner can manage access.</>
+                )}
+              </p>
+              <div className="member-list" data-testid="board-member-list">
+                {boardMembers.map((member) => {
+                  const isSelf = member.user_id === userId
+                  const isMemberOwner = member.role === 'owner' || member.user_id === currentBoard?.owner_id
+                  const label = profiles[member.user_id] || `${(member.user_id ?? '').slice(0, 8)}…`
+                  return (
+                    <div key={member.user_id} className="member-chip-row" data-testid={`board-member-${member.user_id}`}>
+                      <span className="discipline-pill">
+                        {label}{isSelf ? ' (you)' : ''}
+                      </span>
+                      {isMemberOwner ? (
+                        <span className="member-owner-badge" data-testid={`board-member-owner-badge-${member.user_id}`}>
+                          Owner
+                        </span>
+                      ) : (
+                        <span className="member-role-tag">{member.role ?? 'member'}</span>
+                      )}
+                      {isBoardOwner && !isSelf && !isMemberOwner ? (
+                        <>
+                          <select
+                            className="member-role-select"
+                            value={member.role === 'editor' || member.role === 'viewer' ? member.role : 'editor'}
+                            aria-label={`Board role for ${label}`}
+                            data-testid={`board-member-role-${member.user_id}`}
+                            onChange={(e) => changeBoardMemberRole(member, e.target.value)}
+                          >
+                            <option value="editor">Editor</option>
+                            <option value="viewer">Viewer</option>
+                          </select>
+                          <button
+                            type="button"
+                            className="chip-action"
+                            data-testid={`board-member-transfer-${member.user_id}`}
+                            onClick={() => transferBoardOwnership(member)}
+                          >
+                            Make owner
+                          </button>
+                          <button
+                            type="button"
+                            className="chip-action danger"
+                            data-testid={`board-member-remove-${member.user_id}`}
+                            onClick={() => removeBoardMember(member)}
+                          >
+                            Remove
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  )
+                })}
+                {boardMembers.length === 0 ? (
+                  <p className="muted-copy">No collaborators have joined this board yet.</p>
+                ) : null}
               </div>
             </div>
 
