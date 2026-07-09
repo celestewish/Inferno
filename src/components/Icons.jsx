@@ -105,6 +105,55 @@ export function SettingsIcon(props) {
   )
 }
 
+// Grimoire / docs book, used for the Docs Hub nav item and headers.
+export function BookIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H6.5a2.5 2.5 0 0 0-2.5 2.5z" />
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M9 7h7" />
+    </Svg>
+  )
+}
+
+export function ExternalLinkIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4h6v6" />
+      <path d="M20 4 10 14" />
+      <path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+    </Svg>
+  )
+}
+
+export function EditIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </Svg>
+  )
+}
+
+export function ArchiveIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="4" width="18" height="4" rx="1" />
+      <path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8" />
+      <path d="M10 12h4" />
+    </Svg>
+  )
+}
+
+export function SearchIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.5-3.5" />
+    </Svg>
+  )
+}
+
 export function PlusIcon(props) {
   return (
     <Svg {...props}>
@@ -119,6 +168,42 @@ export function CloseIcon(props) {
     <Svg {...props}>
       <path d="M6 6l12 12" />
       <path d="M18 6 6 18" />
+    </Svg>
+  )
+}
+
+// Code Forge glyph: angle brackets over a forge/anvil base, used for the Code
+// Forge nav item and headers.
+export function ForgeIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M8.5 6 4 10l4.5 4" />
+      <path d="M15.5 6 20 10l-4.5 4" />
+      <path d="M4 19h16" />
+      <path d="M7 19l2-3h6l2 3" />
+    </Svg>
+  )
+}
+
+// Git branch glyph, used for branch/PR badges on code links.
+export function GitBranchIcon(props) {
+  return (
+    <Svg {...props}>
+      <circle cx="6" cy="6" r="2.5" />
+      <circle cx="6" cy="18" r="2.5" />
+      <circle cx="18" cy="7" r="2.5" />
+      <path d="M6 8.5v7" />
+      <path d="M18 9.5c0 4-4 3.5-6 6.5" />
+    </Svg>
+  )
+}
+
+// Copy-to-clipboard glyph, used for the clone command snippet button.
+export function CopyIcon(props) {
+  return (
+    <Svg {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
     </Svg>
   )
 }

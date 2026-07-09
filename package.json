@@ -10,6 +10,8 @@
     "test:dates": "node scripts/date-sanity.mjs",
     "test:gamify": "node scripts/gamification-sanity.mjs",
     "test:campfire": "node scripts/campfire-sanity.mjs",
+    "test:docs": "node scripts/docs-sanity.mjs",
+    "test:codeforge": "node scripts/codeforge-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
