@@ -17,6 +17,7 @@ import NotificationsView from './components/NotificationsView'
 import CommandPalette from './components/CommandPalette'
 import TemplatesView from './components/TemplatesView'
 import { getTemplate, buildTemplateTasks, templateTaskCount } from './lib/templates'
+import RecapView from './components/RecapView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -4016,6 +4017,18 @@ return (
           <TemplatesView
             currentProjectName={currentProject?.name || ''}
             onApply={applyTemplate}
+          />
+        ) : null}
+
+        {activeSection === 'recaps' ? (
+          <RecapView
+            projects={projects}
+            tasks={tasks}
+            docs={docs}
+            repos={repos}
+            messages={messages}
+            meetingNotes={meetingNotes}
+            profiles={profiles}
           />
         ) : null}
 
