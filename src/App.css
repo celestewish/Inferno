@@ -1196,11 +1196,22 @@ textarea:hover {
      account) so every page is reachable from one place. */
   .sidebar.app-nav {
     position: fixed;
-    inset: 0 auto 0 0;
+    top: 0;
+    left: 0;
     z-index: 50;
     width: min(90vw, 380px);
     max-width: 100%;
-    min-height: 100vh;
+    /* Pin to the (dynamic) viewport height so the drawer is a bounded box that
+       scrolls internally; without this the base min-height:100vh lets the
+       content grow past the screen and the bottom nav items are unreachable. */
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    /* Keep touch scrolling inside the drawer instead of chaining to the page. */
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     border-right: 1px solid var(--card-border);
     box-shadow: 12px 0 40px rgba(4, 6, 14, 0.5);
     transform: translateX(-100%);

@@ -602,14 +602,20 @@ useEffect(() => {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [session?.user])
 
-  // Escape closes the mobile navigation drawer.
+  // Escape closes the mobile navigation drawer, and body scroll is locked while
+  // it is open so the page underneath does not scroll behind the overlay.
   useEffect(() => {
     if (!mobileNavOpen) return undefined
     const onKeyDown = (event) => {
       if (event.key === 'Escape') setMobileNavOpen(false)
     }
     window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = previousOverflow
+    }
   }, [mobileNavOpen])
 
 useEffect(() => {
