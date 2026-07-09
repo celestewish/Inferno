@@ -27,6 +27,7 @@ export default function CodeForgeView({
   onUpdateRepo,
   onArchiveRepo,
   migrationMissing = false,
+  accessError = false,
 }) {
   const [search, setSearch] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -137,6 +138,13 @@ export default function CodeForgeView({
         <div className="forge-migration-note" role="status" data-testid="codeforge-migration-note">
           Code Forge needs its database migration. Run <code className="chat-code">supabase db push</code> to
           start linking repositories. The rest of Inferno keeps working.
+        </div>
+      ) : null}
+
+      {accessError ? (
+        <div className="forge-migration-note" role="status" data-testid="codeforge-access-note">
+          Code Forge could not load. You may need to sign in again, or you do not have access to this
+          board's repositories. The rest of Inferno keeps working.
         </div>
       ) : null}
 
