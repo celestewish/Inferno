@@ -11,6 +11,7 @@ import CalendarView from './components/CalendarView'
 import ReportsView from './components/ReportsView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
+import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
 import {
   createActivity,
   defaultProjects,
@@ -58,6 +59,23 @@ import {
   pickBossTasks,
   computeBossRewardXp,
 } from './lib/gamification'
+import {
+  BOARD_CHANNEL_KEY,
+  CAMPFIRE_REACTIONS,
+  DEFAULT_CHANNEL_SUGGESTIONS,
+  buildChannelGroups,
+  flattenChannels,
+  channelProjectId,
+  customChannelKey,
+  messageChannelKey,
+  filterMessagesByChannel,
+  normalizeReactions,
+  reactionCount,
+  hasReacted,
+  toggleReaction,
+  firstLine,
+  renderMessageSegments,
+} from './lib/campfire'
 
 const emptyTaskForm = {
   title: '',
@@ -393,6 +411,12 @@ function App() {
   const [sendingMessage, setSendingMessage] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState(null)
   const [editingMessageText, setEditingMessageText] = useState('')
+  const [campfireChannel, setCampfireChannel] = useState(BOARD_CHANNEL_KEY)
+  const [campfireContextOpen, setCampfireContextOpen] = useState(false)
+  const [customChannels, setCustomChannels] = useState([])
+  const [addingChannelProjectId, setAddingChannelProjectId] = useState(null)
+  const [newChannelName, setNewChannelName] = useState('')
+  const [savingChannel, setSavingChannel] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -509,6 +533,8 @@ useEffect(() => {
       setSendingMessage(false)
       setEditingMessageId(null)
       setEditingMessageText('')
+      setCustomChannels([])
+      setCampfireChannel(BOARD_CHANNEL_KEY)
     }
   })
 
@@ -682,6 +708,7 @@ setCurrentBoardId(activeBoardId)
         setBoardMembers([])
         setLoading(false)
         setMessages([])
+        setCustomChannels([])
   return
 }
 
@@ -692,6 +719,7 @@ setCurrentBoardId(activeBoardId)
   { data: boardMemberRows },
   { data: messageData },
   { data: inviteData },
+  { data: channelData },
 ] = await Promise.all([
   supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
   supabase
@@ -713,6 +741,13 @@ setCurrentBoardId(activeBoardId)
     .eq('board_id', activeBoardId)
     .is('accepted_at', null)
     .order('created_at', { ascending: false }),
+  // Campfire channels; resolves with null data if the migration is not yet
+  // pushed, in which case the UI falls back to board + default project rooms.
+  supabase
+    .from('campfire_channels')
+    .select('*')
+    .eq('board_id', activeBoardId)
+    .order('created_at', { ascending: true }),
 ])
 
 
@@ -761,6 +796,7 @@ setCurrentProjectId((currentId) =>
   setBoardMembers(boardMemberRows ?? [])
   setLoading(false)
   setMessages(loadedMessages)
+  setCustomChannels(channelData?.length ? channelData.map(dbToChannel) : [])
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
@@ -918,11 +954,26 @@ useEffect(() => {
     )
     .subscribe()
 
+  const campfireChannelsChannel = supabase
+    .channel(`campfire-channels-${currentBoardId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'campfire_channels',
+        filter: `board_id=eq.${currentBoardId}`,
+      },
+      refresh
+    )
+    .subscribe()
+
   return () => {
     supabase.removeChannel(projectsChannel)
     supabase.removeChannel(teamMembersChannel)
     supabase.removeChannel(boardMembersChannel)
     supabase.removeChannel(tasksChannel)
+    supabase.removeChannel(campfireChannelsChannel)
   }
 }, [session?.user?.id, currentBoardId])
 
@@ -968,7 +1019,7 @@ useEffect(() => {
 
 useEffect(() => {
   chatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-}, [messages.length])
+}, [messages.length, campfireChannel])
 
 useEffect(() => {
   const acceptInviteFromUrl = async () => {
@@ -1203,10 +1254,27 @@ function dbToTask(row) {
   return {
     id: row.id,
     boardId: row.board_id,
+    projectId: row.project_id ?? null,
+    channelKey: messageChannelKey({ channelKey: row.channel_key }),
     userId: row.user_id,
     text: row.message,
+    pinned: Boolean(row.pinned),
+    reactions: normalizeReactions(row.reactions),
     createdAt: row.created_at,
     editedAt: row.updated_at ?? null,
+  }
+}
+
+function dbToChannel(row) {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    projectId: row.project_id ?? null,
+    name: row.name,
+    channelKey: row.channel_key,
+    createdBy: row.created_by ?? null,
+    createdAt: row.created_at,
+    archivedAt: row.archived_at ?? null,
   }
 }
 
@@ -1418,6 +1486,28 @@ function dbToInvite(row) {
   const bossTaskCandidates = currentProject
     ? tasks.filter((task) => task.projectId === currentProject.id)
     : []
+
+  // ── Campfire (chat) view model ──
+  const campfireGroups = useMemo(
+    () => buildChannelGroups(projects, customChannels),
+    [projects, customChannels],
+  )
+  const campfireChannels = useMemo(() => flattenChannels(campfireGroups), [campfireGroups])
+  // Guard against a stale selection (e.g. a project room whose project was
+  // deleted, or a channel that was just archived) by falling back to the board room.
+  const activeCampfireKey = campfireChannels.some((channel) => channel.key === campfireChannel)
+    ? campfireChannel
+    : BOARD_CHANNEL_KEY
+  const activeCampfireChannel =
+    campfireChannels.find((channel) => channel.key === activeCampfireKey) || campfireChannels[0]
+  const campfireMessages = useMemo(
+    () => filterMessagesByChannel(messages, activeCampfireKey),
+    [messages, activeCampfireKey],
+  )
+  const pinnedCampfireMessages = useMemo(
+    () => campfireMessages.filter((message) => message.pinned),
+    [campfireMessages],
+  )
 
   // ── Project actions ──
   const logProjectActivity = (projectId, type, text) => {
@@ -2218,6 +2308,7 @@ const goToCreateTask = () => {
 }
 
 const goToTeam = () => setActiveSection('team')
+const goToCampfire = () => setActiveSection('campfire')
 
 const openLogin = () => {
   setAuthError('')
@@ -2312,15 +2403,25 @@ const sendMessage = async (event) => {
 
   setSendingMessage(true)
 
-  const { data, error } = await supabase
+  const channelKey = activeCampfireKey || BOARD_CHANNEL_KEY
+  const projectId = channelProjectId(channelKey)
+
+  const basePayload = { board_id: currentBoardId, user_id: userId, message: body }
+  let { data, error } = await supabase
     .from('board_messages')
-    .insert({
-      board_id: currentBoardId,
-      user_id: userId,
-      message: body, 
-    })
+    .insert({ ...basePayload, channel_key: channelKey, project_id: projectId })
     .select()
     .single()
+
+  // If the Campfire migration has not been pushed yet, fall back to a plain
+  // board message so the chat is never blocked (it just lands in the board room).
+  if (error && isMissingColumnError(error)) {
+    ;({ data, error } = await supabase
+      .from('board_messages')
+      .insert(basePayload)
+      .select()
+      .single())
+  }
 
   if (error) {
     console.error('Send message error:', error)
@@ -2339,6 +2440,183 @@ const sendMessage = async (event) => {
   setNewMessage('')
   setSendingMessage(false)
 }
+
+// Pin/unpin via RPC so any board member (not just the author) can curate the
+// pinned list. Optimistic, with a rollback if the RPC fails.
+const toggleMessagePin = async (message) => {
+  if (!userId) return
+  const nextPinned = !message.pinned
+  const previous = messages
+  setMessages((current) =>
+    current.map((item) => (item.id === message.id ? { ...item, pinned: nextPinned } : item)),
+  )
+  const { error } = await supabase.rpc('set_message_pinned', {
+    p_message_id: message.id,
+    p_pinned: nextPinned,
+  })
+  if (error) {
+    console.error('Pin message error:', formatSupabaseError(error), error)
+    setMessages(previous)
+    pushCelebration({ kind: 'error', title: 'Pin not saved', detail: 'Change kept locally only.' })
+  }
+}
+
+// React/unreact via RPC (board-member scoped, server-side toggle avoids races).
+// Optimistic local toggle mirrors the server using the shared pure helper.
+const toggleMessageReaction = async (message, reactionKey) => {
+  if (!userId) return
+  const previous = messages
+  const optimistic = toggleReaction(message.reactions, reactionKey, userId)
+  setMessages((current) =>
+    current.map((item) => (item.id === message.id ? { ...item, reactions: optimistic } : item)),
+  )
+  const { data, error } = await supabase.rpc('toggle_message_reaction', {
+    p_message_id: message.id,
+    p_reaction: reactionKey,
+  })
+  if (error) {
+    console.error('React message error:', formatSupabaseError(error), error)
+    setMessages(previous)
+    pushCelebration({ kind: 'error', title: 'Reaction not saved', detail: 'Change kept locally only.' })
+    return
+  }
+  const row = Array.isArray(data) ? data[0] : data
+  if (row) {
+    const synced = normalizeReactions(row.reactions)
+    setMessages((current) =>
+      current.map((item) => (item.id === message.id ? { ...item, reactions: synced } : item)),
+    )
+  }
+}
+
+// Spin a message into a task in the active project: first line becomes the
+// title, the full body the description. Safe when no project is selected.
+const createTaskFromMessage = async (message) => {
+  if (!userId || !currentProject) {
+    pushCelebration({ kind: 'error', title: 'No project selected', detail: 'Pick a project first.' })
+    return
+  }
+  const title = firstLine(message.text, 200) || 'Task from Campfire'
+  const description = (message.text || '').trim().slice(0, 2000) || 'Created from a Campfire message.'
+  const task = {
+    id: crypto.randomUUID(),
+    projectId: currentProject.id,
+    title,
+    description,
+    status: 'backlog',
+    priority: 'Medium',
+    discipline: 'Programming',
+    assignee: clampAssignee('Unassigned', teamMembers),
+    sprint: currentProject.phase,
+    estimate: '1 pt',
+    due: 'TBD',
+    completed: false,
+    labels: currentProject.labels?.slice(0, 2) || [],
+    subtasks: [],
+    activity: [createActivity('task', 'Task created from a Campfire message.')],
+  }
+  setTasks((current) => [task, ...current])
+  logProjectActivity(currentProject.id, 'task', `Created task ${task.title} from Campfire.`)
+  const { error } = await supabase.from('tasks').insert([taskToDb(task, userId)])
+  if (error) {
+    console.error('Create task from message error:', formatSupabaseError(error), error)
+    setTasks((current) => current.filter((item) => item.id !== task.id))
+    pushCelebration({ kind: 'error', title: 'Task not saved', detail: 'Please try again.' })
+    return
+  }
+  pushCelebration({ kind: 'xp', title: 'Task created', detail: title, icon: '✎' })
+}
+
+// Add a user-created channel under a project. Board members only (enforced by
+// RLS); the channel_key encodes the project so message filtering stays scoped.
+const addCampfireChannel = async (projectId, rawName) => {
+  const name = (rawName || '').trim().slice(0, 40)
+  if (!projectId || !name || !currentBoardId || !userId || savingChannel) return
+
+  const key = customChannelKey(projectId, name)
+  if (!key) {
+    pushCelebration({ kind: 'error', title: 'Invalid channel name', detail: 'Use letters or numbers.' })
+    return
+  }
+  // Reject duplicates (including the reserved General/default room) up front.
+  if (campfireChannels.some((channel) => channel.key === key)) {
+    pushCelebration({ kind: 'error', title: 'Channel exists', detail: `${name} is already a room.` })
+    setNewChannelName('')
+    setAddingChannelProjectId(null)
+    return
+  }
+
+  setSavingChannel(true)
+  const { data, error } = await supabase
+    .from('campfire_channels')
+    .insert({
+      board_id: currentBoardId,
+      project_id: projectId,
+      name,
+      channel_key: key,
+      created_by: userId,
+    })
+    .select()
+    .single()
+
+  setSavingChannel(false)
+  if (error) {
+    console.error('Add channel error:', formatSupabaseError(error), error)
+    pushCelebration({
+      kind: 'error',
+      title: 'Channel not added',
+      detail: isMissingColumnError(error) ? 'Run the Campfire channels migration.' : 'Please try again.',
+    })
+    return
+  }
+
+  if (data) {
+    const channel = dbToChannel(data)
+    setCustomChannels((current) =>
+      current.some((item) => item.id === channel.id) ? current : [...current, channel],
+    )
+    setCampfireChannel(channel.channelKey)
+  }
+  setNewChannelName('')
+  setAddingChannelProjectId(null)
+}
+
+// Remove (archive) a user-created channel. Messages are preserved: we set
+// archived_at rather than deleting, so the room just disappears from the list.
+const removeCampfireChannel = async (channel) => {
+  if (!channel?.id || !channel.removable) return
+
+  const previous = customChannels
+  setCustomChannels((current) => current.filter((item) => item.id !== channel.id))
+  if (activeCampfireKey === channel.key) setCampfireChannel(BOARD_CHANNEL_KEY)
+
+  const { error } = await supabase
+    .from('campfire_channels')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', channel.id)
+
+  if (error) {
+    console.error('Remove channel error:', formatSupabaseError(error), error)
+    setCustomChannels(previous)
+    pushCelebration({ kind: 'error', title: 'Channel not removed', detail: 'Please try again.' })
+  }
+}
+
+// Render a message body from safe parsed segments (no dangerouslySetInnerHTML).
+// Bold/code become styled spans; URLs become external links with rel guards.
+const renderMessageBody = (text) =>
+  renderMessageSegments(text).map((segment, index) => {
+    if (segment.type === 'bold') return <strong key={index}>{segment.value}</strong>
+    if (segment.type === 'code') return <code key={index} className="chat-code">{segment.value}</code>
+    if (segment.type === 'link') {
+      return (
+        <a key={index} href={segment.href} target="_blank" rel="noopener noreferrer">
+          {segment.value}
+        </a>
+      )
+    }
+    return <span key={index}>{segment.value}</span>
+  })
 
 const getMessageAuthorLabel = (message) => {
   if (message.userId === userId) return 'You'
@@ -3107,7 +3385,7 @@ return (
               isExampleBoard={isExampleBoard}
               onDismiss={dismissOnboarding}
               onFocusCreateTask={goToCreateTask}
-              onScrollToMessages={goToTeam}
+              onScrollToMessages={goToCampfire}
               onScrollToInvites={goToTeam}
             />
           ) : (
@@ -4169,115 +4447,28 @@ return (
               </div>
             </div>
 
-        <section className="chat-panel panel" aria-label="Board chat" data-testid="chat-panel">
+        <section className="chat-panel panel" aria-label="Campfire" data-testid="chat-panel">
   <div className="chat-panel-header">
     <div>
-      <p className="eyebrow">Board chat</p>
-      <h3>Team messages</h3>
+      <p className="eyebrow">Team chat</p>
+      <h3>Campfire</h3>
     </div>
     <span className="chat-count">
       {messages.length} {messages.length === 1 ? 'message' : 'messages'}
     </span>
   </div>
-
-  <div className="chat-messages" role="log" aria-live="polite">
-    {messages.length ? (
-      <>
-        {messages.map((message) => {
-          const isSelf = message.userId === userId
-          const isEditing = editingMessageId === message.id
-
-          return (
-            <article
-              key={message.id}
-              className={isSelf ? 'chat-message self' : 'chat-message'}
-            >
-              <div className="chat-message-meta">
-                <span className="chat-message-author">{getMessageAuthorLabel(message)}</span>
-                <span className="chat-message-meta-end">
-                  {message.editedAt && message.editedAt !== message.createdAt ? (
-                    <span className="chat-edited">edited</span>
-                  ) : null}
-                  <time dateTime={message.createdAt}>
-                    {new Date(message.createdAt).toLocaleTimeString([], {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </time>
-                </span>
-              </div>
-
-              {isEditing ? (
-                <form className="chat-edit-form" onSubmit={saveEditedMessage}>
-                  <input
-                    value={editingMessageText}
-                    onChange={(e) => setEditingMessageText(e.target.value)}
-                    maxLength={2000}
-                    aria-label="Edit message"
-                    autoFocus
-                  />
-                  <div className="chat-edit-actions">
-                    <button type="submit" className="secondary-btn chip-action">Save</button>
-                    <button
-                      type="button"
-                      className="secondary-btn chip-action"
-                      onClick={cancelEditingMessage}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                <>
-                  <p>{message.text}</p>
-                  {isSelf ? (
-                    <div className="chat-message-actions">
-                      <button
-                        type="button"
-                        className="chat-action-btn"
-                        onClick={() => startEditingMessage(message)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="chat-action-btn danger"
-                        onClick={() => deleteMessage(message)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  ) : null}
-                </>
-              )}
-            </article>
-          )
-        })}
-        <div ref={chatMessagesEndRef} />
-      </>
-    ) : (
-      <div className="chat-empty">
-        No messages yet. Start the board conversation.
-      </div>
-    )}
-  </div>
-
-  <form className="chat-form" onSubmit={sendMessage}>
-    <input
-      value={newMessage}
-      onChange={(e) => setNewMessage(e.target.value)}
-      placeholder="Send a message to the board"
-      aria-label="Message to the board"
-      maxLength={2000}
-    />
-    <button
-      type="submit"
-      className="primary-btn"
-      disabled={sendingMessage || !newMessage.trim()}
-    >
-      {sendingMessage ? 'Sending…' : 'Send'}
-    </button>
-  </form>
+  <p className="muted-copy">
+    Gather around the Campfire to coordinate. Board and project rooms, pins, and
+    reactions all live there.
+  </p>
+  <button
+    type="button"
+    className="primary-btn"
+    data-testid="team-open-campfire"
+    onClick={goToCampfire}
+  >
+    Open Campfire
+  </button>
 </section>
 
 <section className="panel invite-panel" aria-label="Invite collaborators" data-testid="invite-panel">
@@ -4334,6 +4525,372 @@ return (
     )}
   </div>
 </section>
+          </section>
+        ) : null}
+
+        {activeSection === 'campfire' ? (
+          <section className="campfire-view" data-testid="campfire-view" aria-label="Campfire">
+            <header className="view-header">
+              <div>
+                <p className="eyebrow">Team chat</p>
+                <h1>Campfire</h1>
+                <p className="muted-copy">
+                  Gather around the Campfire. Board and project rooms keep every conversation next to the work.
+                </p>
+              </div>
+            </header>
+
+            <div className="campfire-layout">
+              <aside className="campfire-rooms panel" aria-label="Campfire rooms" data-testid="campfire-rooms">
+                <div className="section-heading">
+                  <h2>Rooms</h2>
+                  <span>{campfireChannels.length}</span>
+                </div>
+                <div className="campfire-room-groups">
+                  {campfireGroups.map((group) => {
+                    const groupId = group.projectId ?? 'board'
+                    const isAdding = group.projectId && addingChannelProjectId === group.projectId
+                    const onlyGeneral = group.channels.length <= 1
+                    return (
+                      <div className="campfire-room-group" key={groupId} data-testid={`campfire-group-${groupId}`}>
+                        <div className="campfire-room-group-head">
+                          <p className="campfire-room-group-name">{group.projectName}</p>
+                          {group.projectId ? (
+                            <button
+                              type="button"
+                              className="campfire-add-channel-btn"
+                              data-testid={`campfire-add-channel-${group.projectId}`}
+                              aria-expanded={isAdding ? 'true' : 'false'}
+                              aria-label={`Add channel to ${group.projectName}`}
+                              onClick={() => {
+                                setNewChannelName('')
+                                setAddingChannelProjectId((prev) =>
+                                  prev === group.projectId ? null : group.projectId,
+                                )
+                              }}
+                            >
+                              <PlusIcon size={13} />
+                              <span>Add</span>
+                            </button>
+                          ) : null}
+                        </div>
+                        <ul className="campfire-room-list">
+                          {group.channels.map((channel) => {
+                            const count = filterMessagesByChannel(messages, channel.key).length
+                            const active = channel.key === activeCampfireKey
+                            return (
+                              <li key={channel.key} className="campfire-room-row">
+                                <button
+                                  type="button"
+                                  className={active ? 'campfire-room is-active' : 'campfire-room'}
+                                  aria-current={active ? 'true' : undefined}
+                                  data-testid={`campfire-room-${channel.key}`}
+                                  onClick={() => setCampfireChannel(channel.key)}
+                                >
+                                  <span className="campfire-room-flame" aria-hidden="true">
+                                    <FlameIcon size={14} />
+                                  </span>
+                                  <span className="campfire-room-name">{channel.name}</span>
+                                  <span className="campfire-room-count">{count}</span>
+                                </button>
+                                {channel.removable ? (
+                                  <button
+                                    type="button"
+                                    className="campfire-remove-channel"
+                                    data-testid={`campfire-remove-channel-${channel.key}`}
+                                    aria-label={`Remove ${channel.name} channel`}
+                                    title={`Remove ${channel.name}`}
+                                    onClick={() => removeCampfireChannel(channel)}
+                                  >
+                                    <CloseIcon size={12} />
+                                  </button>
+                                ) : null}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                        {isAdding ? (
+                          <form
+                            className="campfire-add-channel-form"
+                            data-testid={`campfire-add-channel-form-${group.projectId}`}
+                            onSubmit={(event) => {
+                              event.preventDefault()
+                              addCampfireChannel(group.projectId, newChannelName)
+                            }}
+                          >
+                            <input
+                              type="text"
+                              className="campfire-add-channel-input"
+                              value={newChannelName}
+                              maxLength={40}
+                              autoFocus
+                              placeholder="Channel name"
+                              aria-label={`New channel name for ${group.projectName}`}
+                              data-testid="campfire-channel-name-input"
+                              onChange={(event) => setNewChannelName(event.target.value)}
+                            />
+                            <div className="campfire-add-channel-actions">
+                              <button
+                                type="submit"
+                                className="secondary-btn"
+                                disabled={savingChannel || !newChannelName.trim()}
+                                data-testid="campfire-channel-save"
+                              >
+                                {savingChannel ? 'Adding…' : 'Add channel'}
+                              </button>
+                              <button
+                                type="button"
+                                className="ghost-btn"
+                                onClick={() => {
+                                  setAddingChannelProjectId(null)
+                                  setNewChannelName('')
+                                }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                            {onlyGeneral ? (
+                              <div className="campfire-channel-suggestions">
+                                <span className="campfire-suggestion-label">Quick add</span>
+                                {DEFAULT_CHANNEL_SUGGESTIONS.map((suggestion) => (
+                                  <button
+                                    key={suggestion}
+                                    type="button"
+                                    className="campfire-suggestion-chip"
+                                    disabled={savingChannel}
+                                    data-testid={`campfire-suggestion-${suggestion.toLowerCase()}`}
+                                    onClick={() => addCampfireChannel(group.projectId, suggestion)}
+                                  >
+                                    <PlusIcon size={11} />
+                                    {suggestion}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </form>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+              </aside>
+
+              <div className="campfire-feed-wrap panel" data-testid="campfire-feed">
+                <div className="campfire-feed-head">
+                  <div>
+                    <p className="eyebrow">{activeCampfireChannel?.projectId ? 'Project room' : 'Board room'}</p>
+                    <h2>{activeCampfireChannel?.name || 'Board Campfire'}</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className="secondary-btn campfire-context-toggle"
+                    aria-expanded={campfireContextOpen}
+                    data-testid="campfire-context-toggle"
+                    onClick={() => setCampfireContextOpen((open) => !open)}
+                  >
+                    {campfireContextOpen ? 'Hide details' : 'Details'}
+                  </button>
+                </div>
+
+                <div className="chat-messages campfire-messages" role="log" aria-live="polite">
+                  {campfireMessages.length ? (
+                    <>
+                      {campfireMessages.map((message) => {
+                        const isSelf = message.userId === userId
+                        const isEditing = editingMessageId === message.id
+                        return (
+                          <article
+                            key={message.id}
+                            className={isSelf ? 'chat-message campfire-message self' : 'chat-message campfire-message'}
+                            data-testid="campfire-message"
+                          >
+                            <div className="chat-message-meta">
+                              <span className="chat-message-author">{getMessageAuthorLabel(message)}</span>
+                              <span className="chat-message-meta-end">
+                                {message.pinned ? <span className="campfire-pin-tag">Pinned</span> : null}
+                                {message.editedAt && message.editedAt !== message.createdAt ? (
+                                  <span className="chat-edited">edited</span>
+                                ) : null}
+                                <time dateTime={message.createdAt}>
+                                  {new Date(message.createdAt).toLocaleTimeString([], {
+                                    hour: 'numeric',
+                                    minute: '2-digit',
+                                  })}
+                                </time>
+                              </span>
+                            </div>
+
+                            {isEditing ? (
+                              <form className="chat-edit-form" onSubmit={saveEditedMessage}>
+                                <input
+                                  value={editingMessageText}
+                                  onChange={(e) => setEditingMessageText(e.target.value)}
+                                  maxLength={2000}
+                                  aria-label="Edit message"
+                                  autoFocus
+                                />
+                                <div className="chat-edit-actions">
+                                  <button type="submit" className="secondary-btn chip-action">Save</button>
+                                  <button type="button" className="secondary-btn chip-action" onClick={cancelEditingMessage}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              </form>
+                            ) : (
+                              <>
+                                <p className="campfire-message-body">{renderMessageBody(message.text)}</p>
+
+                                <div className="campfire-reactions" data-testid="campfire-reactions">
+                                  {CAMPFIRE_REACTIONS.map((reaction) => {
+                                    const count = reactionCount(message.reactions, reaction.key)
+                                    const mine = hasReacted(message.reactions, reaction.key, userId)
+                                    return (
+                                      <button
+                                        key={reaction.key}
+                                        type="button"
+                                        className={mine ? 'campfire-reaction is-mine' : 'campfire-reaction'}
+                                        data-testid={`campfire-reaction-${reaction.key}`}
+                                        aria-pressed={mine}
+                                        aria-label={`${reaction.label} reaction${count ? `, ${count}` : ''}`}
+                                        onClick={() => toggleMessageReaction(message, reaction.key)}
+                                      >
+                                        <span className="campfire-reaction-glyph" aria-hidden="true">{reaction.glyph}</span>
+                                        <span className="campfire-reaction-label">{reaction.label}</span>
+                                        {count > 0 ? <span className="campfire-reaction-count">{count}</span> : null}
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+
+                                <div className="chat-message-actions">
+                                  <button
+                                    type="button"
+                                    className="chat-action-btn"
+                                    data-testid="campfire-pin"
+                                    onClick={() => toggleMessagePin(message)}
+                                  >
+                                    {message.pinned ? 'Unpin' : 'Pin'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="chat-action-btn"
+                                    data-testid="campfire-create-task"
+                                    onClick={() => createTaskFromMessage(message)}
+                                  >
+                                    Create task
+                                  </button>
+                                  {isSelf ? (
+                                    <>
+                                      <button type="button" className="chat-action-btn" onClick={() => startEditingMessage(message)}>
+                                        Edit
+                                      </button>
+                                      <button type="button" className="chat-action-btn danger" onClick={() => deleteMessage(message)}>
+                                        Delete
+                                      </button>
+                                    </>
+                                  ) : null}
+                                </div>
+                              </>
+                            )}
+                          </article>
+                        )
+                      })}
+                      <div ref={chatMessagesEndRef} />
+                    </>
+                  ) : (
+                    <div className="chat-empty campfire-empty" data-testid="campfire-empty">
+                      No sparks yet. Start the campfire.
+                    </div>
+                  )}
+                </div>
+
+                <form className="chat-form campfire-form" onSubmit={sendMessage}>
+                  <textarea
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder={`Message ${activeCampfireChannel?.name || 'the Campfire'}`}
+                    aria-label={`Message ${activeCampfireChannel?.name || 'the Campfire'}`}
+                    maxLength={2000}
+                    rows={2}
+                    data-testid="campfire-composer"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        sendMessage(e)
+                      }
+                    }}
+                  />
+                  <button type="submit" className="primary-btn" disabled={sendingMessage || !newMessage.trim()}>
+                    {sendingMessage ? 'Sending…' : 'Send'}
+                  </button>
+                </form>
+                <p className="campfire-hint muted-copy">
+                  Enter sends. Shift+Enter adds a line. Use **bold**, `code`, and links are auto-detected.
+                </p>
+              </div>
+
+              <aside
+                className={campfireContextOpen ? 'campfire-context panel is-open' : 'campfire-context panel'}
+                aria-label="Campfire details"
+                data-testid="campfire-context"
+              >
+                <div className="campfire-context-block">
+                  <div className="section-heading">
+                    <h2>Pinned</h2>
+                    <span>{pinnedCampfireMessages.length}</span>
+                  </div>
+                  {pinnedCampfireMessages.length ? (
+                    <ul className="campfire-pin-list">
+                      {pinnedCampfireMessages.map((message) => (
+                        <li key={message.id} className="campfire-pin-item" data-testid="campfire-pinned-item">
+                          <span className="campfire-pin-author">{getMessageAuthorLabel(message)}</span>
+                          <span className="campfire-pin-text">{firstLine(message.text, 90) || 'Message'}</span>
+                          <button
+                            type="button"
+                            className="chat-action-btn"
+                            onClick={() => toggleMessagePin(message)}
+                          >
+                            Unpin
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted-copy">No pinned messages yet. Pin a message to keep it handy.</p>
+                  )}
+                </div>
+
+                <div className="campfire-context-block">
+                  <div className="section-heading">
+                    <h2>Around the fire</h2>
+                    <span>{onlineUsers.length}</span>
+                  </div>
+                  {onlineUsers.length ? (
+                    <ul className="campfire-online-list">
+                      {onlineUsers.map((online) => (
+                        <li key={online.userId} className="campfire-online-item" data-testid="campfire-online-item">
+                          <span className="campfire-online-dot" aria-hidden="true" />
+                          <span>{profiles[online.userId] || online.email || 'Teammate'}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="muted-copy">No one else is online right now.</p>
+                  )}
+                </div>
+
+                <div className="campfire-context-block">
+                  <div className="section-heading">
+                    <h2>Quick tips</h2>
+                  </div>
+                  <ul className="campfire-tips">
+                    <li>Switch rooms to keep board and project chatter separate.</li>
+                    <li>Pin decisions so nobody loses them.</li>
+                    <li>Turn any message into a task with Create task.</li>
+                  </ul>
+                </div>
+              </aside>
+            </div>
           </section>
         ) : null}
       </main>

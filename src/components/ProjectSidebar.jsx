@@ -1,18 +1,30 @@
 import InfernoLogo from './InfernoLogo'
+import {
+  BoardIcon,
+  TasksIcon,
+  ProjectsIcon,
+  FlameIcon,
+  TeamIcon,
+  CalendarIcon,
+  ReportsIcon,
+  SettingsIcon,
+} from './Icons'
 
 // Each nav item switches the main workspace to a distinct page/view — no more
-// scrolling one long board. All items are real, navigable pages.
+// scrolling one long board. All items are real, navigable pages. Icons are
+// inline SVG components (no emoji) so they render consistently everywhere.
 const PRIMARY_NAV = [
-  { id: 'board', label: 'Board', icon: '▦' },
-  { id: 'tasks', label: 'Tasks', icon: '✎' },
-  { id: 'projects', label: 'Projects', icon: '◆' },
-  { id: 'team', label: 'Team', icon: '◍' },
+  { id: 'board', label: 'Board', Icon: BoardIcon },
+  { id: 'tasks', label: 'Tasks', Icon: TasksIcon },
+  { id: 'projects', label: 'Projects', Icon: ProjectsIcon },
+  { id: 'campfire', label: 'Campfire', Icon: FlameIcon },
+  { id: 'team', label: 'Team', Icon: TeamIcon },
 ]
 
 const SECONDARY_NAV = [
-  { id: 'calendar', label: 'Calendar', icon: '▤' },
-  { id: 'reports', label: 'Reports', icon: '▧' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
+  { id: 'calendar', label: 'Calendar', Icon: CalendarIcon },
+  { id: 'reports', label: 'Reports', Icon: ReportsIcon },
+  { id: 'settings', label: 'Settings', Icon: SettingsIcon },
 ]
 
 export default function ProjectSidebar({
@@ -42,20 +54,23 @@ export default function ProjectSidebar({
   const accountSub = gamerTag || (displayName ? userEmail : null) || 'Signed in'
   const accountInitial = (displayName?.[0] || userEmail?.trim()?.[0] || 'I').toUpperCase()
 
-  const renderNavItem = (item) => (
-    <li key={item.id}>
-      <button
-        type="button"
-        className={activeSection === item.id ? 'app-nav-item active' : 'app-nav-item'}
-        aria-current={activeSection === item.id ? 'page' : undefined}
-        data-testid={`nav-${item.id}`}
-        onClick={() => onSelectSection?.(item.id)}
-      >
-        <span className="app-nav-icon" aria-hidden="true">{item.icon}</span>
-        <span className="app-nav-label">{item.label}</span>
-      </button>
-    </li>
-  )
+  const renderNavItem = (item) => {
+    const { Icon } = item
+    return (
+      <li key={item.id}>
+        <button
+          type="button"
+          className={activeSection === item.id ? 'app-nav-item active' : 'app-nav-item'}
+          aria-current={activeSection === item.id ? 'page' : undefined}
+          data-testid={`nav-${item.id}`}
+          onClick={() => onSelectSection?.(item.id)}
+        >
+          <span className="app-nav-icon" aria-hidden="true"><Icon size={18} /></span>
+          <span className="app-nav-label">{item.label}</span>
+        </button>
+      </li>
+    )
+  }
 
   return (
     <aside

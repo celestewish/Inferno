@@ -3556,3 +3556,247 @@ textarea:hover {
   .boss-panel-head { align-items: flex-start; }
   .boss-card-actions .chip-action { flex: 1; }
 }
+
+/* ── Campfire (chat hub) ── */
+.campfire-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr) 260px;
+  gap: 16px;
+  align-items: start;
+}
+
+.campfire-rooms { display: grid; gap: 12px; }
+.campfire-room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.campfire-room {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: #edf2ff;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.campfire-room:hover { border-color: color-mix(in srgb, var(--ember) 40%, var(--card-border)); }
+.campfire-room.is-active {
+  border-color: color-mix(in srgb, var(--ember) 60%, transparent);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+}
+.campfire-room-flame { display: inline-flex; color: var(--ember); }
+.campfire-room-name { flex: 1; min-width: 0; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.campfire-room-count { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Channels grouped by project, with per-project add controls. */
+.campfire-room-groups { display: grid; gap: 14px; }
+.campfire-room-group { display: grid; gap: 6px; }
+.campfire-room-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.campfire-room-group-name {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.campfire-add-channel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.campfire-add-channel-btn:hover {
+  color: #edf2ff;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+}
+.campfire-room-row { display: flex; align-items: center; gap: 4px; }
+.campfire-room-row .campfire-room { flex: 1; min-width: 0; }
+.campfire-remove-channel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.campfire-remove-channel:hover {
+  color: #ffd7c7;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.campfire-add-channel-form {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+.campfire-add-channel-input {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.24);
+  color: #edf2ff;
+  font-size: 0.82rem;
+}
+.campfire-add-channel-actions { display: flex; gap: 6px; }
+.campfire-add-channel-actions .secondary-btn,
+.campfire-add-channel-actions .ghost-btn { padding: 5px 10px; font-size: 0.72rem; }
+.campfire-channel-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.campfire-suggestion-label { font-size: 0.66rem; color: var(--text-muted); }
+.campfire-suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.campfire-suggestion-chip:hover:not(:disabled) {
+  color: #edf2ff;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+}
+.campfire-suggestion-chip:disabled { opacity: 0.5; cursor: default; }
+
+.campfire-feed-wrap { display: grid; gap: 12px; }
+.campfire-feed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.campfire-feed-head h2 { margin: 2px 0 0; }
+.campfire-context-toggle { display: none; }
+
+.campfire-messages { max-height: 52vh; }
+.campfire-message-body {
+  margin: 0;
+  color: #edf2ff;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.campfire-message-body a { color: var(--accent-secondary); }
+.chat-code {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.72rem;
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--card-border);
+}
+
+.campfire-pin-tag,
+.campfire-reaction-count {
+  font-size: 0.68rem;
+  color: var(--ember);
+}
+.campfire-pin-tag {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, transparent);
+  background: color-mix(in srgb, var(--ember) 12%, transparent);
+}
+
+.campfire-reactions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.campfire-reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease, background 140ms ease;
+}
+.campfire-reaction:hover { border-color: color-mix(in srgb, var(--ember) 40%, var(--card-border)); }
+.campfire-reaction.is-mine {
+  border-color: color-mix(in srgb, var(--ember) 60%, transparent);
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  color: #edf2ff;
+}
+.campfire-reaction-glyph { color: var(--ember); }
+
+.campfire-form { align-items: start; }
+.campfire-form textarea {
+  min-width: 0;
+  resize: vertical;
+  min-height: 44px;
+  font: inherit;
+}
+.campfire-hint { margin: 0; font-size: 0.74rem; }
+
+.campfire-context { display: grid; gap: 18px; align-content: start; }
+.campfire-context-block { display: grid; gap: 8px; }
+.campfire-pin-list,
+.campfire-online-list,
+.campfire-tips { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.campfire-tips { list-style: disc; padding-left: 18px; color: var(--text-muted); font-size: 0.82rem; gap: 6px; }
+.campfire-pin-item {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.campfire-pin-author { font-size: 0.72rem; color: var(--text-muted); }
+.campfire-pin-text { font-size: 0.85rem; color: #edf2ff; word-break: break-word; }
+.campfire-pin-item .chat-action-btn { justify-self: start; margin-top: 4px; }
+.campfire-online-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+.campfire-online-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-secondary);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent-secondary) 70%, transparent);
+}
+
+@media (max-width: 960px) {
+  .campfire-layout { grid-template-columns: 1fr; }
+  .campfire-rooms { order: -1; }
+  .campfire-room-list { grid-auto-flow: column; grid-auto-columns: max-content; overflow-x: auto; }
+  .campfire-context-toggle { display: inline-flex; }
+  .campfire-context { display: none; }
+  .campfire-context.is-open { display: grid; }
+  .campfire-form { grid-template-columns: 1fr; }
+  .campfire-form .primary-btn { width: 100%; }
+}
