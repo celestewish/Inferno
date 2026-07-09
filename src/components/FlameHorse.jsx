@@ -2,7 +2,7 @@ let uid = 0
 
 // Original cute flame-pony mascot. A rounded side-profile head with a
 // mane made of stacked flame petals, drawn with the Inferno palette.
-export default function FlameHorse({ size = 56, title = 'Blaze the flame pony' }) {
+export default function FlameHorse({ size = 56, title = 'Dante the flame pony' }) {
   const gid = `flame-${(uid += 1)}`
 
   return (

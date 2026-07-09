@@ -2197,6 +2197,25 @@ textarea:hover {
 }
 .landing-final-cta h2 { margin: 0; font-size: clamp(1.6rem, 3.5vw, 2.4rem); }
 .landing-final-cta .muted-copy { margin: 0; max-width: 48ch; }
+.landing-gallop {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  margin-bottom: 0.25rem;
+  pointer-events: none;
+}
+.galloping-horse {
+  width: min(280px, 72vw);
+  height: auto;
+  filter: drop-shadow(0 18px 30px color-mix(in srgb, var(--accent) 30%, transparent));
+}
+@media (prefers-reduced-motion: no-preference) {
+  .galloping-horse { animation: gallop-charge 3.4s ease-in-out infinite; }
+}
+@keyframes gallop-charge {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-6px) scale(1.015); }
+}
 
 /* Footer */
 .landing-footer {
@@ -2308,7 +2327,7 @@ textarea:hover {
   border: 1px solid var(--card-border);
   box-shadow: var(--shadow-panel);
 }
-.hero-carousel-slide {
+.hero-carousel-frame .hero-carousel-slide {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -2322,10 +2341,22 @@ textarea:hover {
   transition: opacity 620ms ease, transform 620ms ease;
   pointer-events: none;
 }
-.hero-carousel-slide.is-active {
+.hero-carousel-frame .hero-carousel-slide.is-active {
   opacity: 1;
   transform: scale(1);
   pointer-events: auto;
+}
+.hero-carousel-fallback {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-main);
+  font-weight: 600;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 26%, var(--surface-custom)), color-mix(in srgb, var(--accent-secondary) 20%, var(--background-custom)));
 }
 .hero-carousel-arrow {
   position: absolute;
@@ -2783,7 +2814,7 @@ textarea:hover {
   .tour-board { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .hero-carousel-slide { transition: none; transform: none; }
+  .hero-carousel-frame .hero-carousel-slide { transition: none; transform: none; }
   .tour-card-main,
   .tour-progress-fill { transition: none; }
 }

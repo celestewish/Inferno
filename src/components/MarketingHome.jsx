@@ -4,6 +4,7 @@ import FeatureIcon from './FeatureIcon'
 import HeroCarousel from './HeroCarousel'
 import GuidedTour from './GuidedTour'
 import RoadmapGantt from './RoadmapGantt'
+import GallopingHorse from './GallopingHorse'
 
 const NAV_LINKS = [
   { href: '#features', label: 'Features' },
@@ -243,7 +244,7 @@ export default function MarketingHome({ openLogin, openSignup }) {
             <p className="eyebrow">Try it, no signup</p>
             <h2>Run a game jam in eight steps</h2>
             <p className="muted-copy">
-              Blaze the flame pony walks you through the whole Inferno loop, from naming a board to
+              Dante the flame pony walks you through the whole Inferno loop, from naming a board to
               shipping a milestone. Complete each quest step on a live mini board. It runs entirely
               in your browser and nothing is saved.
             </p>
@@ -347,6 +348,9 @@ export default function MarketingHome({ openLogin, openSignup }) {
         </section>
 
         <section className="landing-section landing-final-cta" aria-label="Get started">
+          <div className="landing-gallop" data-testid="landing-gallop">
+            <GallopingHorse size={280} />
+          </div>
           <h2>Start planning your game today</h2>
           <p className="muted-copy">
             Create a free account and explore a fully seeded sample board in seconds.
