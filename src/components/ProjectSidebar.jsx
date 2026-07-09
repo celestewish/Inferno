@@ -20,6 +20,11 @@ export default function ProjectSidebar({
   project,
   projects,
   setCurrentProjectId,
+  boards = [],
+  currentBoardId,
+  onSelectBoard,
+  onCreateBoard,
+  creatingBoard = false,
   onSignOut,
   activeSection = 'board',
   onSelectSection,
@@ -101,6 +106,37 @@ export default function ProjectSidebar({
           <span>{stats.projects}</span>
           <p>Tracked projects</p>
         </div>
+      </div>
+
+      <div className="panel board-switcher" data-testid="board-switcher">
+        <div className="section-heading">
+          <h2>Boards</h2>
+          <span>{boards.length}</span>
+        </div>
+        <div className="project-list">
+          {boards.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={currentBoardId === item.id ? 'project-tab active' : 'project-tab'}
+              aria-current={currentBoardId === item.id ? 'true' : undefined}
+              data-testid={`board-tab-${item.id}`}
+              onClick={() => onSelectBoard?.(item.id)}
+            >
+              <strong>{item.name || 'Untitled board'}</strong>
+              {item.description ? <small>{item.description}</small> : null}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="secondary-btn sidebar-manage-projects"
+          data-testid="sidebar-create-board"
+          disabled={creatingBoard}
+          onClick={() => onCreateBoard?.()}
+        >
+          {creatingBoard ? 'Creating…' : 'New board'}
+        </button>
       </div>
 
       <div className="panel project-switcher" data-testid="project-switcher">
