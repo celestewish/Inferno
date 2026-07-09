@@ -196,11 +196,12 @@ export default function GuidedTour({ openSignup }) {
   const crest = (state.boardName || 'GJ').replace(/[^a-zA-Z0-9]/g, '').slice(0, 2).toUpperCase() || 'GJ'
   const disciplinesOnBoard = [...new Set(state.tasks.map((task) => task.discipline))]
   const partyMembers = ['Dante', ...state.roster]
+  const taskTotal = state.tasks.length
   const stats = [
-    { label: 'Tasks', value: state.tasks.length },
-    { label: 'In Progress', value: grouped.building.length },
-    { label: 'Shipped', value: grouped.done.length },
-    { label: 'Crew', value: state.roster.length },
+    { label: 'Backlog', value: grouped.todo.length, max: Math.max(6, taskTotal), tone: 'hp' },
+    { label: 'Building', value: grouped.building.length, max: Math.max(1, taskTotal), tone: 'focus' },
+    { label: 'Shipped', value: grouped.done.length, max: Math.max(1, taskTotal), tone: 'mind' },
+    { label: 'Crew', value: state.roster.length, max: 4, tone: 'grit' },
   ]
 
   return (
@@ -260,16 +261,21 @@ export default function GuidedTour({ openSignup }) {
 
           <ul className="tour-stats">
             {stats.map((stat) => (
-              <li key={stat.label}>
+              <li key={stat.label} className={`tour-stat tour-stat--${stat.tone}`}>
                 <span className="tour-stat-icon" aria-hidden="true" />
                 <span className="tour-stat-label">{stat.label}</span>
-                <span className="tour-stat-value">{stat.value}</span>
+                <span className="tour-stat-meter" aria-hidden="true">
+                  <span style={{ width: `${Math.round((stat.value / stat.max) * 100)}%` }} />
+                </span>
+                <span className="tour-stat-value">{stat.value}/{stat.max}</span>
               </li>
             ))}
           </ul>
 
           <div className="tour-inventory">
-            <span className="tour-panel-eyebrow">Inventory</span>
+            <span className="tour-panel-eyebrow">
+              Inventory <span className="tour-inventory-count">{disciplinesOnBoard.length}</span>
+            </span>
             <div className="tour-inventory-items">
               {disciplinesOnBoard.length === 0 ? (
                 <span className="tour-inventory-empty">Empty pack</span>
