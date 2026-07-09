@@ -437,10 +437,12 @@ function App() {
   const [docsAccessError, setDocsAccessError] = useState(false)
   const [repos, setRepos] = useState([])
   const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
+  const [reposAccessError, setReposAccessError] = useState(false)
   const [meetingNotes, setMeetingNotes] = useState([])
   const [meetingNotesMigrationMissing, setMeetingNotesMigrationMissing] = useState(false)
   const [notificationReads, setNotificationReads] = useState(() => new Set())
   const [notificationsMigrationMissing, setNotificationsMigrationMissing] = useState(false)
+  const [notificationsAccessError, setNotificationsAccessError] = useState(false)
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
@@ -902,11 +904,13 @@ setCurrentProjectId((currentId) =>
   setDocsMigrationMissing(isMissingTableError(docError) || isMissingColumnError(docError))
   setDocsAccessError(isAccessError(docError))
   setDocs(docData?.length ? docData.map(dbToDoc) : [])
-  setReposMigrationMissing(Boolean(repoError))
+  setReposMigrationMissing(isMissingTableError(repoError) || isMissingColumnError(repoError))
+  setReposAccessError(isAccessError(repoError))
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
   setMeetingNotesMigrationMissing(Boolean(meetingError))
   setMeetingNotes(meetingData?.length ? meetingData.map(dbToMeetingNote) : [])
-  setNotificationsMigrationMissing(Boolean(notifReadError))
+  setNotificationsMigrationMissing(isMissingTableError(notifReadError) || isMissingColumnError(notifReadError))
+  setNotificationsAccessError(isAccessError(notifReadError))
   setNotificationReads(new Set((notifReadData ?? []).map((row) => row.notification_key)))
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
@@ -4050,6 +4054,7 @@ return (
             notifications={notifications}
             unread={unreadNotifications}
             migrationMissing={notificationsMigrationMissing}
+            accessError={notificationsAccessError}
             onMarkRead={markNotificationRead}
             onMarkAllRead={markAllNotificationsRead}
           />
@@ -4609,6 +4614,7 @@ return (
             onUpdateRepo={updateRepo}
             onArchiveRepo={archiveRepo}
             migrationMissing={reposMigrationMissing}
+            accessError={reposAccessError}
           />
         ) : null}
 
