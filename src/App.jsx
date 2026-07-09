@@ -15,6 +15,8 @@ import WarRoomView from './components/WarRoomView'
 import StudioHomeView from './components/StudioHomeView'
 import NotificationsView from './components/NotificationsView'
 import CommandPalette from './components/CommandPalette'
+import TemplatesView from './components/TemplatesView'
+import { getTemplate, buildTemplateTasks, templateTaskCount } from './lib/templates'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -2519,6 +2521,43 @@ const runQuickAction = (id) => {
   }
 }
 
+// Apply a Templates library starter pack to the current project. Creates many
+// tasks at once, so it confirms first. Persists via the standard task path.
+const applyTemplate = async (templateId) => {
+  const template = getTemplate(templateId)
+  if (!template) return
+  if (!userId || !currentProject) {
+    pushCelebration({ kind: 'error', title: 'No project selected', detail: 'Pick a project first, then apply a template.' })
+    return
+  }
+  const count = templateTaskCount(template)
+  const confirmed = window.confirm(
+    `Apply "${template.name}" to ${currentProject.name}? This adds ${count} tasks to your backlog.`
+  )
+  if (!confirmed) return
+
+  const newTasks = buildTemplateTasks(template, {
+    projectId: currentProject.id,
+    sprint: currentProject.phase || '',
+    makeId: () => crypto.randomUUID(),
+    makeActivity: (type, note) => createActivity(type, note),
+  })
+  if (!newTasks.length) return
+
+  setTasks((current) => [...newTasks, ...current])
+  logProjectActivity(currentProject.id, 'task', `Applied the ${template.name} template (${count} tasks).`)
+  const { error } = await supabase.from('tasks').insert(newTasks.map((task) => taskToDb(task, userId)))
+  if (error) {
+    console.error('Apply template error:', formatSupabaseError(error), error)
+    const ids = new Set(newTasks.map((task) => task.id))
+    setTasks((current) => current.filter((task) => !ids.has(task.id)))
+    pushCelebration({ kind: 'error', title: 'Template not applied', detail: 'Please try again.' })
+    return
+  }
+  pushCelebration({ kind: 'xp', title: 'Template applied', detail: `${count} tasks added to ${currentProject.name}.`, icon: '✦' })
+  handleSelectSection('board')
+}
+
 // Persist a single notification as read. Optimistically updates local state so
 // the badge/list respond immediately; a missing migration is non-fatal (the
 // note in NotificationsView explains read state will not survive a reload).
@@ -3970,6 +4009,13 @@ return (
             migrationMissing={notificationsMigrationMissing}
             onMarkRead={markNotificationRead}
             onMarkAllRead={markAllNotificationsRead}
+          />
+        ) : null}
+
+        {activeSection === 'templates' ? (
+          <TemplatesView
+            currentProjectName={currentProject?.name || ''}
+            onApply={applyTemplate}
           />
         ) : null}
 

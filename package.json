@@ -17,6 +17,7 @@
     "test:notifications": "node scripts/notifications-sanity.mjs",
     "test:search": "node scripts/search-sanity.mjs",
     "test:tasklinks": "node scripts/tasklinks-sanity.mjs",
+    "test:templates": "node scripts/templates-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
