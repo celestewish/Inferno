@@ -172,7 +172,7 @@ export default function GuidedTour() {
             <FlameHorse size={52} />
           </span>
           <div className="tour-quest-copy">
-            <p className="tour-quest-kicker">Blaze the flame pony, your production buddy</p>
+            <p className="tour-quest-kicker">Dante the flame pony, your production buddy</p>
             {finished ? (
               <h3 className="tour-quest-title">Build shipped. You ran the whole pipeline.</h3>
             ) : (

@@ -61,7 +61,7 @@ export default function RoadmapGantt() {
           <div className="gantt-head" role="row" aria-hidden="true">
             <span className="gantt-lane-label gantt-head-label">
               <span className="gantt-runner">
-                <FlameHorse size={34} title="Blaze racing the roadmap" />
+                <FlameHorse size={34} title="Dante racing the roadmap" />
               </span>
               Quest lanes
             </span>
@@ -102,7 +102,7 @@ export default function RoadmapGantt() {
       </div>
 
       <p className="gantt-caption muted-copy">
-        Blaze gallops the track as each phase ships. Timeline is a forward-looking plan, not a promise.
+        Dante gallops the track as each phase ships. Timeline is a forward-looking plan, not a promise.
       </p>
     </div>
   )

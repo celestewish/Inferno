@@ -244,7 +244,7 @@ export default function MarketingHome({ openLogin, openSignup }) {
             <p className="eyebrow">Try it, no signup</p>
             <h2>Run a game jam in eight steps</h2>
             <p className="muted-copy">
-              Blaze the flame pony walks you through the whole Inferno loop, from naming a board to
+              Dante the flame pony walks you through the whole Inferno loop, from naming a board to
               shipping a milestone. Complete each quest step on a live mini board. It runs entirely
               in your browser and nothing is saved.
             </p>

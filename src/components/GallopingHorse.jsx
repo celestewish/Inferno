@@ -1,6 +1,6 @@
 let gallopUid = 0
 
-// Blaze charging the viewer: a front-facing gallop used as the closing brand
+// Dante charging the viewer: a front-facing gallop used as the closing brand
 // motif on the landing page. Ember mane, violet coat, fierce glowing eyes.
 export default function GallopingHorse({ size = 260 }) {
   const gid = `gallop-${(gallopUid += 1)}`

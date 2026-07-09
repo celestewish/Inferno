@@ -1,6 +1,6 @@
 let logoUid = 0
 
-// Inferno brand mark: Blaze the flame horse in profile. Shares the mascot
+// Inferno brand mark: Dante the flame horse in profile. Shares the mascot
 // silhouette used across the site so the horse is the single brand motif.
 export default function InfernoLogo({ size = 28 }) {
   const gid = `inferno-logo-${(logoUid += 1)}`
