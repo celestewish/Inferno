@@ -1,6 +1,6 @@
 import DatePicker from './DatePicker.jsx'
 
-export default function TaskModal({ editingTask, setEditingTask, handleEditSave, teamMembers, columns, disciplines, priorities, labelPool, deleteTask, addSubtaskToEditing }) {
+export default function TaskModal({ editingTask, setEditingTask, handleEditSave, teamMembers, columns, disciplines, priorities, labelPool, projects = [], deleteTask, addSubtaskToEditing }) {
   if (!editingTask) return null
 
   return (
@@ -38,6 +38,20 @@ export default function TaskModal({ editingTask, setEditingTask, handleEditSave,
               {columns.map((column) => <option key={column.id} value={column.id}>{column.label}</option>)}
             </select>
           </div>
+          {projects.length > 1 ? (
+            <label className="form-field">
+              <span className="form-field-label">Project</span>
+              <select
+                value={editingTask.projectId}
+                data-testid="task-project-select"
+                onChange={(e) => setEditingTask((c) => ({ ...c, projectId: e.target.value }))}
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>{project.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           <div className="form-row">
             <input value={editingTask.sprint} onChange={(e) => setEditingTask((c) => ({ ...c, sprint: e.target.value }))} placeholder="Sprint" />
             <input value={editingTask.estimate} onChange={(e) => setEditingTask((c) => ({ ...c, estimate: e.target.value }))} placeholder="Estimate" />

@@ -80,6 +80,62 @@ export const disciplines = ['Programming', 'Design', 'Art', 'UI / UX', 'Audio', 
 export const priorities = ['High', 'Medium', 'Low']
 export const labelPool = ['Combat', 'AI', 'UI', 'Boss', 'Narrative', 'Tutorial', 'Accessibility', 'Playtest']
 
+// Default team role labels offered when a board has no custom roles set.
+export const defaultRoles = ['Programmer', 'Artist', 'Designer', 'Producer', 'QA', 'Audio']
+
+// The customizable lists stored in boards.settings. Each maps to a UI list that
+// merges the built-in defaults with the board's user-defined entries.
+export const boardSettingKeys = ['tags', 'categories', 'roles']
+
+// Coerce an arbitrary value into a clean list of unique, trimmed, non-empty
+// strings. Caps entries and length so a malformed or hostile settings blob can
+// never blow up the UI.
+export function sanitizeStringList(value, { max = 60, maxLength = 40 } = {}) {
+  if (!Array.isArray(value)) return []
+  const seen = new Set()
+  const list = []
+  for (const item of value) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim().slice(0, maxLength)
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    list.push(trimmed)
+    if (list.length >= max) break
+  }
+  return list
+}
+
+// Normalize a stored boards.settings blob into a predictable shape so the app
+// can read board.settings.tags / .categories / .roles without guarding each
+// access. Unknown keys are dropped.
+export function sanitizeBoardSettings(stored) {
+  const settings = {}
+  const source = stored && typeof stored === 'object' ? stored : {}
+  for (const key of boardSettingKeys) {
+    settings[key] = sanitizeStringList(source[key])
+  }
+  return settings
+}
+
+// Merge built-in defaults with a board's custom entries, preserving default
+// order first and dropping case-insensitive duplicates.
+export function mergeWithDefaults(defaults, custom = []) {
+  const seen = new Set()
+  const merged = []
+  for (const item of [...defaults, ...custom]) {
+    if (typeof item !== 'string') continue
+    const trimmed = item.trim()
+    if (!trimmed) continue
+    const key = trimmed.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(trimmed)
+  }
+  return merged
+}
+
 export const createActivity = (type, text, actor = 'You') => ({
   id: crypto.randomUUID(),
   type,

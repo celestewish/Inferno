@@ -13,6 +13,7 @@ import DatePicker from './components/DatePicker.jsx'
 import {
   createActivity,
   defaultProjects,
+  defaultRoles,
   defaultTasks,
   defaultTeamMembers,
   defaultTheme,
@@ -20,9 +21,11 @@ import {
   FALLBACK_STATUS,
   gameCategories,
   labelPool,
+  mergeWithDefaults,
   methodologies,
   priorities,
   resolveSections,
+  sanitizeBoardSettings,
   sanitizeTheme,
   slugifySection,
 } from './data/defaultData'
@@ -534,6 +537,15 @@ function App() {
   const [themeError, setThemeError] = useState('')
   const [passwordResetStatus, setPasswordResetStatus] = useState('idle')
   const [passwordResetMessage, setPasswordResetMessage] = useState('')
+  const [memberRoles, setMemberRoles] = useState({})
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [newBoardSetting, setNewBoardSetting] = useState({ tags: '', categories: '', roles: '' })
+  // Password recovery (from the emailed reset link) shows a dedicated
+  // update-password panel instead of dropping the user onto the board.
+  const [recoveryMode, setRecoveryMode] = useState(false)
+  const [recoveryForm, setRecoveryForm] = useState({ password: '', confirmPassword: '' })
+  const [recoveryStatus, setRecoveryStatus] = useState('idle')
+  const [recoveryMessage, setRecoveryMessage] = useState('')
 
   // ── Auth listener ──
 useEffect(() => {
@@ -550,12 +562,21 @@ useEffect(() => {
   // Listen for sign in / sign out events
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     setSession(session)
-    if (event === 'SIGNED_IN' && session) {
+    if (event === 'PASSWORD_RECOVERY') {
+      // The user followed the emailed reset link. Show the update-password
+      // panel and load their board in the background so it's ready afterward.
+      setRecoveryMode(true)
+      setRecoveryStatus('idle')
+      setRecoveryMessage('')
+      setLoading(false)
+      if (session) loadAllData(session.user.id)
+    } else if (event === 'SIGNED_IN' && session) {
       loadAllData(session.user.id)
     } else if (event === 'SIGNED_OUT') {
       setProjects([])
       setTasks([])
       setTeamMembers(defaultTeamMembers)
+      setMemberRoles({})
       setCurrentProjectId(null)
       setLoading(false)
       setBoards([])
@@ -602,17 +623,29 @@ useEffect(() => {
     .on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState()
 
-      const users = Object.entries(state).flatMap(([key, presences]) =>
-        (presences || []).map((presence) => ({
-          key,
-          userId: presence.userId ?? key,
-          email: presence.email ?? 'Unknown user',
-          projectId: presence.projectId ?? null,
-          onlineAt: presence.onlineAt ?? null,
-        }))
-      )
+      // A single user can have several presence metas at once (multiple tabs
+      // or rapid re-tracks), which previously rendered the same person more
+      // than once. Collapse to one entry per user, keeping the most recent
+      // presence so their active project stays accurate.
+      const byUser = new Map()
+      Object.entries(state).forEach(([key, presences]) => {
+        ;(presences || []).forEach((presence) => {
+          const userId = presence.userId ?? key
+          const entry = {
+            key,
+            userId,
+            email: presence.email ?? 'Unknown user',
+            projectId: presence.projectId ?? null,
+            onlineAt: presence.onlineAt ?? null,
+          }
+          const existing = byUser.get(userId)
+          if (!existing || (entry.onlineAt ?? '') >= (existing.onlineAt ?? '')) {
+            byUser.set(userId, entry)
+          }
+        })
+      })
 
-      setOnlineUsers(users)
+      setOnlineUsers([...byUser.values()])
     })
     .subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
@@ -764,6 +797,9 @@ setCurrentBoardId(activeBoardId)
   const loadedProjects = projectData?.length ? projectData.map(dbToProject) : []
   const loadedTasks = taskData?.length ? taskData.map(dbToTask) : []
   const loadedMembers = memberData?.length ? memberData.map((m) => m.name) : defaultTeamMembers
+  const loadedRoles = Object.fromEntries(
+    (memberData ?? []).filter((m) => m.role).map((m) => [m.name, m.role])
+  )
   const loadedMessages = messageData?.length ? messageData.map(dbToMessage) : []
   const loadedInvites = inviteData?.length ? inviteData.map(dbToInvite) : []
   setInvites(loadedInvites)
@@ -799,6 +835,7 @@ setCurrentProjectId((currentId) =>
 )
 
   setTeamMembers(loadedMembers)
+  setMemberRoles(loadedRoles)
   setBoardMembers(boardMemberRows ?? [])
   setLoading(false)
   setMessages(loadedMessages)
@@ -1293,6 +1330,58 @@ function dbToInvite(row) {
     return projects.some((p) => p.name && seededNames.has(p.name.toLowerCase()))
   }, [projects])
 
+  // ── Board-level customization (tags, categories, roles) ──
+  const boardSettings = useMemo(
+    () => sanitizeBoardSettings(currentBoard?.settings),
+    [currentBoard]
+  )
+  const availableTags = useMemo(
+    () => mergeWithDefaults(labelPool, boardSettings.tags),
+    [boardSettings]
+  )
+  const availableCategories = useMemo(
+    () => mergeWithDefaults(gameCategories, boardSettings.categories),
+    [boardSettings]
+  )
+  const availableRoles = useMemo(
+    () => mergeWithDefaults(defaultRoles, boardSettings.roles),
+    [boardSettings]
+  )
+
+  // Built-in defaults per setting key — used to reject duplicates and to mark
+  // which entries are removable (only user-added ones can be removed).
+  const settingDefaults = { tags: labelPool, categories: gameCategories, roles: defaultRoles }
+
+  const persistBoardSettings = async (nextSettings) => {
+    if (!currentBoardId) return
+    setBoards((current) =>
+      current.map((board) =>
+        board.id === currentBoardId ? { ...board, settings: nextSettings } : board
+      )
+    )
+    const { error } = await supabase
+      .from('boards')
+      .update({ settings: nextSettings })
+      .eq('id', currentBoardId)
+    if (error) console.error('Persist board settings error:', formatSupabaseError(error), error)
+  }
+
+  const addBoardSettingValue = (key, rawValue) => {
+    const value = (rawValue ?? '').trim()
+    if (!value || value.length > 40) return
+    const merged = mergeWithDefaults(settingDefaults[key] ?? [], boardSettings[key])
+    if (merged.some((item) => item.toLowerCase() === value.toLowerCase())) return
+    persistBoardSettings({ ...boardSettings, [key]: [...boardSettings[key], value] })
+    setNewBoardSetting((current) => ({ ...current, [key]: '' }))
+  }
+
+  const removeBoardSettingValue = (key, value) => {
+    persistBoardSettings({
+      ...boardSettings,
+      [key]: boardSettings[key].filter((item) => item !== value),
+    })
+  }
+
   // ── Kanban sections (board-level columns) ──
   const sections = useMemo(
     () => resolveSections(currentBoard?.kanban_sections, tasks),
@@ -1559,12 +1648,34 @@ function dbToInvite(row) {
   const removeTeamMember = async (member) => {
     if (member === 'Unassigned') return
     setTeamMembers((current) => current.filter((m) => m !== member))
+    setMemberRoles((current) => {
+      const next = { ...current }
+      delete next[member]
+      return next
+    })
     setTasks((current) => current.map((t) => ({ ...t, assignee: t.assignee === member ? 'Unassigned' : t.assignee })))
     await supabase
     .from('team_members')
     .delete()
     .eq('board_id', currentBoardId)
     .eq('name', member)
+  }
+
+  const updateMemberRole = async (member, role) => {
+    if (member === 'Unassigned') return
+    const nextRole = (role ?? '').trim()
+    setMemberRoles((current) => {
+      const next = { ...current }
+      if (nextRole) next[member] = nextRole
+      else delete next[member]
+      return next
+    })
+    const { error } = await supabase
+      .from('team_members')
+      .update({ role: nextRole || null })
+      .eq('board_id', currentBoardId)
+      .eq('name', member)
+    if (error) console.error('Update member role error:', formatSupabaseError(error), error)
   }
 
   const focusQuickCreate = () => {
@@ -2018,6 +2129,120 @@ const sendPasswordReset = async () => {
   }
 }
 
+const submitPasswordRecovery = async (event) => {
+  event.preventDefault()
+  if (recoveryStatus === 'saving') return
+
+  const password = recoveryForm.password.trim()
+  const confirm = recoveryForm.confirmPassword.trim()
+
+  setRecoveryStatus('idle')
+  setRecoveryMessage('')
+
+  if (password.length < 6) {
+    setRecoveryStatus('error')
+    setRecoveryMessage('Password must be at least 6 characters.')
+    return
+  }
+  if (password !== confirm) {
+    setRecoveryStatus('error')
+    setRecoveryMessage('Passwords do not match.')
+    return
+  }
+
+  setRecoveryStatus('saving')
+
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) {
+    setRecoveryStatus('error')
+    setRecoveryMessage(`We could not update your password. ${formatSupabaseError(error)}`)
+    return
+  }
+
+  setRecoveryStatus('done')
+  setRecoveryMessage('Your password has been updated. You can keep working — you are signed in.')
+  setRecoveryForm({ password: '', confirmPassword: '' })
+}
+
+const dismissRecovery = () => {
+  setRecoveryMode(false)
+  setRecoveryStatus('idle')
+  setRecoveryMessage('')
+  setRecoveryForm({ password: '', confirmPassword: '' })
+}
+
+if (recoveryMode) {
+  return (
+    <div className="auth-overlay" role="presentation">
+      <div
+        className="auth-modal panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="recovery-title"
+        data-testid="password-recovery-panel"
+      >
+        <p className="eyebrow">Account security</p>
+        <h2 id="recovery-title">Choose a new password</h2>
+        <p className="muted-copy">
+          You followed a password reset link. Set a new password below to finish.
+        </p>
+
+        <form className="auth-form" onSubmit={submitPasswordRecovery}>
+          <label htmlFor="recovery-password">New password</label>
+          <input
+            id="recovery-password"
+            type="password"
+            autoComplete="new-password"
+            value={recoveryForm.password}
+            data-testid="recovery-password"
+            onChange={(e) => setRecoveryForm((c) => ({ ...c, password: e.target.value }))}
+            placeholder="At least 6 characters"
+          />
+
+          <label htmlFor="recovery-confirm">Confirm new password</label>
+          <input
+            id="recovery-confirm"
+            type="password"
+            autoComplete="new-password"
+            value={recoveryForm.confirmPassword}
+            data-testid="recovery-confirm"
+            onChange={(e) => setRecoveryForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+            placeholder="Re-enter your new password"
+          />
+
+          {recoveryStatus === 'error' && recoveryMessage ? (
+            <p className="auth-error" role="alert" data-testid="recovery-status">{recoveryMessage}</p>
+          ) : null}
+          {recoveryStatus === 'done' && recoveryMessage ? (
+            <p className="auth-success" role="status" data-testid="recovery-status">{recoveryMessage}</p>
+          ) : null}
+
+          {recoveryStatus === 'done' ? (
+            <button
+              type="button"
+              className="primary-btn"
+              data-testid="recovery-continue"
+              onClick={dismissRecovery}
+            >
+              Continue to board
+            </button>
+          ) : (
+            <button
+              type="submit"
+              className="primary-btn"
+              data-testid="recovery-save"
+              disabled={recoveryStatus === 'saving'}
+            >
+              {recoveryStatus === 'saving' ? 'Updating…' : 'Update password'}
+            </button>
+          )}
+        </form>
+      </div>
+    </div>
+  )
+}
+
 if (loading) {
   return (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
@@ -2122,7 +2347,7 @@ const pendingInvitesPanel =
 return (
   <>
     {pendingInvitesPanel}
-    <div className="app-shell">
+    <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <ProjectSidebar
         stats={stats}
         project={currentProject}
@@ -2133,6 +2358,8 @@ return (
         onSelectSection={handleSelectSection}
         userEmail={session?.user?.email}
         profile={myProfile}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
         {activeSection === 'board' ? (
@@ -2367,7 +2594,7 @@ return (
                     value={newProject.category}
                     onChange={(e) => setNewProject((c) => ({ ...c, category: e.target.value }))}
                   >
-                    {gameCategories.map((item) => <option key={item}>{item}</option>)}
+                    {availableCategories.map((item) => <option key={item}>{item}</option>)}
                   </select>
                   <select
                     value={newProject.methodology}
@@ -2386,10 +2613,10 @@ return (
               project={currentProject}
               updateProjectField={updateProjectField}
               methodologies={methodologies}
-              gameCategories={gameCategories}
+              gameCategories={availableCategories}
               deleteProject={deleteProject}
             />
-            <DetailsPanel project={currentProject} tasks={tasks} labelPool={labelPool} />
+            <DetailsPanel project={currentProject} tasks={tasks} labelPool={availableTags} />
           </section>
         ) : null}
 
@@ -2439,6 +2666,91 @@ return (
                 Pipeline sections are managed from the Board page. Add or remove columns there and they
                 apply across every project on this board.
               </p>
+            </div>
+
+            <div className="panel settings-panel" data-testid="settings-customization">
+              <div className="section-heading">
+                <h2>Customization</h2>
+              </div>
+              <p className="muted-copy">
+                Tailor the tags, game categories, and team roles available across this board. Built-in
+                options are always available; anything you add here can be removed.
+              </p>
+
+              {[
+                {
+                  key: 'tags',
+                  title: 'Task tags',
+                  hint: 'Labels you can attach to tasks.',
+                  options: availableTags,
+                  placeholder: 'Add a tag (e.g. Multiplayer)',
+                },
+                {
+                  key: 'categories',
+                  title: 'Game categories',
+                  hint: 'Genres available when creating or editing a project.',
+                  options: availableCategories,
+                  placeholder: 'Add a category (e.g. Roguelike)',
+                },
+                {
+                  key: 'roles',
+                  title: 'Team roles',
+                  hint: 'Roles you can assign to members on the Team page.',
+                  options: availableRoles,
+                  placeholder: 'Add a role (e.g. Technical Artist)',
+                },
+              ].map((group) => (
+                <div
+                  key={group.key}
+                  className="customization-group"
+                  data-testid={`customization-${group.key}`}
+                >
+                  <div className="customization-group-heading">
+                    <h3>{group.title}</h3>
+                    <p className="muted-copy">{group.hint}</p>
+                  </div>
+                  <div className="customization-chips">
+                    {group.options.map((option) => {
+                      const removable = boardSettings[group.key].includes(option)
+                      return (
+                        <span key={option} className="customization-chip">
+                          {option}
+                          {removable ? (
+                            <button
+                              type="button"
+                              className="customization-chip-remove"
+                              aria-label={`Remove ${option}`}
+                              data-testid={`customization-remove-${group.key}-${option}`}
+                              onClick={() => removeBoardSettingValue(group.key, option)}
+                            >
+                              ✕
+                            </button>
+                          ) : null}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <form
+                    className="team-form"
+                    onSubmit={(event) => {
+                      event.preventDefault()
+                      addBoardSettingValue(group.key, newBoardSetting[group.key])
+                    }}
+                  >
+                    <input
+                      value={newBoardSetting[group.key]}
+                      maxLength={40}
+                      placeholder={group.placeholder}
+                      aria-label={group.placeholder}
+                      data-testid={`customization-input-${group.key}`}
+                      onChange={(e) =>
+                        setNewBoardSetting((current) => ({ ...current, [group.key]: e.target.value }))
+                      }
+                    />
+                    <button type="submit" className="secondary-btn">Add</button>
+                  </form>
+                </div>
+              ))}
             </div>
 
             <div className="panel settings-panel" data-testid="settings-theme">
@@ -2658,9 +2970,26 @@ return (
                   <div key={member} className="member-chip-row">
                     <span className="discipline-pill">{member}</span>
                     {member !== 'Unassigned' && (
-                      <button type="button" className="chip-action" onClick={() => removeTeamMember(member)}>
-                        Remove
-                      </button>
+                      <>
+                        <select
+                          className="member-role-select"
+                          value={memberRoles[member] ?? ''}
+                          aria-label={`Role for ${member}`}
+                          data-testid={`member-role-${member}`}
+                          onChange={(e) => updateMemberRole(member, e.target.value)}
+                        >
+                          <option value="">No role</option>
+                          {(memberRoles[member] && !availableRoles.includes(memberRoles[member])
+                            ? [memberRoles[member], ...availableRoles]
+                            : availableRoles
+                          ).map((role) => (
+                            <option key={role} value={role}>{role}</option>
+                          ))}
+                        </select>
+                        <button type="button" className="chip-action" onClick={() => removeTeamMember(member)}>
+                          Remove
+                        </button>
+                      </>
                     )}
                   </div>
                 ))}
@@ -2845,7 +3174,8 @@ return (
       columns={sections}
       disciplines={disciplines}
       priorities={priorities}
-      labelPool={labelPool}
+      labelPool={availableTags}
+      projects={projects}
       deleteTask={deleteTask}
       addSubtaskToEditing={addSubtaskToEditing}
     />

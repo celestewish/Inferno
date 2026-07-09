@@ -19,6 +19,10 @@ export default function DatePicker({
   className = '',
 }) {
   const [open, setOpen] = useState(false)
+  // 'days' shows the month grid; 'years' shows a year grid so far-future (or
+  // past) due dates are reachable without clicking the month arrow dozens of
+  // times.
+  const [view, setView] = useState('days')
   const rootRef = useRef(null)
 
   const selectedDate = useMemo(() => parseDueDate(value), [value])
@@ -29,9 +33,13 @@ export default function DatePicker({
     () => selectedDate ?? startOfToday()
   )
 
-  // Re-centre the grid on the selected month whenever the picker opens.
+  // Re-centre the grid on the selected month whenever the picker opens, and
+  // always reopen on the day view.
   useEffect(() => {
-    if (open) setMonthCursor(selectedDate ?? startOfToday())
+    if (open) {
+      setMonthCursor(selectedDate ?? startOfToday())
+      setView('days')
+    }
   }, [open, selectedDate])
 
   useEffect(() => {
@@ -72,6 +80,28 @@ export default function DatePicker({
         new Date(current.getFullYear(), current.getMonth() + delta, 1)
     )
 
+  // The 12-year block currently shown in the year view.
+  const YEAR_BLOCK = 12
+  const [yearRangeStart, setYearRangeStart] = useState(
+    () => monthCursor.getFullYear() - (monthCursor.getFullYear() % YEAR_BLOCK)
+  )
+
+  const openYearView = () => {
+    const year = monthCursor.getFullYear()
+    setYearRangeStart(year - (year % YEAR_BLOCK))
+    setView('years')
+  }
+
+  const years = useMemo(
+    () => Array.from({ length: YEAR_BLOCK }, (_, i) => yearRangeStart + i),
+    [yearRangeStart]
+  )
+
+  const selectYear = (year) => {
+    setMonthCursor((current) => new Date(year, current.getMonth(), 1))
+    setView('days')
+  }
+
   const selectDay = (key) => {
     onChange(key)
     setOpen(false)
@@ -107,58 +137,106 @@ export default function DatePicker({
             <button
               type="button"
               className="chip"
-              data-testid="due-date-prev"
-              aria-label="Previous month"
-              onClick={() => goToMonth(-1)}
+              data-testid={view === 'years' ? 'due-year-prev' : 'due-date-prev'}
+              aria-label={view === 'years' ? 'Previous years' : 'Previous month'}
+              onClick={() =>
+                view === 'years'
+                  ? setYearRangeStart((start) => start - YEAR_BLOCK)
+                  : goToMonth(-1)
+              }
             >
               ‹
             </button>
-            <strong>{formatMonthLabel(monthCursor)}</strong>
+            {view === 'years' ? (
+              <strong data-testid="due-year-range">
+                {years[0]}–{years[years.length - 1]}
+              </strong>
+            ) : (
+              <button
+                type="button"
+                className="date-picker-year-btn"
+                data-testid="due-date-year-toggle"
+                aria-label="Choose a year"
+                title="Choose a year"
+                onClick={openYearView}
+              >
+                {formatMonthLabel(monthCursor)}
+              </button>
+            )}
             <button
               type="button"
               className="chip"
-              data-testid="due-date-next"
-              aria-label="Next month"
-              onClick={() => goToMonth(1)}
+              data-testid={view === 'years' ? 'due-year-next' : 'due-date-next'}
+              aria-label={view === 'years' ? 'Next years' : 'Next month'}
+              onClick={() =>
+                view === 'years'
+                  ? setYearRangeStart((start) => start + YEAR_BLOCK)
+                  : goToMonth(1)
+              }
             >
               ›
             </button>
           </div>
 
-          <div className="date-picker-weekdays" aria-hidden="true">
-            {WEEKDAYS.map((weekday) => (
-              <span key={weekday}>{weekday}</span>
-            ))}
-          </div>
-
-          <div className="date-picker-grid" role="grid">
-            {cells.map((cell, index) =>
-              cell ? (
+          {view === 'years' ? (
+            <div className="date-picker-year-grid" role="grid">
+              {years.map((year) => (
                 <button
                   type="button"
-                  key={cell.key}
+                  key={year}
                   className={[
-                    'date-picker-day',
-                    cell.key === selectedKey ? 'selected' : '',
-                    cell.key === todayKey ? 'today' : '',
+                    'date-picker-year',
+                    year === monthCursor.getFullYear() ? 'selected' : '',
+                    year === startOfToday().getFullYear() ? 'today' : '',
                   ]
                     .filter(Boolean)
                     .join(' ')}
-                  data-testid={`due-date-day-${cell.key}`}
-                  aria-pressed={cell.key === selectedKey}
-                  onClick={() => selectDay(cell.key)}
+                  data-testid={`due-date-year-${year}`}
+                  aria-pressed={year === monthCursor.getFullYear()}
+                  onClick={() => selectYear(year)}
                 >
-                  {cell.day}
+                  {year}
                 </button>
-              ) : (
-                <span
-                  key={`blank-${index}`}
-                  className="date-picker-day empty"
-                  aria-hidden="true"
-                />
-              )
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className="date-picker-weekdays" aria-hidden="true">
+                {WEEKDAYS.map((weekday) => (
+                  <span key={weekday}>{weekday}</span>
+                ))}
+              </div>
+
+              <div className="date-picker-grid" role="grid">
+                {cells.map((cell, index) =>
+                  cell ? (
+                    <button
+                      type="button"
+                      key={cell.key}
+                      className={[
+                        'date-picker-day',
+                        cell.key === selectedKey ? 'selected' : '',
+                        cell.key === todayKey ? 'today' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ')}
+                      data-testid={`due-date-day-${cell.key}`}
+                      aria-pressed={cell.key === selectedKey}
+                      onClick={() => selectDay(cell.key)}
+                    >
+                      {cell.day}
+                    </button>
+                  ) : (
+                    <span
+                      key={`blank-${index}`}
+                      className="date-picker-day empty"
+                      aria-hidden="true"
+                    />
+                  )
+                )}
+              </div>
+            </>
+          )}
 
           {onClear ? (
             <div className="date-picker-actions">

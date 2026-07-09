@@ -25,6 +25,8 @@ export default function ProjectSidebar({
   onSelectSection,
   userEmail,
   profile,
+  collapsed = false,
+  onToggleCollapsed,
 }) {
   if (!project) return null
 
@@ -51,10 +53,24 @@ export default function ProjectSidebar({
   )
 
   return (
-    <aside className="sidebar app-nav" aria-label="Primary navigation" data-testid="app-bottom-nav">
+    <aside
+      className={collapsed ? 'sidebar app-nav is-collapsed' : 'sidebar app-nav'}
+      aria-label="Primary navigation"
+      data-testid="app-bottom-nav"
+    >
       <div className="brand">
-        <InfernoLogo size={30} />
-        <div>
+        <button
+          type="button"
+          className="brand-toggle"
+          data-testid="sidebar-toggle"
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => onToggleCollapsed?.()}
+        >
+          <InfernoLogo size={30} />
+        </button>
+        <div className="brand-copy">
           <h2>Inferno</h2>
           <p className="muted-copy">The game design task board</p>
         </div>
