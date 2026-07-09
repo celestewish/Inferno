@@ -12,6 +12,7 @@ import ReportsView from './components/ReportsView'
 import DocsView from './components/DocsView'
 import CodeForgeView from './components/CodeForgeView'
 import WarRoomView from './components/WarRoomView'
+import StudioHomeView from './components/StudioHomeView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -2421,6 +2422,12 @@ const goToCreateTask = () => {
 const goToTeam = () => setActiveSection('team')
 const goToCampfire = () => setActiveSection('campfire')
 
+// Open a task's detail modal by id from anywhere (Studio Home, search, etc.).
+const openTaskById = (taskId) => {
+  const task = tasks.find((t) => t.id === taskId)
+  if (task) setEditingTask(task)
+}
+
 const openLogin = () => {
   setAuthError('')
   setAuthMessage('')
@@ -3800,6 +3807,24 @@ return (
         onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
+        {activeSection === 'home' ? (
+          <StudioHomeView
+            projects={projects}
+            tasks={tasks}
+            messages={messages}
+            docs={docs}
+            repos={repos}
+            meetingNotes={meetingNotes}
+            focusTasks={focusTasks}
+            focusProgress={focusProgress}
+            completedById={focusCompletedById}
+            profiles={profiles}
+            displayName={myProfile?.display_name?.trim() || ''}
+            onSelectSection={handleSelectSection}
+            onOpenTask={openTaskById}
+          />
+        ) : null}
+
         {activeSection === 'board' ? (
           showOnboarding ? (
             <OnboardingGuide

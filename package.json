@@ -13,6 +13,7 @@
     "test:docs": "node scripts/docs-sanity.mjs",
     "test:codeforge": "node scripts/codeforge-sanity.mjs",
     "test:warroom": "node scripts/warroom-sanity.mjs",
+    "test:studio": "node scripts/studio-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
