@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
-import { supabase, formatSupabaseError, isMissingColumnError } from './lib/supabase'
+import { supabase, formatSupabaseError, isMissingColumnError, isMissingTableError, isAccessError } from './lib/supabase'
 import ProjectSidebar from './components/ProjectSidebar'
 import ProjectHeader from './components/ProjectHeader'
 import TaskBoard from './components/TaskBoard'
@@ -434,6 +434,7 @@ function App() {
   const [savingChannel, setSavingChannel] = useState(false)
   const [docs, setDocs] = useState([])
   const [docsMigrationMissing, setDocsMigrationMissing] = useState(false)
+  const [docsAccessError, setDocsAccessError] = useState(false)
   const [repos, setRepos] = useState([])
   const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
   const [meetingNotes, setMeetingNotes] = useState([])
@@ -898,7 +899,8 @@ setCurrentProjectId((currentId) =>
   setLoading(false)
   setMessages(loadedMessages)
   setCustomChannels(channelData?.length ? channelData.map(dbToChannel) : [])
-  setDocsMigrationMissing(Boolean(docError))
+  setDocsMigrationMissing(isMissingTableError(docError) || isMissingColumnError(docError))
+  setDocsAccessError(isAccessError(docError))
   setDocs(docData?.length ? docData.map(dbToDoc) : [])
   setReposMigrationMissing(Boolean(repoError))
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
@@ -4595,6 +4597,7 @@ return (
             onUpdateDoc={updateDoc}
             onArchiveDoc={archiveDoc}
             migrationMissing={docsMigrationMissing}
+            accessError={docsAccessError}
           />
         ) : null}
 

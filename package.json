@@ -20,6 +20,7 @@
     "test:templates": "node scripts/templates-sanity.mjs",
     "test:recap": "node scripts/recap-sanity.mjs",
     "test:portfolio": "node scripts/portfolio-sanity.mjs",
+    "test:dberrors": "node scripts/supabase-errors-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
