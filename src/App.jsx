@@ -13,6 +13,7 @@ import DocsView from './components/DocsView'
 import CodeForgeView from './components/CodeForgeView'
 import WarRoomView from './components/WarRoomView'
 import StudioHomeView from './components/StudioHomeView'
+import NotificationsView from './components/NotificationsView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -83,6 +84,7 @@ import {
 import { validateDocInput } from './lib/docs'
 import { validateRepoInput } from './lib/codeforge'
 import { validateMeetingNote } from './lib/warroom'
+import { buildNotifications, applyReadState, unreadCount as countUnread, allKeys } from './lib/notifications'
 
 const emptyTaskForm = {
   title: '',
@@ -430,6 +432,9 @@ function App() {
   const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
   const [meetingNotes, setMeetingNotes] = useState([])
   const [meetingNotesMigrationMissing, setMeetingNotesMigrationMissing] = useState(false)
+  const [notificationReads, setNotificationReads] = useState(() => new Set())
+  const [notificationsMigrationMissing, setNotificationsMigrationMissing] = useState(false)
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -554,6 +559,8 @@ useEffect(() => {
       setReposMigrationMissing(false)
       setMeetingNotes([])
       setMeetingNotesMigrationMissing(false)
+      setNotificationReads(new Set())
+      setNotificationsMigrationMissing(false)
     }
   })
 
@@ -734,6 +741,8 @@ setCurrentBoardId(activeBoardId)
         setReposMigrationMissing(false)
         setMeetingNotes([])
         setMeetingNotesMigrationMissing(false)
+        setNotificationReads(new Set())
+        setNotificationsMigrationMissing(false)
   return
 }
 
@@ -748,6 +757,7 @@ setCurrentBoardId(activeBoardId)
   { data: docData, error: docError },
   { data: repoData, error: repoError },
   { data: meetingData, error: meetingError },
+  { data: notifReadData, error: notifReadError },
 ] = await Promise.all([
   supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
   supabase
@@ -801,6 +811,14 @@ setCurrentBoardId(activeBoardId)
     .eq('board_id', activeBoardId)
     .is('archived_at', null)
     .order('created_at', { ascending: false }),
+  // Notifications center read state; resolves with an error if the migration is
+  // not yet pushed, in which case the feed still renders but "read" does not
+  // persist across reloads (a non-blocking note is shown).
+  supabase
+    .from('notification_reads')
+    .select('notification_key')
+    .eq('board_id', activeBoardId)
+    .eq('user_id', userId),
 ])
 
 
@@ -856,6 +874,8 @@ setCurrentProjectId((currentId) =>
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
   setMeetingNotesMigrationMissing(Boolean(meetingError))
   setMeetingNotes(meetingData?.length ? meetingData.map(dbToMeetingNote) : [])
+  setNotificationsMigrationMissing(Boolean(notifReadError))
+  setNotificationReads(new Set((notifReadData ?? []).map((row) => row.notification_key)))
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
@@ -1584,6 +1604,23 @@ function dbToInvite(row) {
   const focusCandidates = currentProject
     ? tasks.filter((task) => task.projectId === currentProject.id && !task.completed)
     : []
+
+  // Notifications center feed: derived deterministically from board data, then
+  // annotated with per-user read state loaded from notification_reads.
+  const notifications = useMemo(() => {
+    const feed = buildNotifications({
+      projects,
+      meetingNotes,
+      messages,
+      boardMembers,
+      profiles,
+      invites,
+      dailyFocusClaimed: Boolean(dailyFocusActive?.claimed),
+      dailyFocusDate: dailyFocusActive ? todayKey : '',
+    })
+    return applyReadState(feed, notificationReads)
+  }, [projects, meetingNotes, messages, boardMembers, profiles, invites, dailyFocusActive, todayKey, notificationReads])
+  const unreadNotifications = countUnread(notifications)
   const momentumStreak = gamification?.settings?.momentum_streak ?? null
   const todayLabel = new Date().toLocaleDateString(undefined, {
     weekday: 'short',
@@ -2426,6 +2463,51 @@ const goToCampfire = () => setActiveSection('campfire')
 const openTaskById = (taskId) => {
   const task = tasks.find((t) => t.id === taskId)
   if (task) setEditingTask(task)
+}
+
+// Persist a single notification as read. Optimistically updates local state so
+// the badge/list respond immediately; a missing migration is non-fatal (the
+// note in NotificationsView explains read state will not survive a reload).
+const markNotificationRead = async (key) => {
+  if (!key) return
+  const userId = session?.user?.id
+  if (!userId || !currentBoardId) return
+  setNotificationReads((prev) => new Set(prev).add(key))
+  const { error } = await supabase
+    .from('notification_reads')
+    .upsert(
+      { board_id: currentBoardId, user_id: userId, notification_key: key },
+      { onConflict: 'board_id,user_id,notification_key' }
+    )
+  if (error) {
+    console.error('Mark notification read error:', formatSupabaseError(error), error)
+    setNotificationsMigrationMissing(true)
+  }
+}
+
+// Persist every notification currently in the feed as read.
+const markAllNotificationsRead = async () => {
+  const userId = session?.user?.id
+  if (!userId || !currentBoardId) return
+  const keys = allKeys(notifications)
+  if (!keys.length) return
+  setNotificationReads((prev) => {
+    const next = new Set(prev)
+    for (const key of keys) next.add(key)
+    return next
+  })
+  const rows = keys.map((key) => ({
+    board_id: currentBoardId,
+    user_id: userId,
+    notification_key: key,
+  }))
+  const { error } = await supabase
+    .from('notification_reads')
+    .upsert(rows, { onConflict: 'board_id,user_id,notification_key' })
+  if (error) {
+    console.error('Mark all notifications read error:', formatSupabaseError(error), error)
+    setNotificationsMigrationMissing(true)
+  }
 }
 
 const openLogin = () => {
@@ -3805,6 +3887,8 @@ return (
         profile={myProfile}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={() => setSidebarCollapsed((current) => !current)}
+        unreadCount={unreadNotifications}
+        onOpenSearch={() => setCommandPaletteOpen(true)}
       />
       <main className="board-area" data-testid={`view-${activeSection}`}>
         {activeSection === 'home' ? (
@@ -3822,6 +3906,16 @@ return (
             displayName={myProfile?.display_name?.trim() || ''}
             onSelectSection={handleSelectSection}
             onOpenTask={openTaskById}
+          />
+        ) : null}
+
+        {activeSection === 'notifications' ? (
+          <NotificationsView
+            notifications={notifications}
+            unread={unreadNotifications}
+            migrationMissing={notificationsMigrationMissing}
+            onMarkRead={markNotificationRead}
+            onMarkAllRead={markAllNotificationsRead}
           />
         ) : null}
 
