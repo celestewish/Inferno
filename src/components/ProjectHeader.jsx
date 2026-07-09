@@ -8,6 +8,11 @@ export default function ProjectHeader({
   deleteProject,
 }) {
   if (!project) return null
+  // Keep the project's own category selectable even if it was later removed
+  // from the board's custom list, so the select never renders blank.
+  const categoryOptions = project.category && !gameCategories.includes(project.category)
+    ? [project.category, ...gameCategories]
+    : gameCategories
   return (
     <section className="hero-panel panel">
       <div className="hero-copy">
@@ -31,7 +36,7 @@ export default function ProjectHeader({
             value={project.category}
             onChange={(e) => updateProjectField('category', e.target.value)}
           >
-            {gameCategories.map((item) => (
+            {categoryOptions.map((item) => (
               <option key={item}>{item}</option>
             ))}
           </select>

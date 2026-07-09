@@ -218,10 +218,12 @@ h1 { font-size: clamp(2rem, 4vw, 3.2rem); line-height: 1; margin-bottom: 0.8rem;
 .panel { background: color-mix(in srgb, var(--surface-custom) 90%, white 4%); border: 1px solid var(--card-border); border-radius: var(--radius-xl); padding: 1.4rem; box-shadow: var(--shadow-panel); animation: riseIn 320ms ease; }
 
 /* ── Stats ── */
-.stats-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; min-width: 0; }
-.stats-panel > div { min-width: 0; overflow: hidden; text-align: center; }
+.stats-panel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; min-width: 0; align-items: start; }
+.stats-panel > div { min-width: 0; text-align: center; }
 .stats-panel span { display: block; font-size: 1.7rem; font-weight: 700; }
-.stats-panel p { margin-top: 0.35rem; color: #98a4d3; font-size: 0.9rem; }
+/* Let the label wrap instead of being clipped — "Tasks completed" was losing
+   its final letters inside the fixed three-column grid. */
+.stats-panel p { margin-top: 0.35rem; color: #98a4d3; font-size: 0.85rem; line-height: 1.25; overflow-wrap: anywhere; hyphens: auto; }
 
 /* ── Project list ── */
 .project-list, .member-list, .activity-list, .column-cards { display: grid; gap: 0.85rem; }
@@ -567,7 +569,8 @@ textarea:hover {
 .modal-form { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 0.25rem; }
 .modal-description { min-height: 8.5rem; line-height: 1.5; resize: vertical; }
 .checkbox-row { display: flex; align-items: center; gap: 0.75rem; color: #d7dfff; }
-.member-chip-row { padding: 0.25rem 0; }
+.member-chip-row { padding: 0.25rem 0; flex-wrap: wrap; }
+.member-chip-row .discipline-pill { margin-right: auto; }
 
 /* ── Animations ── */
 @keyframes riseIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
@@ -597,6 +600,34 @@ textarea:hover {
 
 /* ── App nav (desktop left rail) ── */
 .app-nav .brand { padding-bottom: 0.25rem; }
+
+/* Logo doubles as the sidebar collapse toggle. */
+.brand-toggle {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  line-height: 0;
+}
+.brand-toggle:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--card-border)); }
+
+/* Desktop-only collapse: narrow the sidebar to an icon rail. The logo stays
+   clickable to expand again. Mobile keeps its bottom-bar layout untouched. */
+@media (min-width: 901px) {
+  .app-shell.sidebar-collapsed { --sidebar-width: 76px; }
+  .sidebar.app-nav.is-collapsed { padding: 1.5rem 0.75rem; align-items: stretch; }
+  .sidebar.app-nav.is-collapsed .brand { justify-content: center; }
+  .sidebar.app-nav.is-collapsed .brand-copy,
+  .sidebar.app-nav.is-collapsed .app-nav-heading,
+  .sidebar.app-nav.is-collapsed .app-nav-label,
+  .sidebar.app-nav.is-collapsed .stats-panel,
+  .sidebar.app-nav.is-collapsed .project-switcher,
+  .sidebar.app-nav.is-collapsed .app-nav-account { display: none; }
+  .sidebar.app-nav.is-collapsed .app-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+}
 
 .app-nav-menu {
   display: grid;
@@ -1601,6 +1632,35 @@ textarea:hover {
 /* Settings view */
 .settings-panel { display: grid; gap: 0.9rem; justify-items: start; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+
+/* ── Board customization (tags / categories / roles) ── */
+.customization-group { display: grid; gap: 0.6rem; width: 100%; padding-top: 0.6rem; border-top: 1px solid var(--card-border); }
+.customization-group:first-of-type { border-top: none; padding-top: 0; }
+.customization-group-heading h3 { margin: 0; font-size: 1rem; }
+.customization-group-heading p { margin-top: 0.15rem; font-size: 0.85rem; }
+.customization-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.customization-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7cff2;
+  font-size: 0.85rem;
+}
+.customization-chip-remove {
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  padding: 0;
+  line-height: 1;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.customization-chip-remove:hover { color: var(--ember, #ff8a5b); }
+.member-role-select { max-width: 12rem; }
 .settings-panel .theme-panel-body { display: grid; gap: 0.6rem; width: 100%; }
 .settings-list { display: grid; gap: 0.6rem; width: 100%; margin: 0; }
 .settings-list > div {
@@ -1960,4 +2020,37 @@ textarea:hover {
   display: flex;
   justify-content: flex-end;
   margin-top: 0.6rem;
+}
+.date-picker-year-btn {
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-main);
+  font: inherit;
+  font-weight: 700;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-sm, 8px);
+  cursor: pointer;
+}
+.date-picker-year-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--card-border)); }
+.date-picker-year-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+}
+.date-picker-year {
+  padding: 0.55rem 0.25rem;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-main);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.date-picker-year:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--card-border)); }
+.date-picker-year.today { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent-secondary) 60%, transparent); }
+.date-picker-year.selected {
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+  color: white;
+  font-weight: 700;
 }

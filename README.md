@@ -119,6 +119,12 @@ Current migrations:
   means "hint not yet dismissed". The existing update RLS policy already covers
   it, so no policy change is needed. If the migration has not been applied, the
   hint is simply hidden rather than repeatedly shown.
+- `20260714000000_add_board_settings_and_member_role.sql` — adds a `settings`
+  `jsonb` column to `boards` (defaulted to `{}`) that stores per-board custom
+  **task tags**, **game categories**, and **team roles**, plus a nullable
+  `role` `text` column to `team_members` for each member's assigned role. Both
+  are non-destructive: if the migration has not been applied, the app falls back
+  to the built-in defaults and simply cannot persist new customizations.
 
 > **"Your profile database is missing the new profile columns."**
 > This message in **Settings → Profile** means the profile columns are absent
