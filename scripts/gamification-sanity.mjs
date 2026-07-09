@@ -31,6 +31,14 @@ import {
   shouldAwardBossReward,
   markBossClaimed,
   getBossRewardXp,
+  BOSS_MIN_TASKS,
+  BOSS_MAX_TASKS,
+  BOSS_XP_MIN,
+  BOSS_XP_MAX,
+  taskXpValue,
+  computeBossRewardXp,
+  pickBossTasks,
+  generateBossFight,
 } from '../src/lib/gamification.js'
 
 let failures = 0
@@ -217,6 +225,69 @@ const reclaimed = markBossClaimed(claimed, '2026-07-10T00:00:00.000Z')
 assert(reclaimed.defeated_at === '2026-07-09T12:00:00.000Z', 'markBossClaimed keeps the original defeated_at')
 // reopening a task after a claim must not revoke the reward
 assert(shouldAwardBossReward(claimed, { t1: true, t2: false, t3: true }) === false, 'reopening a task after defeat does not re-trigger an award')
+
+// ── Boss generation (deterministic via injected rng) ──
+const rngLo = () => 0            // always the band/count minimum
+const rngHi = () => 0.9999999    // always the band/count maximum
+
+assert(BOSS_MIN_TASKS === 2 && BOSS_MAX_TASKS === 4, 'boss rolls 2 to 4 weak points')
+assert(BOSS_XP_MIN === 25 && BOSS_XP_MAX === 120, 'boss reward is clamped to 25..120')
+
+// per-task XP bands
+assert(taskXpValue({ priority: 'Low' }, rngLo) === 8, 'low task floors at 8 XP')
+assert(taskXpValue({ priority: 'low' }, rngHi) === 12, 'low task caps at 12 XP')
+assert(taskXpValue({ priority: 'high' }, rngLo) === 18, 'high task floors at 18 XP')
+assert(taskXpValue({ priority: 'high' }, rngHi) === 28, 'high task caps at 28 XP')
+assert(taskXpValue({ priority: 'critical' }, rngLo) === 25, 'critical task floors at 25 XP')
+assert(taskXpValue({ priority: 'urgent' }, rngHi) === 40, 'urgent task caps at 40 XP')
+assert(taskXpValue({ priority: 'mystery' }, rngLo) === 12, 'unknown priority uses the medium band')
+assert(taskXpValue({ priority: 'low', estimate: '6 pt' }, rngLo) === 11, 'estimate adds a small bonus')
+assert(taskXpValue({ priority: 'low', estimate: '40' }, rngLo) === 14, 'estimate bonus is capped at 6')
+assert(taskXpValue({ priority: 'low', estimate: '2 pt' }, rngLo) === 8, 'short estimates add no bonus')
+
+// reward totals + clamping
+assert(computeBossRewardXp([{ priority: 'low' }], rngLo) === BOSS_XP_MIN, 'tiny reward clamps up to 25')
+assert(
+  computeBossRewardXp(
+    [{ priority: 'critical' }, { priority: 'critical' }, { priority: 'critical' }, { priority: 'critical' }],
+    rngHi,
+  ) === BOSS_XP_MAX,
+  'huge reward clamps down to 120',
+)
+assert(
+  computeBossRewardXp([{ priority: 'medium' }, { priority: 'medium' }, { priority: 'medium' }], rngLo) === 41,
+  'three medium tasks = 36 + 5 encounter bonus',
+)
+assert(computeBossRewardXp([], rngLo) === BOSS_XP_MIN, 'empty task list still clamps to 25')
+
+// weak-point selection prefers incomplete, clamps to availability
+const pool5 = [
+  { id: 't1', priority: 'medium' },
+  { id: 't2', priority: 'medium' },
+  { id: 't3', priority: 'medium' },
+  { id: 't4', priority: 'medium', completed: true },
+  { id: 't5', priority: 'medium', completed: true },
+]
+const picked = pickBossTasks(pool5, rngLo)
+assert(picked.length === 2, 'rng floor picks the minimum of 2 weak points')
+assert(picked.every((task) => !task.completed), 'picked weak points are all incomplete when possible')
+assert(pickBossTasks(pool5, rngHi).length === 3, 'rng ceiling clamps to the 3 incomplete tasks')
+assert(pickBossTasks([{ id: 'c1', completed: true }, { id: 'c2', completed: true }], rngLo).length === 2, 'falls back to completed tasks when none are open')
+assert(pickBossTasks([{ id: 'only', completed: false }], rngLo).length === 1, 'a single eligible task yields one weak point')
+assert(pickBossTasks([], rngLo).length === 0, 'no tasks yields no weak points')
+
+// full generation stores stable weak points + reward
+const genTasks = [
+  { id: 'g1', priority: 'medium' },
+  { id: 'g2', priority: 'medium' },
+  { id: 'g3', priority: 'medium' },
+]
+const generated = generateBossFight({ name: '  Ghoul  ', phase: 'M2', projectId: 'p9', tasks: genTasks }, rngLo, '2026-07-09T00:00:00.000Z')
+assert(generated.name === 'Ghoul' && generated.phase === 'M2' && generated.project_id === 'p9', 'generateBossFight carries name/phase/project')
+assert(generated.task_ids.length === 2, 'generateBossFight rolls weak points (2 at rng floor)')
+assert(generated.reward_xp === BOSS_XP_MIN, 'generateBossFight stores the computed reward (24 clamps to 25)')
+assert(generated.claimed === false && generated.defeated_at === null, 'generated boss starts unclaimed')
+assert(generateBossFight({ name: 'Empty', tasks: [] }, rngLo) === null, 'generateBossFight returns null with no eligible tasks')
 
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)

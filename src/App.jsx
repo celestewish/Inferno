@@ -50,12 +50,13 @@ import {
   shouldAwardDailyFocus,
   awardDailyFocusCompletion,
   updateMomentumStreak,
-  DEFAULT_BOSS_REWARD_XP,
   createBossFight,
   getBossProgress,
   shouldAwardBossReward,
   markBossClaimed,
   getBossRewardXp,
+  pickBossTasks,
+  computeBossRewardXp,
 } from './lib/gamification'
 
 const emptyTaskForm = {
@@ -422,9 +423,10 @@ function App() {
   // Daily Focus Quests: the picker modal + its in-flight selection draft.
   const [focusPickerOpen, setFocusPickerOpen] = useState(false)
   const [focusDraft, setFocusDraft] = useState([])
-  // Milestone Boss Fights: the create/edit modal + its in-flight draft.
+  // Milestone Boss Fights: the create/edit modal + its in-flight draft. Weak
+  // points (taskIds) and rewardXp are rolled by Inferno, not chosen by the user.
   const [bossModalOpen, setBossModalOpen] = useState(false)
-  const [bossDraft, setBossDraft] = useState({ id: null, name: '', phase: '', taskIds: [], rewardXp: DEFAULT_BOSS_REWARD_XP })
+  const [bossDraft, setBossDraft] = useState({ id: null, name: '', phase: '', taskIds: [], rewardXp: 0, defeated: false })
   // Mirror the latest gamification snapshot in a ref so the awarding engine can
   // read current XP/badges without stale closures and without re-creating its
   // callbacks on every progress change.
@@ -1751,50 +1753,67 @@ function dbToInvite(row) {
       })
   }
 
+  // Inferno rolls the weak points and reward; the player never hand-picks them,
+  // so a boss can't be stacked with easy tasks for a big payout.
+  const rollBossDraft = () => {
+    const chosen = pickBossTasks(bossTaskCandidates, Math.random)
+    return {
+      taskIds: chosen.map((task) => task.id),
+      rewardXp: chosen.length ? computeBossRewardXp(chosen, Math.random) : 0,
+    }
+  }
+
   const openBossCreator = () => {
-    setBossDraft({ id: null, name: '', phase: '', taskIds: [], rewardXp: DEFAULT_BOSS_REWARD_XP })
+    const rolled = rollBossDraft()
+    setBossDraft({ id: null, name: '', phase: '', ...rolled, defeated: false })
     setBossModalOpen(true)
   }
 
   const openBossEditor = (boss) => {
+    const progress = getBossProgress(boss, focusCompletedById)
     setBossDraft({
       id: boss.id,
       name: boss.name ?? '',
       phase: boss.phase ?? '',
       taskIds: Array.isArray(boss.task_ids) ? [...boss.task_ids] : [],
       rewardXp: getBossRewardXp(boss),
+      defeated: Boolean(boss.claimed) || progress.defeated,
     })
     setBossModalOpen(true)
   }
 
-  const toggleBossDraftTask = (id) => {
+  // Regenerate weak points + reward for the current draft. Blocked once a boss is
+  // defeated so a claimed reward can never be re-rolled into a fresh payout.
+  const rerollBossDraft = () => {
     setBossDraft((current) => {
-      const taskIds = current.taskIds.includes(id)
-        ? current.taskIds.filter((value) => value !== id)
-        : [...current.taskIds, id]
-      return { ...current, taskIds }
+      if (current.defeated) return current
+      return { ...current, ...rollBossDraft() }
     })
   }
 
   const saveBossFight = () => {
     if (!currentProject) return
     const name = bossDraft.name.trim()
-    // A boss must have a name and at least one linked task, or it can never be
-    // fought or defeated.
+    // A boss must have a name and at least one rolled weak point, or it can never
+    // be fought or defeated.
     if (!name || bossDraft.taskIds.length === 0) return
     const existing = Array.isArray(currentProject.bossFights) ? currentProject.bossFights : []
     let nextBosses
     if (bossDraft.id) {
-      // Editing preserves claimed/defeated_at/created_at so a defeated boss can
-      // never be farmed by re-saving it.
+      // Editing preserves claimed/defeated_at/created_at. A defeated boss only
+      // updates its label so a claimed reward can never be farmed by re-saving.
       nextBosses = existing.map((boss) =>
         boss.id === bossDraft.id
           ? {
               ...boss,
               name,
               phase: bossDraft.phase.trim(),
-              task_ids: [...new Set(bossDraft.taskIds)],
-              reward_xp: getBossRewardXp({ reward_xp: bossDraft.rewardXp }),
+              ...(bossDraft.defeated
+                ? {}
+                : {
+                    task_ids: [...new Set(bossDraft.taskIds)],
+                    reward_xp: getBossRewardXp({ reward_xp: bossDraft.rewardXp }),
+                  }),
             }
           : boss,
       )
@@ -2963,7 +2982,7 @@ return (
           <div className="focus-modal-head">
             <h3>{bossDraft.id ? 'Edit Boss Fight' : 'Create Boss Fight'}</h3>
           </div>
-          <p className="muted-copy">Link tasks to weaken this boss. Defeat it by completing them all.</p>
+          <p className="muted-copy">Inferno rolls the weak points and reward. Name your boss and set its phase.</p>
 
           <label className="boss-field">
             <span className="boss-field-label">Boss name</span>
@@ -2987,50 +3006,59 @@ return (
               onChange={(event) => setBossDraft((current) => ({ ...current, phase: event.target.value }))}
             />
           </label>
-          <label className="boss-field">
-            <span className="boss-field-label">Reward XP</span>
-            <input
-              type="number"
-              min={1}
-              value={bossDraft.rewardXp}
-              data-testid="boss-reward-input"
-              onChange={(event) =>
-                setBossDraft((current) => ({ ...current, rewardXp: Number(event.target.value) }))
-              }
-            />
-          </label>
 
-          <div className="boss-field-label boss-tasks-label">
-            Weak Points ({bossDraft.taskIds.length} linked)
+          <div className="boss-reward-panel" data-testid="boss-reward-preview">
+            <span className="boss-field-label">Boss Reward</span>
+            <span className="boss-reward-value">+{bossDraft.rewardXp} XP</span>
+            <span className="boss-reward-note muted-copy">Reward generated from task difficulty.</span>
+          </div>
+
+          <div className="boss-weak-head">
+            <div className="boss-field-label boss-tasks-label">
+              Weak Points ({bossDraft.taskIds.length})
+            </div>
+            {!bossDraft.defeated ? (
+              <button
+                type="button"
+                className="secondary-btn boss-reroll-btn"
+                data-testid="boss-reroll"
+                disabled={bossTaskCandidates.length === 0}
+                onClick={rerollBossDraft}
+              >
+                Reroll
+              </button>
+            ) : null}
           </div>
           {bossTaskCandidates.length === 0 ? (
             <p className="focus-modal-empty muted-copy" data-testid="boss-modal-empty">
-              No tasks in this project yet. Create a task, then link it to a boss.
+              No tasks in this project yet. Create a task, then generate a boss.
+            </p>
+          ) : bossDraft.taskIds.length === 0 ? (
+            <p className="focus-modal-empty muted-copy" data-testid="boss-modal-empty">
+              No weak points rolled. Try Reroll.
             </p>
           ) : (
-            <ul className="focus-modal-list">
-              {bossTaskCandidates.map((task) => {
-                const selected = bossDraft.taskIds.includes(task.id)
-                return (
-                  <li key={task.id}>
-                    <label className="focus-option">
-                      <input
-                        type="checkbox"
-                        checked={selected}
-                        onChange={() => toggleBossDraftTask(task.id)}
-                        data-testid="boss-option"
-                      />
-                      <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
-                        {task.discipline || 'Task'}
-                      </span>
-                      <span className={task.completed ? 'focus-option-title is-done' : 'focus-option-title'}>
-                        {task.title}
-                      </span>
-                    </label>
-                  </li>
-                )
-              })}
-            </ul>
+            <>
+              <p className="boss-weak-hint muted-copy">Inferno rolled these weak points for your boss.</p>
+              <ul className="focus-modal-list">
+                {bossDraft.taskIds.map((taskId) => {
+                  const task = bossTaskCandidates.find((candidate) => candidate.id === taskId)
+                  if (!task) return null
+                  return (
+                    <li key={taskId}>
+                      <div className="focus-option boss-weak-preview" data-testid="boss-weak-point">
+                        <span className={`tour-tag tour-tag--${String(task.discipline || '').toLowerCase()}`}>
+                          {task.discipline || 'Task'}
+                        </span>
+                        <span className={task.completed ? 'focus-option-title is-done' : 'focus-option-title'}>
+                          {task.title}
+                        </span>
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </>
           )}
 
           <div className="focus-modal-actions">
@@ -3044,7 +3072,7 @@ return (
               disabled={!bossDraft.name.trim() || bossDraft.taskIds.length === 0}
               onClick={saveBossFight}
             >
-              {bossDraft.id ? 'Save Boss' : 'Create Boss'}
+              {bossDraft.id ? 'Save Boss' : 'Generate Boss Fight'}
             </button>
           </div>
         </div>
@@ -3217,15 +3245,15 @@ return (
                 data-testid="boss-create"
                 onClick={openBossCreator}
               >
-                Create Boss Fight
+                Generate Boss Fight
               </button>
             </div>
 
             {projectBosses.length === 0 ? (
               <p className="boss-empty muted-copy" data-testid="boss-empty">
-                Turn a milestone into a boss. Link tasks to weaken this boss and
+                Turn a milestone into a boss. Inferno rolls its weak points and
                 {' '}
-                defeat it for a +{DEFAULT_BOSS_REWARD_XP} XP bonus.
+                reward, then defeat it for a bonus.
               </p>
             ) : (
               <ul className="boss-list" data-testid="boss-list">

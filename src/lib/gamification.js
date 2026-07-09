@@ -344,7 +344,7 @@ export function updateMomentumStreak(settings, todayKey = getTodayKey()) {
 
 // Each linked task is worth this much boss HP. maxHp = task_ids.length * 25.
 export const BOSS_HP_PER_TASK = 25
-// Default reward when the creator does not set a custom value.
+// Fallback reward if a boss somehow has no generated reward stored.
 export const DEFAULT_BOSS_REWARD_XP = 50
 
 // Best-effort unique id that works in the browser and in the Node test runner.
@@ -426,4 +426,109 @@ export function shouldAwardBossReward(boss, completedById = {}) {
 export function markBossClaimed(boss, defeatedAt = new Date().toISOString()) {
   if (!boss || typeof boss !== 'object') return boss
   return { ...boss, claimed: true, defeated_at: boss.defeated_at ?? defeatedAt }
+}
+
+// ── Boss generation (weak points + reward) ──
+// Weak points and reward XP are rolled by Inferno rather than chosen by the
+// player, so a boss can't be stacked with trivial tasks for a huge payout. All
+// randomness flows through an injectable `rng` (defaults to Math.random) so the
+// generation is deterministic under test.
+
+// How many weak points a boss rolls, clamped to the eligible task count.
+export const BOSS_MIN_TASKS = 2
+export const BOSS_MAX_TASKS = 4
+// Total reward is clamped to this range so a boss is always worth it but never
+// farmable into the stratosphere.
+export const BOSS_XP_MIN = 25
+export const BOSS_XP_MAX = 120
+
+// XP band [min, max] per task, keyed by priority. Unknown priorities fall back
+// to the medium band.
+const TASK_XP_BANDS = {
+  low: [8, 12],
+  medium: [12, 18],
+  normal: [12, 18],
+  high: [18, 28],
+  critical: [25, 40],
+  urgent: [25, 40],
+}
+
+function normalizeRng(rng) {
+  return typeof rng === 'function' ? rng : Math.random
+}
+
+// Integer in [min, max] inclusive, driven by `rng` (a 0..1 source).
+function randInt(rng, min, max) {
+  if (max <= min) return min
+  const raw = normalizeRng(rng)()
+  const safe = raw >= 1 ? 0.9999999 : raw < 0 ? 0 : raw
+  return min + Math.floor(safe * (max - min + 1))
+}
+
+function shuffle(list, rng) {
+  const arr = [...list]
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = randInt(rng, 0, i)
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr
+}
+
+// XP a single task contributes, based on its priority band plus a small bonus
+// for a longer parseable estimate (e.g. "3 pt"). Randomized within the band.
+export function taskXpValue(task, rng = Math.random) {
+  const priority = String(task?.priority ?? '').toLowerCase().trim()
+  const band = TASK_XP_BANDS[priority] ?? TASK_XP_BANDS.medium
+  let value = randInt(rng, band[0], band[1])
+  const estimate = parseInt(String(task?.estimate ?? ''), 10)
+  if (Number.isFinite(estimate) && estimate >= 3) {
+    value += Math.min(6, Math.floor(estimate / 2))
+  }
+  return value
+}
+
+// Total boss reward from its linked tasks: the sum of per-task values plus a
+// small bonus for larger encounters, clamped to [BOSS_XP_MIN, BOSS_XP_MAX].
+export function computeBossRewardXp(tasks, rng = Math.random) {
+  const list = Array.isArray(tasks) ? tasks.filter(Boolean) : []
+  if (list.length === 0) return BOSS_XP_MIN
+  let total = list.reduce((sum, task) => sum + taskXpValue(task, rng), 0)
+  if (list.length >= 3) total += 5
+  if (list.length >= 4) total += 5
+  return Math.max(BOSS_XP_MIN, Math.min(BOSS_XP_MAX, total))
+}
+
+// Randomly choose 2 to 4 weak-point tasks (clamped to what's available),
+// preferring incomplete tasks. Falls back to any tasks if none are incomplete,
+// and returns a single task when only one is eligible. Never returns more than
+// exist; returns [] only when there are no tasks at all.
+export function pickBossTasks(tasks, rng = Math.random) {
+  const list = Array.isArray(tasks) ? tasks.filter(Boolean) : []
+  if (list.length === 0) return []
+  const incomplete = list.filter((task) => !task.completed)
+  const pool = incomplete.length > 0 ? incomplete : list
+  const minCount = Math.min(BOSS_MIN_TASKS, pool.length)
+  const maxCount = Math.min(BOSS_MAX_TASKS, pool.length)
+  const count = randInt(rng, minCount, maxCount)
+  return shuffle(pool, rng).slice(0, count)
+}
+
+// Roll a full boss: pick weak points, compute the reward from those tasks, and
+// build the record. The generated reward is stored on the boss so it stays
+// stable after creation. Returns null when there are no eligible tasks.
+export function generateBossFight(input = {}, rng = Math.random, createdAt = new Date().toISOString()) {
+  const chosen = pickBossTasks(input.tasks, rng)
+  if (chosen.length === 0) return null
+  const rewardXp = computeBossRewardXp(chosen, rng)
+  return createBossFight(
+    {
+      id: input.id,
+      name: input.name,
+      phase: input.phase,
+      projectId: input.projectId ?? input.project_id,
+      taskIds: chosen.map((task) => task.id),
+      rewardXp,
+    },
+    createdAt,
+  )
 }

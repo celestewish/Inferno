@@ -3522,6 +3522,32 @@ textarea:hover {
 .boss-tasks-label { margin-top: 0.2rem; }
 .focus-option-title.is-done { text-decoration: line-through; opacity: 0.7; }
 
+/* Generated reward + weak-point preview in the boss modal */
+.boss-reward-panel {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.boss-reward-value {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.95rem;
+  color: var(--ember);
+}
+.boss-reward-note { font-size: 0.78rem; }
+.boss-weak-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+}
+.boss-reroll-btn { padding: 0.3rem 0.75rem; font-size: 0.78rem; }
+.boss-weak-hint { margin: 0 0 0.2rem; font-size: 0.78rem; }
+.boss-weak-preview { cursor: default; }
+
 /* Non-blocking error toast (e.g. a failed boss save) */
 .celebration-error { border-color: color-mix(in srgb, #ff5b5b 55%, var(--card-border)); }
 .celebration-error .celebration-title { color: #ff8a8a; }
