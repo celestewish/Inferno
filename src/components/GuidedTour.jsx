@@ -592,7 +592,11 @@ export default function GuidedTour({ openSignup }) {
             <FlameHorse size={44} />
           </span>
           <div className="tour-win-copy">
-            <p>Jam build shipped. That is a full lap around Inferno, from empty board to final polish.</p>
+            <p className="tour-win-badge" data-testid="tour-win-badge">
+              <span className="tour-win-badge-icon" aria-hidden="true">&#128293;</span>
+              Badge preview: Jam Survivor
+            </p>
+            <p>Jam build shipped. That is a full lap around Inferno, from empty board to final polish. Sign up to earn XP and badges like this for real.</p>
             {openSignup ? (
               <button
                 type="button"

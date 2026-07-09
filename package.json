@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:dates": "node scripts/date-sanity.mjs",
+    "test:gamify": "node scripts/gamification-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {

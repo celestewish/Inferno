@@ -3157,3 +3157,149 @@ textarea:hover {
   .tour-chip,
   .tour-reset { transition: none; }
 }
+
+/* ── Gamification: celebration toasts ── */
+.celebration-region {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-width: min(92vw, 320px);
+  pointer-events: none;
+}
+.celebration-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, white 8%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--surface-custom) 82%, black 8%), color-mix(in srgb, var(--surface-custom) 92%, var(--ember) 6%));
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--ember) 26%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--ember) 18%, transparent);
+  color: var(--text-main);
+  animation: celebrationIn 260ms ease;
+}
+.celebration-toast.celebration-badge {
+  border-color: color-mix(in srgb, var(--accent-secondary) 55%, white 10%);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--accent-secondary) 26%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--accent-secondary) 20%, transparent);
+}
+.celebration-toast.celebration-level {
+  border-color: color-mix(in srgb, var(--accent) 55%, white 10%);
+}
+.celebration-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ember) 60%, transparent));
+}
+.celebration-text { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; min-width: 0; }
+.celebration-title {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.celebration-detail { font-size: 0.82rem; color: color-mix(in srgb, white 72%, transparent); }
+.celebration-close {
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, white 60%, transparent);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0.2rem;
+}
+.celebration-close:hover { color: white; }
+@keyframes celebrationIn {
+  from { opacity: 0; transform: translate3d(0, -8px, 0) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Gamification: profile progress showcase ── */
+.gamification-panel { display: grid; gap: 1.1rem; }
+.gami-stat-row { display: flex; align-items: center; gap: 1rem; }
+.gami-level-badge {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--accent), var(--ember) 75%, var(--accent-secondary));
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--ember) 30%, transparent), inset 0 0 0 2px color-mix(in srgb, white 22%, transparent);
+  color: white;
+  flex-shrink: 0;
+}
+.gami-level-num {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+.gami-level-label { font-size: 0.6rem; letter-spacing: 0.16em; opacity: 0.85; margin-top: 0.25rem; }
+.gami-xp-block { flex: 1; min-width: 0; display: grid; gap: 0.4rem; }
+.gami-xp-line { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.85rem; flex-wrap: wrap; }
+.gami-xp-track {
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--surface-custom) 60%, black 20%);
+  border: 1px solid color-mix(in srgb, white 8%, transparent);
+  overflow: hidden;
+}
+.gami-xp-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--ember), var(--accent-secondary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--ember) 60%, transparent);
+  transition: width 320ms ease;
+}
+.gami-inventory-title { margin: 0; font-size: 0.95rem; }
+.gami-badge-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.7rem;
+}
+.gami-badge {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.85rem 0.7rem;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.03);
+}
+.gami-badge.is-earned {
+  border-color: color-mix(in srgb, var(--ember) 50%, white 10%);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--ember) 12%, transparent), color-mix(in srgb, var(--accent-secondary) 8%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ember) 22%, transparent), 0 8px 20px color-mix(in srgb, var(--ember) 16%, transparent);
+}
+.gami-badge.is-locked { opacity: 0.5; filter: grayscale(0.6); }
+.gami-badge-icon { font-size: 1.7rem; line-height: 1; }
+.gami-badge.is-earned .gami-badge-icon { filter: drop-shadow(0 0 8px color-mix(in srgb, var(--ember) 65%, transparent)); }
+.gami-badge-name {
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.02em;
+}
+.gami-badge-desc { font-size: 0.74rem; }
+
+/* ── Guided tour: local badge preview in the win box ── */
+.tour-win-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--ember) 50%, white 10%);
+  background: color-mix(in srgb, var(--ember) 14%, transparent);
+  font-family: 'Press Start 2P', 'Courier New', monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.03em;
+  color: color-mix(in srgb, white 88%, var(--ember));
+}
+.tour-win-badge-icon { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--ember) 60%, transparent)); }

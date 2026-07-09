@@ -31,6 +31,15 @@ import {
   slugifySection,
 } from './data/defaultData'
 import { buildInviteUrl, siteUrl } from './lib/site'
+import {
+  XP_REWARDS,
+  BADGES,
+  levelForXp,
+  levelProgress,
+  normalizeBadges,
+  hasBadge,
+  newlyEarnedBadges,
+} from './lib/gamification'
 
 const emptyTaskForm = {
   title: '',
@@ -386,6 +395,17 @@ function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [activeSection, setActiveSection] = useState('board')
   const [myProfile, setMyProfile] = useState(null)
+  // Gamification: XP / level / earned badges for the signed-in user, loaded
+  // separately from the core profile so a missing migration degrades to a
+  // zeroed-out (but non-crashing) progress state. `celebrations` drives the
+  // transient "Quest Complete" / level-up / badge-unlock toasts.
+  const [gamification, setGamification] = useState(null)
+  const [celebrations, setCelebrations] = useState([])
+  const celebrationSeq = useRef(0)
+  // Mirror the latest gamification snapshot in a ref so the awarding engine can
+  // read current XP/badges without stale closures and without re-creating its
+  // callbacks on every progress change.
+  const gamificationRef = useRef(null)
   const [profileForm, setProfileForm] = useState({
     display_name: '',
     gamer_tag: '',
@@ -479,6 +499,11 @@ useEffect(() => {
       '--background-custom': theme.background,
     }).forEach(([key, value]) => document.documentElement.style.setProperty(key, value))
   }, [theme])
+
+  // Keep the awarding engine's ref in sync with loaded/updated progress.
+  useEffect(() => {
+    gamificationRef.current = gamification
+  }, [gamification])
 
 useEffect(() => {
   if (!session?.user || !currentBoardId) return
@@ -778,6 +803,32 @@ setCurrentProjectId((currentId) =>
       setMobileBoardHintSeen(true)
     } else {
       setMobileBoardHintSeen(Boolean(hintRow?.mobile_board_hint_seen_at))
+    }
+
+    // Load gamification progress separately for the same graceful-degradation
+    // reason as theme_settings: a missing migration must not break the app. A
+    // load error leaves progress at the safe zero default.
+    const { data: gameRow, error: gameLoadError } = await supabase
+      .from('profiles')
+      .select('xp, level, badges, selected_title, gamification_settings')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (gameLoadError) {
+      console.error('Gamification load error:', formatSupabaseError(gameLoadError), gameLoadError)
+      setGamification({ xp: 0, level: 1, badges: [], selected_title: null, settings: {} })
+    } else {
+      const xp = Number.isFinite(gameRow?.xp) ? gameRow.xp : 0
+      setGamification({
+        xp,
+        level: gameRow?.level ?? levelForXp(xp),
+        badges: normalizeBadges(gameRow?.badges),
+        selected_title: gameRow?.selected_title ?? null,
+        settings:
+          gameRow?.gamification_settings && typeof gameRow.gamification_settings === 'object'
+            ? gameRow.gamification_settings
+            : {},
+      })
     }
   }
 }
@@ -1391,6 +1442,155 @@ function dbToInvite(row) {
     await supabase.from('tasks').delete().eq('id', taskId)
   }
 
+  // ── Gamification awarding engine ──
+  // Side effects (persistence + toasts) live here, deliberately OUT of any
+  // setState reducer, so React StrictMode's double-invoke never double-awards.
+
+  const pushCelebration = (celebration) => {
+    celebrationSeq.current += 1
+    const id = celebrationSeq.current
+    setCelebrations((current) => [...current, { id, ...celebration }])
+    // Auto-dismiss after a beat; the toast also has a manual close button.
+    window.setTimeout(() => {
+      setCelebrations((current) => current.filter((item) => item.id !== id))
+    }, 4200)
+  }
+
+  const dismissCelebration = (id) => {
+    setCelebrations((current) => current.filter((item) => item.id !== id))
+  }
+
+  // Persist the progress snapshot. Wrapped so a failure (e.g. missing migration)
+  // is logged and swallowed rather than blocking task completion.
+  const persistGamification = async (snapshot) => {
+    if (!userId) return
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert(
+          {
+            id: userId,
+            xp: snapshot.xp,
+            level: snapshot.level,
+            badges: snapshot.badges,
+            selected_title: snapshot.selected_title ?? null,
+            gamification_settings: snapshot.settings ?? {},
+          },
+          { onConflict: 'id' },
+        )
+      if (error) console.error('Gamification persist error:', formatSupabaseError(error), error)
+    } catch (persistError) {
+      console.error('Gamification persist threw:', persistError)
+    }
+  }
+
+  // Build the stats snapshot the badge evaluator needs from live app state,
+  // allowing callers to override/augment values that are known at award time
+  // (e.g. the task just completed, or boardCount:1 right after creating one).
+  const buildBadgeStats = (overrides = {}) => {
+    const completedTasks =
+      overrides.completedTasks ??
+      tasks.filter((task) => task.completed).map((task) => ({ ...task, projectId: task.projectId }))
+    const projectTaskTotals = {}
+    for (const task of tasks) {
+      const key = task.projectId ?? 'unknown'
+      projectTaskTotals[key] = (projectTaskTotals[key] ?? 0) + 1
+    }
+    return {
+      completedTasks,
+      boardCount: overrides.boardCount ?? (currentBoardId ? 1 : 0),
+      inviteCount: overrides.inviteCount ?? invites.length,
+      level: overrides.level ?? gamificationRef.current?.level ?? 1,
+      projectTaskTotals: overrides.projectTaskTotals ?? projectTaskTotals,
+      tutorialDone: overrides.tutorialDone ?? false,
+    }
+  }
+
+  // Core award routine: apply an XP delta, mark a task rewarded (for idempotent
+  // per-task awarding), re-evaluate badges, update state + ref, fire toasts, and
+  // persist. Reads the latest snapshot from the ref to avoid stale closures.
+  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {} } = {}) => {
+    if (!userId) return
+    const base = gamificationRef.current ?? {
+      xp: 0,
+      level: 1,
+      badges: [],
+      selected_title: null,
+      settings: {},
+    }
+
+    const nextXp = Math.max(0, (base.xp ?? 0) + xpDelta)
+    const prevLevel = base.level ?? 1
+    const nextLevel = levelForXp(nextXp)
+
+    // Track rewarded tasks so completing the same task twice never farms XP.
+    const settings = { ...(base.settings ?? {}) }
+    if (rewardTaskId) {
+      const rewarded = Array.isArray(settings.rewarded_tasks) ? settings.rewarded_tasks : []
+      if (!rewarded.includes(rewardTaskId)) {
+        settings.rewarded_tasks = [...rewarded, rewardTaskId]
+      }
+    }
+
+    const fresh = newlyEarnedBadges(
+      buildBadgeStats({ ...extraStats, level: nextLevel }),
+      base.badges,
+    )
+    const nextBadges = fresh.length ? [...normalizeBadges(base.badges), ...fresh] : base.badges
+
+    const snapshot = {
+      xp: nextXp,
+      level: nextLevel,
+      badges: nextBadges,
+      selected_title: base.selected_title ?? null,
+      settings,
+    }
+
+    gamificationRef.current = snapshot
+    setGamification(snapshot)
+
+    if (xpDelta > 0 && reason) {
+      pushCelebration({ kind: 'xp', title: reason, detail: `+${xpDelta} XP` })
+    }
+    if (nextLevel > prevLevel) {
+      pushCelebration({ kind: 'level', title: `Level ${nextLevel}`, detail: 'Level up!' })
+    }
+    for (const badge of fresh) {
+      pushCelebration({
+        kind: 'badge',
+        title: badge.name,
+        detail: 'Badge unlocked',
+        icon: badge.icon,
+      })
+    }
+
+    persistGamification(snapshot)
+  }
+
+  // Award XP + badges for a task reaching Done for the first time.
+  const rewardTaskCompletion = (task) => {
+    if (!userId || !task) return
+    const settings = gamificationRef.current?.settings ?? {}
+    const rewarded = Array.isArray(settings.rewarded_tasks) ? settings.rewarded_tasks : []
+    if (rewarded.includes(task.id)) return // already rewarded — no farming
+
+    const isHigh = String(task.priority ?? '').toLowerCase() === 'high'
+    const xpDelta = isHigh ? XP_REWARDS.TASK_COMPLETE_HIGH : XP_REWARDS.TASK_COMPLETE
+
+    // Include the just-completed task so badge evaluation sees it even before
+    // the optimistic setTasks has flushed.
+    const completedNow = [
+      ...tasks.filter((t) => t.completed && t.id !== task.id).map((t) => ({ ...t })),
+      { ...task, completed: true },
+    ]
+    awardGamification({
+      xpDelta,
+      reason: 'Quest Complete',
+      rewardTaskId: task.id,
+      extraStats: { completedTasks: completedNow },
+    })
+  }
+
   const moveTask = async (taskId, nextStatus) => {
     setTasks((current) =>
       current.map((task) =>
@@ -1400,6 +1600,10 @@ function dbToInvite(row) {
       )
     )
     await supabase.from('tasks').update({ status: nextStatus, completed: nextStatus === 'done' }).eq('id', taskId)
+    if (nextStatus === 'done') {
+      const doneTask = tasks.find((t) => t.id === taskId)
+      if (doneTask) rewardTaskCompletion(doneTask)
+    }
   }
 
   const shiftTask = (taskId, direction) => {
@@ -1449,11 +1653,13 @@ function dbToInvite(row) {
   }
 
   const toggleComplete = (task) => {
+    const willComplete = !task.completed
     updateTask(task.id, {
-      completed: !task.completed,
+      completed: willComplete,
       status: task.completed ? 'todo' : 'done',
       activity: [createActivity('complete', task.completed ? 'Reopened task.' : 'Marked task complete.'), ...(task.activity || [])],
     })
+    if (willComplete) rewardTaskCompletion(task)
   }
 
   const handleEditSave = (event) => {
@@ -1614,6 +1820,16 @@ function dbToInvite(row) {
       window.alert('The board was created but we could not add you as its owner. Please try again.')
       setCreatingBoard(false)
       return
+    }
+    // Award the First Spark badge + first-board XP once. Guarded on the badge so
+    // additional boards never re-award. extraStats forces boardCount:1 because
+    // loadAllData has not refreshed currentBoardId yet.
+    if (!hasBadge(gamificationRef.current?.badges, 'first_spark')) {
+      awardGamification({
+        xpDelta: XP_REWARDS.FIRST_BOARD,
+        reason: 'First Spark',
+        extraStats: { boardCount: 1 },
+      })
     }
     await loadAllData(userId, created.id)
     setActiveSection('board')
@@ -1933,6 +2149,16 @@ const createInvite = async (event) => {
     setInvites((current) => [invite, ...current])
     setInviteEmail('')
     setInviteRole('member')
+
+    // Award Team Captain + first-invite XP once, guarded on the badge so later
+    // invites never re-award.
+    if (!hasBadge(gamificationRef.current?.badges, 'team_captain')) {
+      awardGamification({
+        xpDelta: XP_REWARDS.FIRST_INVITE,
+        reason: 'Team Captain',
+        extraStats: { inviteCount: 1 },
+      })
+    }
 
     try {
       await navigator.clipboard.writeText(acceptUrl)
@@ -2358,6 +2584,30 @@ const pendingInvitesPanel =
 return (
   <>
     {pendingInvitesPanel}
+    <div className="celebration-region" aria-live="polite" role="status" data-testid="celebration-region">
+      {celebrations.map((celebration) => (
+        <div
+          key={celebration.id}
+          className={`celebration-toast celebration-${celebration.kind}`}
+        >
+          {celebration.icon ? (
+            <span className="celebration-icon" aria-hidden="true">{celebration.icon}</span>
+          ) : null}
+          <span className="celebration-text">
+            <strong className="celebration-title">{celebration.title}</strong>
+            <span className="celebration-detail">{celebration.detail}</span>
+          </span>
+          <button
+            type="button"
+            className="celebration-close"
+            aria-label="Dismiss notification"
+            onClick={() => dismissCelebration(celebration.id)}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
     <div className={sidebarCollapsed ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       <ProjectSidebar
         stats={stats}
@@ -3005,6 +3255,71 @@ return (
                 </button>
               </form>
             </div>
+
+            {(() => {
+              const progress = levelProgress(gamification?.xp ?? 0)
+              const earned = normalizeBadges(gamification?.badges)
+              const earnedIds = new Set(earned.map((badge) => badge.id))
+              return (
+                <div className="panel settings-panel gamification-panel" data-testid="settings-gamification">
+                  <div className="section-heading">
+                    <h2>Progress</h2>
+                  </div>
+                  <p className="muted-copy">
+                    Earn XP and unlock badges as you ship. Progress is saved to your profile.
+                  </p>
+
+                  <div className="gami-stat-row">
+                    <div className="gami-level-badge" aria-hidden="true">
+                      <span className="gami-level-num">{progress.level}</span>
+                      <span className="gami-level-label">LVL</span>
+                    </div>
+                    <div className="gami-xp-block">
+                      <div className="gami-xp-line">
+                        <span data-testid="gami-total-xp">{progress.xp} XP</span>
+                        <span className="muted-copy">
+                          {progress.intoLevel} / {progress.needed} to level {progress.level + 1}
+                        </span>
+                      </div>
+                      <div
+                        className="gami-xp-track"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress.pct}
+                        aria-label={`Level ${progress.level}, ${progress.pct}% to next level`}
+                      >
+                        <div className="gami-xp-fill" style={{ width: `${progress.pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <h3 className="gami-inventory-title">
+                    Badges <span className="muted-copy">({earned.length} / {BADGES.length})</span>
+                  </h3>
+                  <ul className="gami-badge-grid" data-testid="gami-badge-grid">
+                    {BADGES.map((badge) => {
+                      const unlocked = earnedIds.has(badge.id)
+                      return (
+                        <li
+                          key={badge.id}
+                          className={`gami-badge${unlocked ? ' is-earned' : ' is-locked'}`}
+                          data-rarity={badge.rarity}
+                          data-earned={unlocked ? 'true' : 'false'}
+                          title={`${badge.name}: ${badge.description}`}
+                        >
+                          <span className="gami-badge-icon" aria-hidden="true">
+                            {unlocked ? badge.icon : '🔒'}
+                          </span>
+                          <span className="gami-badge-name">{badge.name}</span>
+                          <span className="gami-badge-desc muted-copy">{badge.description}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )
+            })()}
 
             <div className="panel settings-panel" data-testid="settings-account">
               <div className="section-heading">
