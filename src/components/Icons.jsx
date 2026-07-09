@@ -172,6 +172,16 @@ export function CloseIcon(props) {
   )
 }
 
+export function MenuIcon(props) {
+  return (
+    <Svg {...props}>
+      <path d="M4 6h16" />
+      <path d="M4 12h16" />
+      <path d="M4 18h16" />
+    </Svg>
+  )
+}
+
 // Code Forge glyph: angle brackets over a forge/anvil base, used for the Code
 // Forge nav item and headers.
 export function ForgeIcon(props) {

@@ -17,6 +17,7 @@ import {
   BellIcon,
   SearchIcon,
   SettingsIcon,
+  CloseIcon,
 } from './Icons'
 
 // Each nav item switches the main workspace to a distinct page/view — no more
@@ -63,8 +64,14 @@ export default function ProjectSidebar({
   profile,
   collapsed = false,
   onToggleCollapsed,
+  mobileOpen = false,
+  onRequestClose,
 }) {
   if (!project) return null
+
+  // On mobile the sidebar is an off-canvas drawer; every navigation action also
+  // dismisses it. On desktop onRequestClose is a no-op passed by the shell.
+  const closeDrawer = () => onRequestClose?.()
 
   const displayName = profile?.display_name?.trim()
   const gamerTag = profile?.gamer_tag?.trim()
@@ -83,7 +90,7 @@ export default function ProjectSidebar({
           className={activeSection === item.id ? 'app-nav-item active' : 'app-nav-item'}
           aria-current={activeSection === item.id ? 'page' : undefined}
           data-testid={`nav-${item.id}`}
-          onClick={() => onSelectSection?.(item.id)}
+          onClick={() => { onSelectSection?.(item.id); closeDrawer() }}
         >
           <span className="app-nav-icon" aria-hidden="true"><Icon size={18} /></span>
           <span className="app-nav-label">{item.label}</span>
@@ -97,9 +104,17 @@ export default function ProjectSidebar({
     )
   }
 
+  const asideClass = [
+    'sidebar',
+    'app-nav',
+    collapsed ? 'is-collapsed' : '',
+    mobileOpen ? 'is-mobile-open' : '',
+  ].filter(Boolean).join(' ')
+
   return (
     <aside
-      className={collapsed ? 'sidebar app-nav is-collapsed' : 'sidebar app-nav'}
+      id="app-primary-nav"
+      className={asideClass}
       aria-label="Primary navigation"
       data-testid="app-bottom-nav"
     >
@@ -119,13 +134,22 @@ export default function ProjectSidebar({
           <h2>Inferno</h2>
           <p className="muted-copy">The game design task board</p>
         </div>
+        <button
+          type="button"
+          className="app-nav-close"
+          data-testid="mobile-nav-close"
+          aria-label="Close menu"
+          onClick={closeDrawer}
+        >
+          <CloseIcon size={20} />
+        </button>
       </div>
 
       <button
         type="button"
         className="app-nav-search"
         data-testid="sidebar-search"
-        onClick={() => onOpenSearch?.()}
+        onClick={() => { onOpenSearch?.(); closeDrawer() }}
       >
         <span className="app-nav-icon" aria-hidden="true"><SearchIcon size={16} /></span>
         <span className="app-nav-search-label">Search</span>
@@ -172,7 +196,7 @@ export default function ProjectSidebar({
               className={currentBoardId === item.id ? 'project-tab active' : 'project-tab'}
               aria-current={currentBoardId === item.id ? 'true' : undefined}
               data-testid={`board-tab-${item.id}`}
-              onClick={() => onSelectBoard?.(item.id)}
+              onClick={() => { onSelectBoard?.(item.id); closeDrawer() }}
             >
               <strong>{item.name || 'Untitled board'}</strong>
               {item.description ? <small>{item.description}</small> : null}
@@ -184,7 +208,7 @@ export default function ProjectSidebar({
           className="secondary-btn sidebar-manage-projects"
           data-testid="sidebar-create-board"
           disabled={creatingBoard}
-          onClick={() => onCreateBoard?.()}
+          onClick={() => { onCreateBoard?.(); closeDrawer() }}
         >
           {creatingBoard ? 'Creating…' : 'New board'}
         </button>
@@ -203,7 +227,7 @@ export default function ProjectSidebar({
               className={project.id === item.id ? 'project-tab active' : 'project-tab'}
               aria-current={project.id === item.id ? 'true' : undefined}
               data-testid={`project-tab-${item.id}`}
-              onClick={() => setCurrentProjectId(item.id)}
+              onClick={() => { setCurrentProjectId(item.id); closeDrawer() }}
             >
               <strong>{item.name}</strong>
               <small>{item.methodology}</small>
@@ -214,7 +238,7 @@ export default function ProjectSidebar({
           type="button"
           className="secondary-btn sidebar-manage-projects"
           data-testid="sidebar-manage-projects"
-          onClick={() => onSelectSection?.('projects')}
+          onClick={() => { onSelectSection?.('projects'); closeDrawer() }}
         >
           Manage projects
         </button>
