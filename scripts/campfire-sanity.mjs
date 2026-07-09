@@ -4,7 +4,13 @@ import {
   BOARD_CHANNEL_KEY,
   projectChannelKey,
   CAMPFIRE_REACTIONS,
+  DEFAULT_CHANNEL_SUGGESTIONS,
   buildChannels,
+  buildChannelGroups,
+  flattenChannels,
+  channelSlug,
+  customChannelKey,
+  channelProjectId,
   messageChannelKey,
   filterMessagesByChannel,
   normalizeReactions,
@@ -28,14 +34,43 @@ const assert = (cond, message) => {
 // Channels
 assert(BOARD_CHANNEL_KEY === 'board', 'board channel key is "board"')
 assert(projectChannelKey('p1') === 'project:p1', 'project channel key is prefixed')
-const channels = buildChannels([{ id: 'p1', name: 'Emberhold' }, { id: 'p2', name: '  Frostpeak  ' }])
-assert(channels.length === 3, 'buildChannels returns board room + one per project')
-assert(channels[0].key === 'board' && channels[0].name === 'Board Campfire', 'first room is the Board Campfire')
-assert(channels[1].name === 'Emberhold Campfire', 'project room name uses the project name')
-assert(channels[2].name === 'Frostpeak Campfire', 'project room name is trimmed')
-assert(channels[1].projectId === 'p1', 'project room carries the project id')
-assert(buildChannels([{ name: 'no id' }]).length === 1, 'projects without an id are skipped')
-assert(buildChannels().length === 1, 'no projects still yields the board room')
+
+// channelSlug / customChannelKey / channelProjectId
+assert(channelSlug('Art Review!') === 'art-review', 'channelSlug lowercases and hyphenates')
+assert(channelSlug('  QA  ') === 'qa', 'channelSlug trims')
+assert(channelSlug('###') === '', 'channelSlug of punctuation-only is empty')
+assert(customChannelKey('p1', 'Art') === 'project:p1:art', 'customChannelKey composes project + slug')
+assert(customChannelKey('p1', '###') === '', 'customChannelKey rejects unusable names')
+assert(customChannelKey('', 'Art') === '', 'customChannelKey requires a project id')
+assert(channelProjectId('board') === null, 'channelProjectId is null for the board room')
+assert(channelProjectId('project:p1') === 'p1', 'channelProjectId reads the default project room')
+assert(channelProjectId('project:p1:art') === 'p1', 'channelProjectId reads a custom channel key')
+assert(DEFAULT_CHANNEL_SUGGESTIONS.length >= 1, 'there are default channel suggestions')
+
+// Grouped channel building (board group + per-project groups with customs)
+const projects = [{ id: 'p1', name: 'Emberhold' }, { id: 'p2', name: '  Frostpeak  ' }]
+const customs = [
+  { id: 'c1', projectId: 'p1', name: 'Art', channelKey: 'project:p1:art' },
+  { id: 'c2', projectId: 'p1', name: 'Archived', channelKey: 'project:p1:archived', archivedAt: '2026-07-20T00:00:00Z' },
+  { id: 'c3', projectId: 'p2', name: 'Code', channelKey: 'project:p2:code' },
+]
+const groups = buildChannelGroups(projects, customs)
+assert(groups.length === 3, 'buildChannelGroups returns a board group + one per project')
+assert(groups[0].projectId === null && groups[0].channels[0].key === 'board', 'first group is the board room')
+assert(groups[0].channels[0].removable === false, 'the board room cannot be removed')
+assert(groups[1].projectName === 'Emberhold', 'project group uses the project name')
+assert(groups[1].channels[0].name === 'General' && groups[1].channels[0].removable === false, 'each project opens with an undeletable General room')
+assert(groups[1].channels[0].key === 'project:p1', 'the General room keeps the legacy project channel key')
+assert(groups[1].channels.length === 2, 'archived custom channels are hidden from the group')
+assert(groups[1].channels[1].key === 'project:p1:art' && groups[1].channels[1].removable === true, 'active custom channels are removable')
+assert(groups[2].projectName === 'Frostpeak', 'project group name is trimmed')
+assert(groups[2].channels[1].key === 'project:p2:code', 'custom channels group under their own project')
+
+const flat = flattenChannels(groups)
+assert(flat.length === 5, 'flattenChannels returns every room across groups')
+assert(buildChannels(projects, customs).length === 5, 'buildChannels flat list includes customs')
+assert(buildChannels().length === 1, 'no projects still yields just the board room')
+assert(buildChannelGroups([{ name: 'no id' }]).length === 1, 'projects without an id are skipped')
 
 // Message channel resolution + filtering
 assert(messageChannelKey({ channelKey: 'project:p1' }) === 'project:p1', 'reads a message channel key')

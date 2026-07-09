@@ -7,6 +7,36 @@ export const BOARD_CHANNEL_KEY = 'board'
 
 export const projectChannelKey = (projectId) => `project:${projectId}`
 
+// Slugify a channel name into a url-safe token used inside its channel_key.
+export function channelSlug(name) {
+  return String(name || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32)
+}
+
+// Key for a user-created project channel: project:<id>:<slug>. Returns '' when
+// the name has no usable characters so callers can reject empty channels.
+export function customChannelKey(projectId, name) {
+  const slug = channelSlug(name)
+  return projectId && slug ? `project:${projectId}:${slug}` : ''
+}
+
+// The project a channel_key belongs to (null for the board room). Handles both
+// the default 'project:<id>' room and 'project:<id>:<slug>' custom channels.
+export function channelProjectId(key) {
+  if (typeof key !== 'string' || !key.startsWith('project:')) return null
+  const id = key.slice('project:'.length).split(':')[0]
+  return id || null
+}
+
+// Suggested channels offered as one-click adds. 'General' is always the
+// project's default room, so it is intentionally omitted here. Kept short to
+// avoid cluttering a new project with rooms nobody uses.
+export const DEFAULT_CHANNEL_SUGGESTIONS = ['Tasks', 'Art', 'Code', 'QA']
+
 // Curated RPG/flame reactions. Text label + a small glyph, never emoji-only, so
 // they read the same on systems with poor emoji fonts.
 export const CAMPFIRE_REACTIONS = [
@@ -19,20 +49,64 @@ export const CAMPFIRE_REACTIONS = [
 
 const REACTION_KEYS = new Set(CAMPFIRE_REACTIONS.map((r) => r.key))
 
-// Build the room list for a board: the board-wide room first, then one room per
-// project. Names use the project's own name so a team sees "Emberhold Campfire".
-export function buildChannels(projects = []) {
-  const list = Array.isArray(projects) ? projects : []
-  return [
-    { key: BOARD_CHANNEL_KEY, name: 'Board Campfire', projectId: null },
-    ...list
-      .filter((project) => project && project.id)
-      .map((project) => ({
-        key: projectChannelKey(project.id),
-        name: `${(project.name || 'Project').trim()} Campfire`,
-        projectId: project.id,
-      })),
+// Build the Campfire room list grouped for the sidebar: a Board group with the
+// single board-wide room, then one group per project. Each project group opens
+// with its undeletable "General" room (channel_key 'project:<id>', backward
+// compatible with existing project messages) followed by any user-created
+// channels. Archived custom channels are dropped so removing one hides it
+// without deleting its messages.
+export function buildChannelGroups(projects = [], customChannels = []) {
+  const projectList = (Array.isArray(projects) ? projects : []).filter((p) => p && p.id)
+  const active = (Array.isArray(customChannels) ? customChannels : []).filter(
+    (channel) => channel && channel.channelKey && !channel.archivedAt,
+  )
+
+  const groups = [
+    {
+      projectId: null,
+      projectName: 'Board',
+      channels: [
+        { key: BOARD_CHANNEL_KEY, name: 'Board Campfire', projectId: null, removable: false },
+      ],
+    },
   ]
+
+  for (const project of projectList) {
+    const general = {
+      key: projectChannelKey(project.id),
+      name: 'General',
+      projectId: project.id,
+      removable: false,
+    }
+    const customs = active
+      .filter((channel) => channel.projectId === project.id)
+      .map((channel) => ({
+        key: channel.channelKey,
+        name: channel.name,
+        projectId: project.id,
+        removable: true,
+        id: channel.id,
+      }))
+    groups.push({
+      projectId: project.id,
+      projectName: (project.name || 'Project').trim(),
+      channels: [general, ...customs],
+    })
+  }
+
+  return groups
+}
+
+// Flatten grouped channels into a single ordered list (used for validation,
+// counts, and resolving the active room).
+export function flattenChannels(groups = []) {
+  return (Array.isArray(groups) ? groups : []).flatMap((group) => group.channels || [])
+}
+
+// Convenience flat builder mirroring the old buildChannels signature so callers
+// that just need every room key/name keep working.
+export function buildChannels(projects = [], customChannels = []) {
+  return flattenChannels(buildChannelGroups(projects, customChannels))
 }
 
 // A message's room. Older rows have no channel_key and belong to the board room.

@@ -3586,9 +3586,112 @@ textarea:hover {
   border-color: color-mix(in srgb, var(--ember) 60%, transparent);
   background: color-mix(in srgb, var(--ember) 12%, transparent);
 }
-.campfire-room-flame { font-size: 0.9rem; filter: saturate(1.2); }
+.campfire-room-flame { display: inline-flex; color: var(--ember); }
 .campfire-room-name { flex: 1; min-width: 0; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .campfire-room-count { font-size: 0.72rem; color: var(--text-muted); }
+
+/* Channels grouped by project, with per-project add controls. */
+.campfire-room-groups { display: grid; gap: 14px; }
+.campfire-room-group { display: grid; gap: 6px; }
+.campfire-room-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.campfire-room-group-name {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.campfire-add-channel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.campfire-add-channel-btn:hover {
+  color: #edf2ff;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+}
+.campfire-room-row { display: flex; align-items: center; gap: 4px; }
+.campfire-room-row .campfire-room { flex: 1; min-width: 0; }
+.campfire-remove-channel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, border-color 140ms ease;
+}
+.campfire-remove-channel:hover {
+  color: #ffd7c7;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+}
+.campfire-add-channel-form {
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+.campfire-add-channel-input {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+  background: rgba(0, 0, 0, 0.24);
+  color: #edf2ff;
+  font-size: 0.82rem;
+}
+.campfire-add-channel-actions { display: flex; gap: 6px; }
+.campfire-add-channel-actions .secondary-btn,
+.campfire-add-channel-actions .ghost-btn { padding: 5px 10px; font-size: 0.72rem; }
+.campfire-channel-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.campfire-suggestion-label { font-size: 0.66rem; color: var(--text-muted); }
+.campfire-suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: border-color 140ms ease, color 140ms ease;
+}
+.campfire-suggestion-chip:hover:not(:disabled) {
+  color: #edf2ff;
+  border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
+}
+.campfire-suggestion-chip:disabled { opacity: 0.5; cursor: default; }
 
 .campfire-feed-wrap { display: grid; gap: 12px; }
 .campfire-feed-head {
