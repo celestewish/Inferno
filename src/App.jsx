@@ -2540,6 +2540,35 @@ return (
         ) : null}
 
         {activeSection === 'board' ? (
+          <div className="mobile-board-switcher" data-testid="mobile-board-switcher">
+            <label className="mobile-board-switcher-field">
+              <span className="mobile-board-switcher-label">Board</span>
+              <select
+                className="mobile-board-select"
+                data-testid="mobile-board-select"
+                value={currentBoardId ?? ''}
+                onChange={(e) => switchBoard(e.target.value)}
+              >
+                {boards.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name || 'Untitled board'}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="secondary-btn mobile-board-create"
+              data-testid="mobile-create-board"
+              disabled={creatingBoard}
+              onClick={() => createBoard()}
+            >
+              {creatingBoard ? 'Creating…' : 'New board'}
+            </button>
+          </div>
+        ) : null}
+
+        {activeSection === 'board' ? (
           <>
             <section className="toolbar panel">
               <form className="toolbar-group" onSubmit={handleCreateTask}>
