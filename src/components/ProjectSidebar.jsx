@@ -6,6 +6,7 @@ import {
   FlameIcon,
   BookIcon,
   ForgeIcon,
+  HeadsetIcon,
   TeamIcon,
   CalendarIcon,
   ReportsIcon,
@@ -22,6 +23,7 @@ const PRIMARY_NAV = [
   { id: 'campfire', label: 'Campfire', Icon: FlameIcon },
   { id: 'docs', label: 'Docs Hub', Icon: BookIcon },
   { id: 'codeforge', label: 'Code Forge', Icon: ForgeIcon },
+  { id: 'warroom', label: 'War Room', Icon: HeadsetIcon },
   { id: 'team', label: 'Team', Icon: TeamIcon },
 ]
 

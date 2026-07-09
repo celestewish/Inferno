@@ -11,6 +11,7 @@ import CalendarView from './components/CalendarView'
 import ReportsView from './components/ReportsView'
 import DocsView from './components/DocsView'
 import CodeForgeView from './components/CodeForgeView'
+import WarRoomView from './components/WarRoomView'
 import DatePicker from './components/DatePicker.jsx'
 import MarketingHome from './components/MarketingHome'
 import { FlameIcon, PlusIcon, CloseIcon } from './components/Icons'
@@ -80,6 +81,7 @@ import {
 } from './lib/campfire'
 import { validateDocInput } from './lib/docs'
 import { validateRepoInput } from './lib/codeforge'
+import { validateMeetingNote } from './lib/warroom'
 
 const emptyTaskForm = {
   title: '',
@@ -425,6 +427,8 @@ function App() {
   const [docsMigrationMissing, setDocsMigrationMissing] = useState(false)
   const [repos, setRepos] = useState([])
   const [reposMigrationMissing, setReposMigrationMissing] = useState(false)
+  const [meetingNotes, setMeetingNotes] = useState([])
+  const [meetingNotesMigrationMissing, setMeetingNotesMigrationMissing] = useState(false)
   const chatMessagesEndRef = useRef(null)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -547,6 +551,8 @@ useEffect(() => {
       setDocsMigrationMissing(false)
       setRepos([])
       setReposMigrationMissing(false)
+      setMeetingNotes([])
+      setMeetingNotesMigrationMissing(false)
     }
   })
 
@@ -725,6 +731,8 @@ setCurrentBoardId(activeBoardId)
         setDocsMigrationMissing(false)
         setRepos([])
         setReposMigrationMissing(false)
+        setMeetingNotes([])
+        setMeetingNotesMigrationMissing(false)
   return
 }
 
@@ -738,6 +746,7 @@ setCurrentBoardId(activeBoardId)
   { data: channelData },
   { data: docData, error: docError },
   { data: repoData, error: repoError },
+  { data: meetingData, error: meetingError },
 ] = await Promise.all([
   supabase.from('projects').select('*').eq('board_id', activeBoardId).order('created_at'),
   supabase
@@ -781,6 +790,15 @@ setCurrentBoardId(activeBoardId)
     .from('board_repositories')
     .select('*')
     .eq('board_id', activeBoardId)
+    .order('created_at', { ascending: false }),
+  // War Room meeting notes; resolves with an error if the migration is not yet
+  // pushed, in which case War Room shows a non-blocking note and voice still
+  // works (voice needs no table).
+  supabase
+    .from('meeting_notes')
+    .select('*')
+    .eq('board_id', activeBoardId)
+    .is('archived_at', null)
     .order('created_at', { ascending: false }),
 ])
 
@@ -835,6 +853,8 @@ setCurrentProjectId((currentId) =>
   setDocs(docData?.length ? docData.map(dbToDoc) : [])
   setReposMigrationMissing(Boolean(repoError))
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
+  setMeetingNotesMigrationMissing(Boolean(meetingError))
+  setMeetingNotes(meetingData?.length ? meetingData.map(dbToMeetingNote) : [])
 
   const memberIds = [...new Set((boardMemberRows ?? []).map((row) => row.user_id).filter(Boolean))]
   if (memberIds.length) {
@@ -1345,6 +1365,24 @@ function dbToRepo(row) {
     owner: row.owner ?? null,
     repo: row.repo ?? null,
     description: row.description ?? '',
+    archivedAt: row.archived_at ?? null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at ?? null,
+  }
+}
+
+function dbToMeetingNote(row) {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    projectId: row.project_id ?? null,
+    roomKey: row.room_key ?? 'board',
+    title: row.title,
+    agenda: Array.isArray(row.agenda) ? row.agenda : [],
+    notes: row.notes ?? '',
+    actionItems: Array.isArray(row.action_items) ? row.action_items : [],
+    createdBy: row.created_by,
+    updatedBy: row.updated_by ?? null,
     archivedAt: row.archived_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at ?? null,
@@ -2859,6 +2897,135 @@ const archiveRepo = async (repo) => {
   return { ok: true }
 }
 
+// ── War Room meeting notes handlers ──────────────────────────────────────────
+// Notes are text-only meeting records scoped to a board and an optional
+// project/huddle room. Voice huddles store nothing here; they are live-only.
+const createMeetingNote = async (value) => {
+  const result = validateMeetingNote(value)
+  if (!result.ok) return { ok: false, message: 'Add a meeting title first.' }
+  if (!currentBoardId || !userId) return { ok: false, message: 'No active board.' }
+
+  const { data, error } = await supabase
+    .from('meeting_notes')
+    .insert({
+      board_id: currentBoardId,
+      project_id: result.value.projectId,
+      room_key: result.value.roomKey,
+      title: result.value.title,
+      agenda: result.value.agenda,
+      notes: result.value.notes,
+      action_items: result.value.actionItems,
+      created_by: userId,
+      updated_by: userId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Create meeting note error:', formatSupabaseError(error), error)
+    return {
+      ok: false,
+      message: isMissingColumnError(error)
+        ? 'Run the War Room migration first.'
+        : 'Could not save the meeting. Please try again.',
+    }
+  }
+
+  const note = dbToMeetingNote(data)
+  setMeetingNotes((current) => [note, ...current])
+  pushCelebration({ kind: 'xp', title: 'Meeting saved', detail: note.title })
+  return { ok: true }
+}
+
+const updateMeetingNote = async (id, value) => {
+  const result = validateMeetingNote(value)
+  if (!result.ok) return { ok: false, message: 'Add a meeting title first.' }
+
+  const { data, error } = await supabase
+    .from('meeting_notes')
+    .update({
+      project_id: result.value.projectId,
+      room_key: result.value.roomKey,
+      title: result.value.title,
+      agenda: result.value.agenda,
+      notes: result.value.notes,
+      action_items: result.value.actionItems,
+      updated_by: userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Update meeting note error:', formatSupabaseError(error), error)
+    return { ok: false, message: 'Could not save changes. Please try again.' }
+  }
+
+  const note = dbToMeetingNote(data)
+  setMeetingNotes((current) => current.map((item) => (item.id === note.id ? note : item)))
+  return { ok: true }
+}
+
+const archiveMeetingNote = async (note) => {
+  if (!note?.id) return { ok: false }
+
+  const previous = meetingNotes
+  setMeetingNotes((current) => current.filter((item) => item.id !== note.id))
+
+  const { error } = await supabase
+    .from('meeting_notes')
+    .update({ archived_at: new Date().toISOString() })
+    .eq('id', note.id)
+
+  if (error) {
+    console.error('Archive meeting note error:', formatSupabaseError(error), error)
+    setMeetingNotes(previous)
+    pushCelebration({ kind: 'error', title: 'Meeting not archived', detail: 'Please try again.' })
+    return { ok: false }
+  }
+  return { ok: true }
+}
+
+// Spin an action item into a backlog task in the current project, reusing the
+// same task-creation path as Campfire so board/gamification stays consistent.
+const createTaskFromActionItem = async (text) => {
+  const title = (text || '').trim().slice(0, 200)
+  if (!title) return { ok: false }
+  if (!userId || !currentProject) {
+    pushCelebration({ kind: 'error', title: 'No project selected', detail: 'Pick a project first.' })
+    return { ok: false }
+  }
+  const task = {
+    id: crypto.randomUUID(),
+    projectId: currentProject.id,
+    title,
+    description: 'Created from a War Room action item.',
+    status: 'backlog',
+    priority: 'Medium',
+    discipline: 'Programming',
+    assignee: clampAssignee('Unassigned', teamMembers),
+    sprint: currentProject.phase,
+    estimate: '1 pt',
+    due: 'TBD',
+    completed: false,
+    labels: currentProject.labels?.slice(0, 2) || [],
+    subtasks: [],
+    activity: [createActivity('task', 'Task created from a War Room action item.')],
+  }
+  setTasks((current) => [task, ...current])
+  logProjectActivity(currentProject.id, 'task', `Created task ${task.title} from the War Room.`)
+  const { error } = await supabase.from('tasks').insert([taskToDb(task, userId)])
+  if (error) {
+    console.error('Create task from action item error:', formatSupabaseError(error), error)
+    setTasks((current) => current.filter((item) => item.id !== task.id))
+    pushCelebration({ kind: 'error', title: 'Task not saved', detail: 'Please try again.' })
+    return { ok: false }
+  }
+  pushCelebration({ kind: 'xp', title: 'Task created', detail: title, icon: '✎' })
+  return { ok: true }
+}
+
 // Render a message body from safe parsed segments (no dangerouslySetInnerHTML).
 // Bold/code become styled spans; URLs become external links with rel guards.
 const renderMessageBody = (text) =>
@@ -4155,6 +4322,28 @@ return (
             onUpdateRepo={updateRepo}
             onArchiveRepo={archiveRepo}
             migrationMissing={reposMigrationMissing}
+          />
+        ) : null}
+
+        {activeSection === 'warroom' ? (
+          <WarRoomView
+            boardId={currentBoardId}
+            self={
+              userId
+                ? {
+                    id: userId,
+                    name: profiles[userId] || session?.user?.email || 'You',
+                    email: session?.user?.email || '',
+                  }
+                : null
+            }
+            projects={projects}
+            notes={meetingNotes}
+            migrationMissing={meetingNotesMigrationMissing}
+            onCreateNote={createMeetingNote}
+            onUpdateNote={updateMeetingNote}
+            onArchiveNote={archiveMeetingNote}
+            onCreateTaskFromAction={createTaskFromActionItem}
           />
         ) : null}
 
