@@ -20,7 +20,7 @@ import { getTemplate, buildTemplateTasks, templateTaskCount } from './lib/templa
 import RecapView from './components/RecapView'
 import PortfolioView from './components/PortfolioView'
 import DatePicker from './components/DatePicker.jsx'
-import MarketingHome from './components/MarketingHome'
+import QuestLanding from './components/QuestLanding'
 import { FlameIcon, PlusIcon, CloseIcon, MenuIcon } from './components/Icons'
 import InfernoLogo from './components/InfernoLogo'
 import {
@@ -3733,7 +3733,7 @@ if (!loading && session && !currentProject) {
 if (!loading && !session) {
   return (
     <>
-      <MarketingHome
+      <QuestLanding
         openLogin={openLogin}
         openSignup={openSignup}
       />
