@@ -126,6 +126,28 @@ for (const id of ['id: page', 'id: environment', 'id: steps', 'id: expected', 'i
   assert(tmpl.includes(id), `bug report template has field ${id}`)
 }
 
+// Legal identity: the public legal pages must name the exact operating entity
+// and must not leave a bare "Rousell Technologies" placeholder without "LLC".
+const LEGAL_FILES = ['public/terms.html', 'public/privacy.html']
+const BARE_ENTITY = /Rousell Technologies(?! LLC)/
+for (const rel of LEGAL_FILES) {
+  const text = read(rel)
+  assert(text.includes('Rousell Technologies LLC'), `${rel} names Rousell Technologies LLC`)
+  assert(!BARE_ENTITY.test(text), `${rel} has no bare "Rousell Technologies" placeholder`)
+  assert(text.includes('celeste@infernotaskboard.com'), `${rel} shows the support email`)
+  assert(!EM_DASH.test(text), `${rel} has no em dash`)
+  assert(!EMOJI.test(text), `${rel} has no emoji`)
+}
+
+// The company name must be consistent wherever it appears in the app UI: no bare
+// placeholder in the landing footer or the feedback widget.
+for (const rel of ['src/components/QuestLanding.jsx', 'src/components/FeedbackWidget.jsx']) {
+  const text = read(rel)
+  if (text.includes('Rousell Technologies')) {
+    assert(!BARE_ENTITY.test(text), `${rel} uses the full "Rousell Technologies LLC" name`)
+  }
+}
+
 if (failures) {
   console.error(`\n${failures} copy/polish check(s) failed.`)
   process.exit(1)

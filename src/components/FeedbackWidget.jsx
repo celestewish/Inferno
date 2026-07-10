@@ -75,6 +75,7 @@ export default function FeedbackWidget({ activeSection }) {
             <span aria-hidden="true"> · </span>
             <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
           </p>
+          <p className="feedback-company">&copy; 2026 Rousell Technologies LLC</p>
         </div>
       ) : null}
       <button

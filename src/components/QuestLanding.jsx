@@ -787,6 +787,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
         <button type="button" className="studio-footer-cta" onClick={openSignup}>
           Start your real studio board
         </button>
+        <span className="quest-footer-copy">&copy; 2026 Rousell Technologies LLC</span>
       </footer>
 
       {dragMeta && dragMeta.moved ? (
