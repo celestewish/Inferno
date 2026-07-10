@@ -19,6 +19,7 @@ import {
   SettingsIcon,
   CloseIcon,
 } from './Icons'
+import { safeImageUrl } from '../lib/url'
 
 // Each nav item switches the main workspace to a distinct page/view — no more
 // scrolling one long board. All items are real, navigable pages. Icons are
@@ -75,7 +76,7 @@ export default function ProjectSidebar({
 
   const displayName = profile?.display_name?.trim()
   const gamerTag = profile?.gamer_tag?.trim()
-  const avatarUrl = profile?.avatar_url?.trim()
+  const avatarUrl = safeImageUrl(profile?.avatar_url)
   const accountLabel = displayName || userEmail || 'Signed in'
   const accountSub = gamerTag || (displayName ? userEmail : null) || 'Signed in'
   const accountInitial = (displayName?.[0] || userEmail?.trim()?.[0] || 'I').toUpperCase()

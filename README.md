@@ -244,6 +244,12 @@ Current migrations:
   load and save for board members. Run `supabase db push` after deploying this
   release to apply it; until then War Room shows an access notice instead of
   loading notes.
+- `20260729000000_grant_campfire_channels_privileges.sql`: grants the table
+  privileges on `campfire_channels` to the `authenticated` role. This table was
+  created with RLS but never received its table-level GRANT, so creating or
+  listing a custom Campfire channel could fail with `42501 permission denied`
+  for board members. Run `supabase db push` after deploying this release to
+  apply it. Idempotent and non-destructive.
 
 > **"Your profile database is missing the new profile columns."**
 > This message in **Settings → Profile** means the profile columns are absent
@@ -286,6 +292,91 @@ npm run build      # production build to dist/
 npm run preview    # preview the production build locally
 npm run test:dates # run the date-handling sanity checks
 ```
+
+The repository also ships focused sanity suites for individual features, each
+run with `npm run test:<name>` (for example `test:url`, `test:copy`,
+`test:layout`, `test:dberrors`). They are plain Node scripts with no test
+framework and exit non-zero on failure.
+
+## Operations and release readiness
+
+This section collects the operational tasks that sit outside the app code but
+matter for running Inferno in production during the alpha. Items marked "manual"
+require action in a dashboard or an external account and cannot be done from the
+repository.
+
+### Data backups (manual)
+
+Inferno stores all application data in Supabase (Postgres). Backups are a
+Supabase feature and depend on your plan:
+
+- **Enable and verify backups** in the Supabase dashboard under
+  **Project Settings -> Database -> Backups**. Daily automated backups are
+  available on paid plans; point-in-time recovery is a separate add-on. Confirm
+  which is active for this project rather than assuming backups are on.
+- **Take a manual export before each alpha milestone.** The most portable option
+  is `supabase db dump` (or `pg_dump` with the project connection string) saved
+  somewhere off Supabase. Keep at least one recent copy outside the provider.
+- Do not treat the seeded sample board as a backup; it is regenerated per new
+  account and is not your users' data.
+
+We do not claim backups are enabled by default: verify the setting above for the
+linked project before relying on it.
+
+### Concurrency model (task moves and updates)
+
+Task moves and edits use a last-write-wins model. `moveTask` writes only the
+`status` and `completed` columns, and `updateTask` writes a targeted column
+patch, so a concurrent status change touches a single column rather than
+overwriting the whole row. Every client also subscribes to `postgres_changes`
+on `tasks` and refetches on any change, so clients converge to the database
+state after each write instead of drifting apart. The remaining edge is a
+read-modify-write on a jsonb array (a task's `activity`/`subtasks`, or a board's
+`kanban_sections`/`settings`) when two people edit the exact same record at the
+same instant: the later write wins and the earlier one is reconciled away on the
+next refresh. This is acceptable for small-team boards; if Inferno later needs
+stronger guarantees, add a version column and optimistic-concurrency checks to
+those jsonb updates.
+
+### Error monitoring (optional, env-gated)
+
+Browser error monitoring is built in but disabled unless configured. Set
+`VITE_ERROR_MONITOR_URL` at build time to forward uncaught errors and unhandled
+promise rejections as JSON to a collector you control (see
+`src/lib/errorMonitor.js`). It uses `navigator.sendBeacon`, adds no third-party
+SDK, and makes no requests when the variable is unset. To adopt a full product
+such as Sentry later, replace the body of that module with the SDK init; the
+single call site in `src/main.jsx` stays the same.
+
+### Uptime monitoring (manual)
+
+Set up an external uptime checker that pings the production URL
+`https://infernotaskboard.com/` on an interval and alerts you when it is down.
+Free tiers of services such as UptimeRobot, Better Stack, or a hosting-provided
+health check are sufficient for the alpha. Point the check at the root URL and,
+if the service supports it, assert on a `200` status and the presence of the
+page title. This is an external-account task and is not configured from the
+repository.
+
+### Launch-day social media kit
+
+Brand and marketing assets already live in the repository, so no large files
+need to be produced for launch:
+
+- **Logos and profile/cover art:** `public/brand/` (Facebook, Twitter/X,
+  Instagram, TikTok, YouTube variants, plus `logo-1`, `logo-2`, and
+  `logo-cropped`).
+- **Product screenshots:** `public/marketing/` (`board`, `tasks`, `projects`,
+  `calendar`, `reports`, `team`, `customization`, `mobile`).
+- **Social preview images:** `public/brand/facebook-image.jpg` and
+  `public/brand/twitter-image.jpg` are already referenced by the Open Graph and
+  Twitter Card tags in `index.html`.
+- **Tagline:** "Inferno - The game design task board." Longer description copy is
+  in the `index.html` meta tags and the top of this README.
+
+Launch checklist: pick one hero screenshot, pair it with the tagline, confirm
+the Open Graph image renders in a link-preview debugger, and schedule posts using
+the per-platform art above.
 
 ## How to report issues
 

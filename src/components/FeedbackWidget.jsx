@@ -70,6 +70,11 @@ export default function FeedbackWidget({ activeSection }) {
           >
             Send feedback by email
           </a>
+          <p className="feedback-legal">
+            <a href="/terms.html" target="_blank" rel="noopener noreferrer">Terms</a>
+            <span aria-hidden="true"> · </span>
+            <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy</a>
+          </p>
         </div>
       ) : null}
       <button

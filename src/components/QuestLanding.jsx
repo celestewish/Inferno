@@ -418,6 +418,10 @@ export default function QuestLanding({ openLogin, openSignup }) {
               Enter Dashboard
             </button>
           </div>
+          <p className="studio-demo-note">
+            This is a free playable demo. Your own boards, projects, tasks, and team start once you
+            sign up and log in.
+          </p>
         </div>
         <div className="quest-dante">
           <span className="quest-dante-avatar"><InfernoLogo size={44} /></span>
@@ -775,6 +779,11 @@ export default function QuestLanding({ openLogin, openSignup }) {
       <footer className="quest-footer">
         <span>Inferno</span>
         <span className="quest-footer-muted">Plan, staff, and ship games with your crew.</span>
+        <nav className="quest-footer-links" aria-label="Legal and support">
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="mailto:celeste@infernotaskboard.com">Support</a>
+        </nav>
         <button type="button" className="studio-footer-cta" onClick={openSignup}>
           Start your real studio board
         </button>

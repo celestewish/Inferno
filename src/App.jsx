@@ -92,6 +92,7 @@ import { validateDocInput } from './lib/docs'
 import { validateRepoInput } from './lib/codeforge'
 import { validateMeetingNote } from './lib/warroom'
 import { buildNotifications, applyReadState, unreadCount as countUnread, allKeys } from './lib/notifications'
+import { safeImageUrl } from './lib/url'
 
 const emptyTaskForm = {
   title: '',
@@ -4914,8 +4915,8 @@ return (
               <form className="profile-form" onSubmit={saveProfile}>
                 <div className="profile-avatar-row">
                   <span className="profile-avatar-preview" aria-hidden="true">
-                    {profileForm.avatar_url.trim() ? (
-                      <img src={profileForm.avatar_url.trim()} alt="" />
+                    {safeImageUrl(profileForm.avatar_url) ? (
+                      <img src={safeImageUrl(profileForm.avatar_url)} alt="" />
                     ) : (
                       <span className="profile-avatar-fallback">
                         {(profileForm.display_name.trim()[0] ||
