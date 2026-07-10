@@ -23,6 +23,7 @@
     "test:dberrors": "node scripts/supabase-errors-sanity.mjs",
     "test:quest": "node scripts/quest-sanity.mjs",
     "test:layout": "node scripts/layout-sanity.mjs",
+    "test:landingperf": "node scripts/landing-perf-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {
