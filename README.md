@@ -8,10 +8,9 @@ one dark, focused board.
 
 **Live site: [infernotaskboard.com](https://infernotaskboard.com/)**
 
-> **Release status: alpha / release candidate.** Inferno is stable enough for
-> daily use and we are actively polishing it toward a 1.0 release. You may still
-> hit rough edges. Bug reports and feedback from early users are very welcome;
-> see [How to report issues](#how-to-report-issues) below.
+> **Inferno is live and free to use.** We actively maintain and improve it, and
+> bug reports and feedback are always welcome; see
+> [How to report issues](#how-to-report-issues) below.
 
 ![Inferno Kanban board](public/marketing/board.webp)
 
@@ -313,7 +312,7 @@ framework and exit non-zero on failure.
 ## Operations and release readiness
 
 This section collects the operational tasks that sit outside the app code but
-matter for running Inferno in production during the alpha. Items marked "manual"
+matter for running Inferno in production. Items marked "manual"
 require action in a dashboard or an external account and cannot be done from the
 repository.
 
@@ -330,7 +329,7 @@ Supabase feature and depend on your plan:
   **Project Settings -> Database -> Backups**. Daily automated backups are
   available on paid plans; point-in-time recovery is a separate add-on. Confirm
   which is active for this project rather than assuming backups are on.
-- **Take a manual export before each alpha milestone.** The most portable option
+- **Take a manual export before each release.** The most portable option
   is `supabase db dump` (or `pg_dump` with the project connection string) saved
   somewhere off Supabase. Keep at least one recent copy outside the provider.
 - Do not treat the seeded sample board as a backup; it is regenerated per new
@@ -369,7 +368,7 @@ single call site in `src/main.jsx` stays the same.
 Set up an external uptime checker that pings the production URL
 `https://infernotaskboard.com/` on an interval and alerts you when it is down.
 Free tiers of services such as UptimeRobot, Better Stack, or a hosting-provided
-health check are sufficient for the alpha. Point the check at the root URL and,
+health check are sufficient. Point the check at the root URL and,
 if the service supports it, assert on a `200` status and the presence of the
 page title. This is an external-account task and is not configured from the
 repository.
@@ -427,7 +426,7 @@ Those belong only in the private admin dashboards above.
 Found a bug or have feedback? We want to hear it.
 
 - **In the app:** click the **Feedback** button in the bottom corner. It opens a
-  short form for logged-in alpha testers and can start a pre-filled bug report.
+  short form for logged-in users and can start a pre-filled bug report.
 - **On GitHub:** open an issue using the
   [Bug report template](https://github.com/celestewish/Inferno/issues/new?template=bug_report.yml).
   The template asks for the page, your browser and device, the steps to

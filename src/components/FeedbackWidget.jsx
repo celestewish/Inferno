@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-// Non-invasive feedback launcher for alpha testers. Renders a small floating
+// Non-invasive feedback launcher. Renders a small floating
 // button in the authenticated app only (never on the signed-out landing). It
 // opens a popover with two low-friction paths: file a GitHub bug report using
 // the repo's issue template, or send feedback by email. No paid services and no
@@ -50,7 +50,7 @@ export default function FeedbackWidget({ activeSection }) {
         <div className="feedback-popover" role="dialog" aria-label="Send feedback">
           <p className="feedback-popover-title">Help shape Inferno</p>
           <p className="feedback-popover-copy">
-            Inferno is in alpha. Tell us what broke or what you would change.
+            We would love your input. Tell us what broke or what you would change.
           </p>
           <a
             className="primary-btn feedback-action"
