@@ -25,6 +25,7 @@
     "test:layout": "node scripts/layout-sanity.mjs",
     "test:landingperf": "node scripts/landing-perf-sanity.mjs",
     "test:copy": "node scripts/copy-sanity.mjs",
+    "test:url": "node scripts/url-sanity.mjs",
     "deploy": "npm run build && gh-pages -d dist"
   },
   "dependencies": {

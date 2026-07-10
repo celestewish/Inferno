@@ -3344,6 +3344,9 @@ textarea:hover {
 .feedback-popover-title { margin: 0; font-size: 0.95rem; font-weight: 700; }
 .feedback-popover-copy { margin: 0 0 0.2rem; font-size: 0.82rem; color: var(--text-muted); }
 .feedback-action { width: 100%; text-align: center; text-decoration: none; }
+.feedback-legal { margin: 0.2rem 0 0; text-align: center; font-size: 0.75rem; color: var(--text-muted); }
+.feedback-legal a { color: var(--text-muted); text-decoration: none; }
+.feedback-legal a:hover { text-decoration: underline; }
 @media (max-width: 900px) {
   .feedback-widget { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
 }
@@ -5575,6 +5578,13 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   max-width: 46ch;
   margin: 0 0 1.25rem;
 }
+.studio-demo-note {
+  margin: 0.9rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+  max-width: 48ch;
+}
 
 /* Dante dialogue */
 .quest-dante {
@@ -5800,6 +5810,17 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   color: var(--q-cream);
 }
 .quest-footer-muted { color: var(--text-muted); }
+.quest-footer-links {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+}
+.quest-footer-links a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+.quest-footer-links a:hover { color: var(--q-ember); }
 .quest-footer-link {
   margin-left: auto;
   display: inline-flex;
