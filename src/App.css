@@ -667,15 +667,34 @@ textarea:hover {
    clickable to expand again. Mobile keeps its bottom-bar layout untouched. */
 @media (min-width: 901px) {
   .app-shell.sidebar-collapsed { --sidebar-width: 76px; }
-  .sidebar.app-nav.is-collapsed { padding: 1.5rem 0.75rem; align-items: stretch; }
+  .sidebar.app-nav.is-collapsed {
+    padding: 1.5rem 0.75rem;
+    align-items: stretch;
+    /* The rail is a fixed-width icon column: never let a stray-wide child
+       (search label, kbd hint, board switcher) force a horizontal scrollbar,
+       and keep vertical scroll clean instead of painting native bars over the
+       icons. */
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .sidebar.app-nav.is-collapsed::-webkit-scrollbar { width: 0; height: 0; }
   .sidebar.app-nav.is-collapsed .brand { justify-content: center; }
   .sidebar.app-nav.is-collapsed .brand-copy,
   .sidebar.app-nav.is-collapsed .app-nav-heading,
   .sidebar.app-nav.is-collapsed .app-nav-label,
+  .sidebar.app-nav.is-collapsed .app-nav-search-label,
+  .sidebar.app-nav.is-collapsed .app-nav-kbd,
   .sidebar.app-nav.is-collapsed .stats-panel,
+  .sidebar.app-nav.is-collapsed .board-switcher,
   .sidebar.app-nav.is-collapsed .project-switcher,
   .sidebar.app-nav.is-collapsed .app-nav-account { display: none; }
   .sidebar.app-nav.is-collapsed .app-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
+  .sidebar.app-nav.is-collapsed .app-nav-search {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
 }
 
 .app-nav-menu {

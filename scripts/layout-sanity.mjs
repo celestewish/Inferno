@@ -130,6 +130,30 @@ assert(
   'App.jsx toggles board-area-flush only on the Campfire section',
 )
 
+// ---------------------------------------------------------------------------
+// Condensed desktop sidebar rail (>= 901px, .sidebar.app-nav.is-collapsed)
+// Root cause of the regression: the base .sidebar sets overflow-y: auto, which
+// forces overflow-x to compute to auto; combined with wide children (search
+// label, kbd hint, board switcher) that were never hidden in the 76px rail,
+// this produced an ugly horizontal scrollbar and clipped content. The collapsed
+// rail must clip horizontally, hide its native scrollbar, hide the wide
+// children, and center the search icon.
+// ---------------------------------------------------------------------------
+assert(has('.sidebar.app-nav.is-collapsed', 'overflow-x: hidden'), 'collapsed rail clips horizontal overflow (no horizontal scrollbar)')
+assert(has('.sidebar.app-nav.is-collapsed', 'scrollbar-width: none'), 'collapsed rail hides the native scrollbar (Firefox)')
+assert(
+  has('.sidebar.app-nav.is-collapsed::-webkit-scrollbar', 'width: 0'),
+  'collapsed rail zeroes the WebKit scrollbar so no native bar paints over icons',
+)
+for (const child of ['.app-nav-search-label', '.app-nav-kbd', '.board-switcher', '.project-switcher', '.stats-panel', '.app-nav-account']) {
+  assert(
+    css.includes(`.sidebar.app-nav.is-collapsed ${child}`),
+    `collapsed rail hides wide child ${child}`,
+  )
+}
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-search', 'justify-content: center'), 'collapsed rail centers the search icon')
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-item', 'justify-content: center'), 'collapsed rail centers nav item icons')
+
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
   process.exit(1)
