@@ -76,16 +76,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 }
 
 /* ── Shell ── */
+/* The authenticated app is viewport-locked: the outer wrapper is exactly one
+   screen tall and clips its own overflow, so the document never scrolls as a
+   whole. Scrolling happens inside the sidebar and the main content area, which
+   keeps full-page tools (Campfire, Reports) on screen instead of flowing below
+   the fold and leaving a blank background beside the fixed sidebar. */
+.app-viewport {
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .app-shell {
   display: grid;
   /* minmax(0, 1fr) lets the board column shrink below its content width so the
      Kanban strip scrolls internally instead of expanding past the viewport and
      getting clipped (which made the extra columns unreachable). */
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
-  min-height: 100vh;
+  /* Single full-height row so the sidebar and main area fill the viewport and
+     scroll internally rather than the row growing with content. */
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
   width: 100%;
-  align-items: start;
-  overflow-x: hidden;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 /* Mobile-only navigation chrome. Hidden on desktop; the media query below
@@ -105,11 +122,10 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   display: flex;
   flex-direction: column;
   gap: 1.1rem;
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
   overflow-y: auto;
-  position: sticky;
-  top: 0;
-  align-self: start;
+  align-self: stretch;
 }
 
 /* ── Board area ── */
@@ -119,6 +135,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   gap: 1.25rem;
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow-y: auto;
   align-content: start;
 }
 
@@ -3847,6 +3866,51 @@ textarea:hover {
   .campfire-context.is-open { display: grid; }
   .campfire-form { grid-template-columns: 1fr; }
   .campfire-form .primary-btn { width: 100%; }
+}
+
+/* Campfire fills the viewport on desktop so the composer stays reachable and
+   only the message list scrolls, not the whole page. The main area drops its
+   own scroll (board-area-flush) and hands the height to the campfire view. */
+@media (min-width: 961px) {
+  .board-area-flush {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .board-area-flush .campfire-view {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .board-area-flush .campfire-view > .view-header { flex: none; }
+  .board-area-flush .campfire-layout {
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .board-area-flush .campfire-rooms,
+  .board-area-flush .campfire-context {
+    min-height: 0;
+    max-height: 100%;
+    overflow-y: auto;
+  }
+  .board-area-flush .campfire-feed-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .board-area-flush .campfire-feed-head,
+  .board-area-flush .campfire-form,
+  .board-area-flush .campfire-hint { flex: none; }
+  .board-area-flush .campfire-messages {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+  }
 }
 
 /* ── Docs Hub ─────────────────────────────────────────────────────────────── */

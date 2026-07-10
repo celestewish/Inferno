@@ -80,6 +80,56 @@ assert(
   'the mobile campfire layout track can shrink',
 )
 
+// ---------------------------------------------------------------------------
+// App shell viewport lock (authenticated app only)
+// Root cause of the regression: `.app-shell { min-height: 100vh }` plus a
+// sticky sidebar let the whole document grow and scroll, so main content could
+// scroll away and leave a blank background beside the fixed sidebar. The outer
+// wrapper must be exactly one screen tall and clip its overflow, and the shell,
+// sidebar, and board area must scroll internally instead of the page as a whole.
+// ---------------------------------------------------------------------------
+assert(ruleBody('.app-viewport') !== null, '.app-viewport rule exists')
+assert(has('.app-viewport', '100dvh'), '.app-viewport is one dynamic-viewport tall (100dvh)')
+assert(has('.app-viewport', 'overflow: hidden'), '.app-viewport clips its own overflow (no whole-document scroll)')
+assert(has('.app-viewport', 'flex-direction: column'), '.app-viewport is a vertical flex container')
+
+assert(has('.app-shell', 'min-height: 0'), '.app-shell can shrink inside the viewport (min-height: 0)')
+assert(has('.app-shell', 'overflow: hidden'), '.app-shell clips overflow so its rows scroll internally')
+assert(has('.app-shell', 'flex: 1'), '.app-shell fills the remaining viewport height')
+assert(has('.app-shell', 'grid-template-rows: minmax(0, 1fr)'), '.app-shell uses a single shrinkable full-height row')
+
+assert(has('.board-area', 'overflow-y: auto'), '.board-area scrolls its own content instead of the document')
+assert(has('.board-area', 'min-height: 0'), '.board-area can shrink so its scroll engages (min-height: 0)')
+
+// ---------------------------------------------------------------------------
+// Campfire full-height mode (desktop >= 961px)
+// The header must not push the columns below the fold; the message list scrolls
+// internally so the composer stays reachable without scrolling the page.
+// ---------------------------------------------------------------------------
+assert(has('.board-area-flush', 'display: flex'), '.board-area-flush is a flex column that hands height to campfire')
+assert(has('.board-area-flush', 'overflow: hidden'), '.board-area-flush drops its own scroll')
+assert(has('.board-area-flush .campfire-view', 'flex: 1'), 'campfire view fills the board area height')
+assert(has('.board-area-flush .campfire-view', 'min-height: 0'), 'campfire view can shrink (min-height: 0)')
+assert(has('.board-area-flush .campfire-layout', 'flex: 1'), 'campfire layout fills remaining height below the header')
+assert(has('.board-area-flush .campfire-layout', 'min-height: 0'), 'campfire layout can shrink (min-height: 0)')
+assert(has('.board-area-flush .campfire-feed-wrap', 'min-height: 0'), 'campfire feed wrap can shrink so the list scrolls, not the page')
+assert(has('.board-area-flush .campfire-feed-wrap', 'overflow: hidden'), 'campfire feed wrap clips so only the message list scrolls')
+assert(has('.board-area-flush .campfire-messages', 'flex: 1'), 'campfire message list takes the remaining height')
+assert(has('.board-area-flush .campfire-messages', 'min-height: 0'), 'campfire message list can shrink to enable its scroll')
+assert(has('.board-area-flush .campfire-messages', 'max-height: none'), 'campfire message list drops the 52vh cap in full-height mode')
+
+// ---------------------------------------------------------------------------
+// JSX wiring: the CSS above only helps if the authenticated app actually mounts
+// the wrapper class and toggles the flush modifier for the Campfire section.
+// ---------------------------------------------------------------------------
+const jsx = readFileSync(join(here, '..', 'src', 'App.jsx'), 'utf8')
+assert(jsx.includes('className="app-viewport"'), 'App.jsx wraps the authenticated app in .app-viewport')
+assert(jsx.includes('board-area-flush'), 'App.jsx applies the board-area-flush modifier')
+assert(
+  /activeSection === 'campfire'\s*\?\s*' board-area-flush'/.test(jsx),
+  'App.jsx toggles board-area-flush only on the Campfire section',
+)
+
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
   process.exit(1)
