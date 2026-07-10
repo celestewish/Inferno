@@ -317,6 +317,10 @@ matter for running Inferno in production during the alpha. Items marked "manual"
 require action in a dashboard or an external account and cannot be done from the
 repository.
 
+For the full release operations procedures (backups, uptime monitoring,
+incident response, and the maintenance cadence), see
+[RELEASE_RUNBOOK.md](RELEASE_RUNBOOK.md).
+
 ### Data backups (manual)
 
 Inferno stores all application data in Supabase (Postgres). Backups are a
