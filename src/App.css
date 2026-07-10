@@ -3316,6 +3316,7 @@ textarea:hover {
   list-style: none;
   margin: 0;
   padding: 0;
+  width: 100%;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.7rem;
@@ -3609,8 +3610,8 @@ textarea:hover {
   align-items: start;
 }
 
-.campfire-rooms { display: grid; gap: 12px; }
-.campfire-room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.campfire-rooms { display: grid; gap: 12px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.campfire-room-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .campfire-room {
   width: 100%;
   display: flex;
@@ -3635,8 +3636,8 @@ textarea:hover {
 .campfire-room-count { flex: none; font-size: 0.72rem; color: var(--text-muted); white-space: nowrap; }
 
 /* Channels grouped by project, with per-project add controls. */
-.campfire-room-groups { display: grid; gap: 14px; }
-.campfire-room-group { display: grid; gap: 6px; }
+.campfire-room-groups { display: grid; gap: 14px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
+.campfire-room-group { display: grid; gap: 6px; min-width: 0; grid-template-columns: minmax(0, 1fr); }
 .campfire-room-group-head {
   display: flex;
   align-items: center;
@@ -3674,7 +3675,7 @@ textarea:hover {
   color: #edf2ff;
   border-color: color-mix(in srgb, var(--ember) 45%, var(--card-border));
 }
-.campfire-room-row { display: flex; align-items: center; gap: 4px; }
+.campfire-room-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .campfire-room-row .campfire-room { flex: 1; min-width: 0; }
 .campfire-remove-channel {
   display: inline-flex;
@@ -3839,7 +3840,7 @@ textarea:hover {
 }
 
 @media (max-width: 960px) {
-  .campfire-layout { grid-template-columns: 1fr; }
+  .campfire-layout { grid-template-columns: minmax(0, 1fr); }
   .campfire-rooms { order: -1; }
   .campfire-context-toggle { display: inline-flex; }
   .campfire-context { display: none; }
