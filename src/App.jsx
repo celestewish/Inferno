@@ -440,6 +440,7 @@ function App() {
   const [reposAccessError, setReposAccessError] = useState(false)
   const [meetingNotes, setMeetingNotes] = useState([])
   const [meetingNotesMigrationMissing, setMeetingNotesMigrationMissing] = useState(false)
+  const [meetingNotesAccessError, setMeetingNotesAccessError] = useState(false)
   const [notificationReads, setNotificationReads] = useState(() => new Set())
   const [notificationsMigrationMissing, setNotificationsMigrationMissing] = useState(false)
   const [notificationsAccessError, setNotificationsAccessError] = useState(false)
@@ -569,6 +570,7 @@ useEffect(() => {
       setReposMigrationMissing(false)
       setMeetingNotes([])
       setMeetingNotesMigrationMissing(false)
+      setMeetingNotesAccessError(false)
       setNotificationReads(new Set())
       setNotificationsMigrationMissing(false)
     }
@@ -780,6 +782,7 @@ setCurrentBoardId(activeBoardId)
         setReposMigrationMissing(false)
         setMeetingNotes([])
         setMeetingNotesMigrationMissing(false)
+        setMeetingNotesAccessError(false)
         setNotificationReads(new Set())
         setNotificationsMigrationMissing(false)
   return
@@ -913,7 +916,8 @@ setCurrentProjectId((currentId) =>
   setReposMigrationMissing(isMissingTableError(repoError) || isMissingColumnError(repoError))
   setReposAccessError(isAccessError(repoError))
   setRepos(repoData?.length ? repoData.map(dbToRepo) : [])
-  setMeetingNotesMigrationMissing(Boolean(meetingError))
+  setMeetingNotesMigrationMissing(isMissingTableError(meetingError) || isMissingColumnError(meetingError))
+  setMeetingNotesAccessError(isAccessError(meetingError))
   setMeetingNotes(meetingData?.length ? meetingData.map(dbToMeetingNote) : [])
   setNotificationsMigrationMissing(isMissingTableError(notifReadError) || isMissingColumnError(notifReadError))
   setNotificationsAccessError(isAccessError(notifReadError))
@@ -3135,9 +3139,12 @@ const createMeetingNote = async (value) => {
     console.error('Create meeting note error:', formatSupabaseError(error), error)
     return {
       ok: false,
-      message: isMissingColumnError(error)
-        ? 'Run the War Room migration first.'
-        : 'Could not save the meeting. Please try again.',
+      message:
+        isMissingTableError(error) || isMissingColumnError(error)
+          ? 'Run the War Room migration first.'
+          : isAccessError(error)
+            ? 'Could not save. Sign in again, or check your access to this board.'
+            : 'Could not save the meeting. Please try again.',
     }
   }
 
@@ -4645,6 +4652,7 @@ return (
             projects={projects}
             notes={meetingNotes}
             migrationMissing={meetingNotesMigrationMissing}
+            accessError={meetingNotesAccessError}
             onCreateNote={createMeetingNote}
             onUpdateNote={updateMeetingNote}
             onArchiveNote={archiveMeetingNote}

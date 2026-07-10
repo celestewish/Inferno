@@ -89,6 +89,25 @@ assert(
   'a truly missing notification_reads table DOES drive the migration banner',
 )
 
+// War Room / meeting_notes guard: meeting_notes had RLS + policies but no table
+// GRANT, so an authenticated board member's read/write failed with 42501. This
+// must route to the access banner, NOT the "Apply the War Room migration
+// (supabase db push)" banner (the reported bug).
+const meetingWrite = { code: '42501', status: 401, message: 'permission denied for table meeting_notes' }
+assert(
+  (isMissingTableError(meetingWrite) || isMissingColumnError(meetingWrite)) === false,
+  'meeting_notes 42501 does NOT drive the War Room migration banner',
+)
+assert(isAccessError(meetingWrite) === true, 'meeting_notes 42501 is an access error')
+
+// A genuinely missing meeting_notes table must still drive the migration banner.
+const meetingMissing = { code: 'PGRST205', message: 'Could not find the table public.meeting_notes in the schema cache' }
+assert(
+  (isMissingTableError(meetingMissing) || isMissingColumnError(meetingMissing)) === true,
+  'a truly missing meeting_notes table DOES drive the War Room migration banner',
+)
+assert(isAccessError(meetingMissing) === false, 'a missing meeting_notes table is NOT an access error')
+
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)
   process.exit(1)
