@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
   BOARD_COLUMNS,
   STUDIO_TASKS,
@@ -53,13 +53,31 @@ const DRAG_THRESHOLD = 6
 // A single pointer-drag engine shared by task cards and crew tokens. Uses
 // Pointer Events so mouse and touch behave the same, and a movement threshold
 // so a tap (no drag) can be handled separately as a fallback.
+//
+// Performance: pointer coordinates live in a ref and are written straight to
+// the drag-ghost element's transform inside a requestAnimationFrame callback,
+// so continuous pointer movement never triggers a React re-render. Only the
+// low-frequency drag metadata (which item, and whether the threshold was
+// crossed) is kept in state, because that drives class names on the board.
 function usePointerDrag(onDrop, onTap) {
-  const [drag, setDrag] = useState(null)
+  const [dragMeta, setDragMeta] = useState(null)
+  const ghostRef = useRef(null)
+  const stateRef = useRef(null)
+  const rafRef = useRef(0)
+
+  const paintGhost = useCallback(() => {
+    rafRef.current = 0
+    const s = stateRef.current
+    const el = ghostRef.current
+    if (s && el) {
+      el.style.transform = `translate3d(${s.x}px, ${s.y}px, 0) translate(-50%, -140%)`
+    }
+  }, [])
 
   const start = useCallback(
     (kind, id, label) => (event) => {
       event.currentTarget.setPointerCapture?.(event.pointerId)
-      setDrag({
+      stateRef.current = {
         kind,
         id,
         label,
@@ -68,44 +86,72 @@ function usePointerDrag(onDrop, onTap) {
         startX: event.clientX,
         startY: event.clientY,
         moved: false,
-      })
+      }
+      setDragMeta({ kind, id, label, moved: false })
     },
     [],
   )
 
-  const move = useCallback((event) => {
-    setDrag((current) => {
-      if (!current) return current
-      const moved =
-        current.moved ||
-        Math.hypot(event.clientX - current.startX, event.clientY - current.startY) > DRAG_THRESHOLD
-      return { ...current, x: event.clientX, y: event.clientY, moved }
-    })
-  }, [])
+  const move = useCallback(
+    (event) => {
+      const s = stateRef.current
+      if (!s) return
+      s.x = event.clientX
+      s.y = event.clientY
+      if (
+        !s.moved &&
+        Math.hypot(event.clientX - s.startX, event.clientY - s.startY) > DRAG_THRESHOLD
+      ) {
+        s.moved = true
+        setDragMeta((m) => (m ? { ...m, moved: true } : m))
+      }
+      if (s.moved && !rafRef.current) {
+        rafRef.current = requestAnimationFrame(paintGhost)
+      }
+    },
+    [paintGhost],
+  )
 
   const end = useCallback(
     (event) => {
+      const s = stateRef.current
       const clientX = event.clientX
       const clientY = event.clientY
-      setDrag((current) => {
-        if (current) {
-          if (current.moved) onDrop?.(current.kind, current.id, clientX, clientY)
-          else onTap?.(current.kind, current.id)
-        }
-        return null
-      })
+      stateRef.current = null
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = 0
+      }
+      if (s) {
+        if (s.moved) onDrop?.(s.kind, s.id, clientX, clientY)
+        else onTap?.(s.kind, s.id)
+      }
+      setDragMeta(null)
     },
     [onDrop, onTap],
   )
 
-  return { drag, start, move, end }
+  // Position the ghost before paint on the frame it first mounts so it never
+  // flashes at the origin, then rAF keeps it under the pointer.
+  useLayoutEffect(() => {
+    if (dragMeta?.moved) paintGhost()
+  }, [dragMeta?.moved, paintGhost])
+
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current)
+    },
+    [],
+  )
+
+  return { dragMeta, ghostRef, start, move, end }
 }
 
 function initials(name) {
   return name.slice(0, 1).toUpperCase()
 }
 
-function MeterBar({ meterKey, value }) {
+const MeterBar = memo(function MeterBar({ meterKey, value }) {
   const meta = METER_META[meterKey]
   const Icon = meta.icon
   const low = value < 30
@@ -121,7 +167,24 @@ function MeterBar({ meterKey, value }) {
       </span>
     </div>
   )
-}
+})
+
+// Self-contained deadline clock. It owns its own interval so the once-a-second
+// tick re-renders only this small node instead of the whole landing tree. The
+// countdown is purely cosmetic (no game logic reads it), so isolating it here
+// is behavior-preserving.
+const StudioCountdown = memo(function StudioCountdown({ className, testId }) {
+  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_DEADLINE_SECONDS)
+  useEffect(() => {
+    const timer = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000)
+    return () => clearInterval(timer)
+  }, [])
+  return (
+    <span className={className} data-testid={testId}>
+      {formatCountdown(secondsLeft)}
+    </span>
+  )
+})
 
 export default function QuestLanding({ openLogin, openSignup }) {
   const [tasks, setTasks] = useState(initialTasks)
@@ -132,15 +195,9 @@ export default function QuestLanding({ openLogin, openSignup }) {
   const [pickedCard, setPickedCard] = useState(null)
   const [roomTried, setRoomTried] = useState({})
   const [selectedMember, setSelectedMember] = useState(null)
-  const [secondsLeft, setSecondsLeft] = useState(DEFAULT_DEADLINE_SECONDS)
   const [started, setStarted] = useState(false)
   const [shipped, setShipped] = useState(false)
   const boardRef = useRef(null)
-
-  useEffect(() => {
-    const timer = setInterval(() => setSecondsLeft((s) => (s > 0 ? s - 1 : 0)), 1000)
-    return () => clearInterval(timer)
-  }, [])
 
   const meters = useMemo(
     () => computeMeters({ tasks, assignments, roomActions: rooms }),
@@ -273,7 +330,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
     }
   }, [])
 
-  const { drag, start, move, end } = usePointerDrag(handleDrop, handleTap)
+  const { dragMeta, ghostRef, start, move, end } = usePointerDrag(handleDrop, handleTap)
 
   const startJam = () => {
     setStarted(true)
@@ -339,7 +396,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
           </div>
           <div className="studio-hud-timer">
             <span className="quest-hud-key">Deadline</span>
-            <span className="quest-hud-clock" data-testid="studio-clock">{formatCountdown(secondsLeft)}</span>
+            <StudioCountdown className="quest-hud-clock" testId="studio-clock" />
           </div>
         </div>
       </div>
@@ -386,7 +443,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
           <div className="studio-columns">
             {BOARD_COLUMNS.map((col) => {
               const colTasks = tasks.filter((t) => t.col === col.id)
-              const isTarget = drag?.kind === 'task' && drag.moved
+              const isTarget = dragMeta?.kind === 'task' && dragMeta.moved
               return (
                 <div
                   key={col.id}
@@ -401,7 +458,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
                       const memberId = assignments[task.id]
                       const member = getMember(memberId)
                       const quality = assignmentQuality(meta, member)
-                      const dragging = drag?.kind === 'task' && drag.id === task.id
+                      const dragging = dragMeta?.kind === 'task' && dragMeta.id === task.id
                       const canAssignHere = Boolean(selectedMember)
                       return (
                         <li
@@ -487,7 +544,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
             <ul className="studio-token-row">
               {TEAM.map((member) => {
                 const active = selectedMember === member.id
-                const dragging = drag?.kind === 'member' && drag.id === member.id
+                const dragging = dragMeta?.kind === 'member' && dragMeta.id === member.id
                 return (
                   <li key={member.id}>
                     <button
@@ -672,7 +729,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
           <div className="studio-station-head">
             <span className="studio-station-icon" aria-hidden="true"><TrophyIcon size={16} /></span>
             <h2 className="studio-station-title">Deadline Boss</h2>
-            <span className="studio-station-meta">{formatCountdown(secondsLeft)}</span>
+            <StudioCountdown className="studio-station-meta" testId="studio-ship-clock" />
           </div>
           {result ? (
             <div className={`studio-result is-${result.tier}`} role="status" data-testid="studio-result">
@@ -723,9 +780,9 @@ export default function QuestLanding({ openLogin, openSignup }) {
         </button>
       </footer>
 
-      {drag && drag.moved ? (
-        <div className="studio-drag-ghost" style={{ left: drag.x, top: drag.y }} aria-hidden="true">
-          {drag.label}
+      {dragMeta && dragMeta.moved ? (
+        <div ref={ghostRef} className="studio-drag-ghost" aria-hidden="true">
+          {dragMeta.label}
         </div>
       ) : null}
     </div>

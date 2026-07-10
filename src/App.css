@@ -6687,8 +6687,14 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
 /* Drag ghost */
 .studio-drag-ghost {
   position: fixed;
+  top: 0;
+  left: 0;
   z-index: 80;
   transform: translate(-50%, -140%);
+  /* The ghost is the only element that moves during a drag and is written to
+     via requestAnimationFrame, so promote it to its own compositor layer. It
+     is conditionally rendered (only present mid-drag), so this hint is scoped. */
+  will-change: transform;
   pointer-events: none;
   font-family: var(--q-pixel);
   font-size: 0.6rem;
