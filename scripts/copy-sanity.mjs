@@ -130,11 +130,15 @@ for (const id of ['id: page', 'id: environment', 'id: steps', 'id: expected', 'i
 // and must not leave a bare "Rousell Technologies" placeholder without "LLC".
 const LEGAL_FILES = ['public/terms.html', 'public/privacy.html']
 const BARE_ENTITY = /Rousell Technologies(?! LLC)/
+// Public legal copy must read as a released product, not a pre-release build:
+// no alpha/beta/release-candidate/pre-release/test-phase positioning language.
+const PRERELEASE = /\b(alpha|beta|release[ -]?candidate|pre[ -]?release|test[ -]?phase|testing[ -]?only)\b/i
 for (const rel of LEGAL_FILES) {
   const text = read(rel)
   assert(text.includes('Rousell Technologies LLC'), `${rel} names Rousell Technologies LLC`)
   assert(!BARE_ENTITY.test(text), `${rel} has no bare "Rousell Technologies" placeholder`)
   assert(text.includes('celeste@infernotaskboard.com'), `${rel} shows the support email`)
+  assert(!PRERELEASE.test(text), `${rel} has no alpha/beta/release-candidate positioning`)
   assert(!EM_DASH.test(text), `${rel} has no em dash`)
   assert(!EMOJI.test(text), `${rel} has no emoji`)
 }
