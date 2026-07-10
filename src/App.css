@@ -3347,6 +3347,7 @@ textarea:hover {
 .feedback-legal { margin: 0.2rem 0 0; text-align: center; font-size: 0.75rem; color: var(--text-muted); }
 .feedback-legal a { color: var(--text-muted); text-decoration: none; }
 .feedback-legal a:hover { text-decoration: underline; }
+.feedback-company { margin: 0.1rem 0 0; text-align: center; font-size: 0.7rem; color: var(--text-muted); }
 @media (max-width: 900px) {
   .feedback-widget { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
 }
@@ -5821,6 +5822,11 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   font-weight: 600;
 }
 .quest-footer-links a:hover { color: var(--q-ember); }
+.quest-footer-copy {
+  flex-basis: 100%;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
 .quest-footer-link {
   margin-left: auto;
   display: inline-flex;

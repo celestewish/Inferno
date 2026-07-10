@@ -74,6 +74,18 @@ role (viewer, editor, or owner), owners can transfer ownership or remove members
 these boundaries are enforced at the database level. This lets a studio safely run
 several separate boards from one account.
 
+## Company and support
+
+Inferno is a product operated by **Rousell Technologies LLC**.
+
+- **Legal entity:** Rousell Technologies LLC
+- **Product and domain:** Inferno at [infernotaskboard.com](https://infernotaskboard.com/)
+- **Support and contact:** [celeste@infernotaskboard.com](mailto:celeste@infernotaskboard.com)
+- **Legal:** see the [Terms of Service](https://infernotaskboard.com/terms.html) and
+  [Privacy Policy](https://infernotaskboard.com/privacy.html)
+
+For bug reports and feedback, see [How to report issues](#how-to-report-issues).
+
 ## Tech stack
 
 - **Frontend:** React + [Vite](https://vitejs.dev/)
@@ -377,6 +389,34 @@ need to be produced for launch:
 Launch checklist: pick one hero screenshot, pair it with the tagline, confirm
 the Open Graph image renders in a link-preview debugger, and schedule posts using
 the per-platform art above.
+
+### Account setup checklist (external, manual)
+
+Now that Rousell Technologies LLC exists, align the owner and admin accounts
+below with the legal entity and support mailbox. These live in external
+dashboards and cannot be changed from this repository. Use the exact legal name
+`Rousell Technologies LLC` and the support address
+`celeste@infernotaskboard.com` consistently.
+
+- **Domain registrar and admin profile (IONOS):** set the account or billing
+  profile legal name to `Rousell Technologies LLC`, set the support/contact
+  email, and review the owner contact and WHOIS/privacy settings for the
+  `infernotaskboard.com` domain.
+- **Resend:** confirm the account/organization identity reflects
+  `Rousell Technologies LLC`, set the support/contact email, and keep the
+  verified sending domain `infernotaskboard.com` (sender
+  `Inferno <celeste@infernotaskboard.com>`) in good standing.
+- **Supabase:** set the project and organization display name to reference
+  Inferno / Rousell Technologies LLC, set the billing and contact email, confirm
+  backup settings are enabled and verified, and set a support/security contact.
+- **GitHub repo and organization:** confirm the repository description names
+  Inferno, keep the issue templates and the support contact in
+  `.github/ISSUE_TEMPLATE/config.yml` pointed at the support mailbox, and add the
+  operating entity to the org profile if desired.
+
+Do not put an EIN, SSN, date of birth, personal home address, or bank or payment
+account numbers in this public repository or in any public filing or issue.
+Those belong only in the private admin dashboards above.
 
 ## How to report issues
 
