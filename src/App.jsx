@@ -3785,6 +3785,7 @@ const pendingInvitesPanel =
 
 return (
   <>
+    <div className="app-viewport">
     {pendingInvitesPanel}
     <div className="celebration-region" aria-live="polite" role="status" data-testid="celebration-region">
       {celebrations.map((celebration) => (
@@ -4038,7 +4039,10 @@ return (
         mobileOpen={mobileNavOpen}
         onRequestClose={() => setMobileNavOpen(false)}
       />
-      <main className="board-area" data-testid={`view-${activeSection}`}>
+      <main
+        className={`board-area${activeSection === 'campfire' ? ' board-area-flush' : ''}`}
+        data-testid={`view-${activeSection}`}
+      >
         {activeSection === 'home' ? (
           <StudioHomeView
             projects={projects}
@@ -5663,6 +5667,7 @@ return (
           </section>
         ) : null}
       </main>
+    </div>
     </div>
 
     <TaskModal
