@@ -135,14 +135,14 @@ export default function CodeForgeView({
       </header>
 
       {migrationMissing ? (
-        <div className="forge-migration-note" role="status" data-testid="codeforge-migration-note">
+        <div className="app-data-note is-setup" role="status" data-testid="codeforge-migration-note">
           Code Forge needs its database migration. Run <code className="chat-code">supabase db push</code> to
           start linking repositories. The rest of Inferno keeps working.
         </div>
       ) : null}
 
       {accessError ? (
-        <div className="forge-migration-note" role="status" data-testid="codeforge-access-note">
+        <div className="app-data-note is-access" role="status" data-testid="codeforge-access-note">
           Code Forge could not load. You may need to sign in again, or you do not have access to this
           board's repositories. The rest of Inferno keeps working.
         </div>

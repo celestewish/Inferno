@@ -50,13 +50,14 @@ export default function NotificationsView({
       </header>
 
       {migrationMissing ? (
-        <p className="notif-note" role="status">
-          Apply the notifications migration (supabase db push) to remember which alerts you have read.
+        <p className="app-data-note is-setup" role="status" data-testid="notif-migration-note">
+          Notifications need their database migration. Run <code className="chat-code">supabase db push</code> to
+          remember which alerts you have read. The rest of Inferno keeps working.
         </p>
       ) : null}
 
       {accessError ? (
-        <p className="notif-note" role="status" data-testid="notif-access-note">
+        <p className="app-data-note is-access" role="status" data-testid="notif-access-note">
           Read state could not load. You may need to sign in again. The rest of Inferno keeps working.
         </p>
       ) : null}

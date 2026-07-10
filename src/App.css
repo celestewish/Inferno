@@ -1443,6 +1443,29 @@ textarea:hover {
 .onboarding-sample-callout strong { color: color-mix(in srgb, white 84%, var(--ember)); }
 
 /* ── Load error fallback ── */
+.app-loading {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.9rem;
+  min-height: 100dvh;
+  padding: 1.5rem;
+  color: var(--text-muted);
+}
+.app-loading-spinner {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 3px solid color-mix(in srgb, var(--ember) 25%, var(--card-border));
+  border-top-color: var(--ember);
+  animation: app-loading-spin 0.8s linear infinite;
+}
+.app-loading p { margin: 0; font-size: 0.95rem; }
+@keyframes app-loading-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .app-loading-spinner { animation-duration: 2.4s; }
+}
+
 .load-error-shell {
   display: grid;
   place-items: center;
@@ -1701,6 +1724,17 @@ textarea:hover {
 .agenda-undated { display: grid; gap: 0.75rem; }
 
 /* Reports view */
+.report-empty {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 0.6rem;
+  padding: 2.4rem 1.6rem;
+}
+.report-empty-icon { color: var(--ember); }
+.report-empty h2 { margin: 0; font-size: 1.1rem; }
+.report-empty p { margin: 0; max-width: 42ch; }
+
 .report-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -3270,6 +3304,49 @@ textarea:hover {
   max-width: min(92vw, 320px);
   pointer-events: none;
 }
+
+/* Alpha feedback launcher: a small fixed button in the authenticated app. */
+.feedback-widget {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1150;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+.feedback-toggle {
+  align-self: flex-end;
+  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 16%, var(--surface-custom));
+  color: var(--text-strong, #fff);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--ember) 25%, transparent);
+}
+.feedback-toggle:hover {
+  background: color-mix(in srgb, var(--ember) 26%, var(--surface-custom));
+}
+.feedback-popover {
+  width: min(88vw, 280px);
+  display: grid;
+  gap: 0.55rem;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--card-border);
+  background: var(--surface-custom, #16101d);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+}
+.feedback-popover-title { margin: 0; font-size: 0.95rem; font-weight: 700; }
+.feedback-popover-copy { margin: 0 0 0.2rem; font-size: 0.82rem; color: var(--text-muted); }
+.feedback-action { width: 100%; text-align: center; text-decoration: none; }
+@media (max-width: 900px) {
+  .feedback-widget { bottom: calc(1rem + env(safe-area-inset-bottom, 0px)); }
+}
 .celebration-toast {
   pointer-events: auto;
   display: flex;
@@ -3955,14 +4032,26 @@ textarea:hover {
 .docs-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .docs-link-btn { display: inline-flex; align-items: center; gap: 8px; }
 
-.docs-migration-note {
-  border: 1px solid color-mix(in srgb, var(--ember) 32%, var(--card-border));
-  background: color-mix(in srgb, var(--ember) 10%, transparent);
-  color: #ffd7c2;
+/* Shared data/access banner used across Docs Hub, Code Forge, Notifications,
+   and War Room. .is-setup means the feature needs a database migration (admin
+   setup state); .is-access means a sign-in / permission / RLS problem. */
+.app-data-note {
+  margin: 0;
   border-radius: var(--radius-md);
   padding: 0.85rem 1rem;
   font-size: 0.9rem;
   line-height: 1.55;
+}
+.app-data-note code, .app-data-note .chat-code { font-size: 0.85em; }
+.app-data-note.is-setup {
+  border: 1px solid color-mix(in srgb, var(--ember) 32%, var(--card-border));
+  background: color-mix(in srgb, var(--ember) 10%, transparent);
+  color: #ffd7c2;
+}
+.app-data-note.is-access {
+  border: 1px solid color-mix(in srgb, #ff9a9a 38%, var(--card-border));
+  background: color-mix(in srgb, #ff9a9a 10%, transparent);
+  color: #ffd0d0;
 }
 
 .docs-toolbar { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: flex-end; }
@@ -4105,16 +4194,6 @@ textarea:hover {
 .forge-view { display: grid; gap: 1.3rem; }
 .forge-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
 .forge-link-btn { display: inline-flex; align-items: center; gap: 8px; }
-
-.forge-migration-note {
-  border: 1px solid color-mix(in srgb, var(--ember) 32%, var(--card-border));
-  background: color-mix(in srgb, var(--ember) 10%, transparent);
-  color: #ffd7c2;
-  border-radius: var(--radius-md);
-  padding: 0.85rem 1rem;
-  font-size: 0.9rem;
-  line-height: 1.55;
-}
 
 .forge-toolbar { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: flex-end; }
 .forge-search { position: relative; flex: 1 1 220px; min-width: 0; }
@@ -4551,15 +4630,6 @@ textarea:hover {
   display: flex;
   flex-direction: column;
   gap: 18px;
-}
-.notif-note {
-  margin: 0;
-  padding: 12px 16px;
-  border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--ember) 45%, var(--card-border));
-  background: color-mix(in srgb, var(--ember) 10%, var(--surface-custom));
-  color: var(--text-muted);
-  font-size: 0.86rem;
 }
 .notif-empty {
   display: flex;

@@ -8,6 +8,11 @@ one dark, focused board.
 
 **Live site: [infernotaskboard.com](https://infernotaskboard.com/)**
 
+> **Release status: alpha / release candidate.** Inferno is stable enough for
+> daily use and we are actively polishing it toward a 1.0 release. You may still
+> hit rough edges. Bug reports and feedback from early users are very welcome;
+> see [How to report issues](#how-to-report-issues) below.
+
 ![Inferno Kanban board](public/marketing/board.webp)
 
 ## What is Inferno?
@@ -205,6 +210,40 @@ Current migrations:
   `role` `text` column to `team_members` for each member's assigned role. Both
   are non-destructive: if the migration has not been applied, the app falls back
   to the built-in defaults and simply cannot persist new customizations.
+- `20260715000000_board_collaboration_rls_and_rpcs.sql`: adds the board
+  collaboration model, including row level security policies and the RPCs that
+  power sharing a board with teammates.
+- `20260716000000_add_delete_board_rpc.sql`: adds the RPC that deletes a board
+  and its dependent rows safely under RLS.
+- `20260717000000_add_gamification_fields.sql`: adds the gamification columns
+  (XP, level, streak) used by the Progress panel.
+- `20260718000000_add_project_boss_fights.sql`: adds the project boss fight
+  fields that model milestones as boss encounters.
+- `20260719000000_add_campfire_messaging.sql`: adds the Campfire board chat
+  tables and their RLS policies.
+- `20260720000000_add_campfire_channels.sql`: adds user-created Campfire
+  channels so each board can organize chat into topics.
+- `20260721000000_add_board_docs.sql`: adds the Docs Hub table that links
+  documents to a board, with board-scoped RLS.
+- `20260722000000_add_board_repositories.sql`: adds the Code Forge table that
+  links repositories to a board, with board-scoped RLS.
+- `20260723000000_add_meeting_notes.sql`: adds the War Room meeting notes table
+  and its board-scoped RLS policies.
+- `20260724000000_add_notification_reads.sql`: adds the table that remembers
+  which notifications each user has read.
+- `20260725000000_add_task_links.sql`: adds the table that links related tasks
+  together.
+- `20260726000000_grant_board_docs_privileges.sql`: grants the table privileges
+  on `board_docs` to the `authenticated` role. RLS alone is not enough; without
+  the GRANT, authenticated board members hit a `42501 permission denied` error.
+- `20260727000000_grant_repos_and_notification_privileges.sql`: grants the table
+  privileges on `board_repositories` and `notification_reads` to the
+  `authenticated` role, fixing the same missing-GRANT permission error.
+- `20260728000000_grant_meeting_notes_privileges.sql`: grants the table
+  privileges on `meeting_notes` to the `authenticated` role so War Room notes
+  load and save for board members. Run `supabase db push` after deploying this
+  release to apply it; until then War Room shows an access notice instead of
+  loading notes.
 
 > **"Your profile database is missing the new profile columns."**
 > This message in **Settings → Profile** means the profile columns are absent
@@ -247,3 +286,21 @@ npm run build      # production build to dist/
 npm run preview    # preview the production build locally
 npm run test:dates # run the date-handling sanity checks
 ```
+
+## How to report issues
+
+Found a bug or have feedback? We want to hear it.
+
+- **In the app:** click the **Feedback** button in the bottom corner. It opens a
+  short form for logged-in alpha testers and can start a pre-filled bug report.
+- **On GitHub:** open an issue using the
+  [Bug report template](https://github.com/celestewish/Inferno/issues/new?template=bug_report.yml).
+  The template asks for the page, your browser and device, the steps to
+  reproduce, what you expected, what actually happened, an optional screenshot,
+  and a severity so we can triage quickly.
+- **By email:** write to
+  [celeste@infernotaskboard.com](mailto:celeste@infernotaskboard.com) if you
+  prefer not to use GitHub.
+
+When reporting a bug, please include the page you were on, what you did, and what
+you expected to happen. Screenshots help a lot.

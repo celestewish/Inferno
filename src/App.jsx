@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { supabase, formatSupabaseError, isMissingColumnError, isMissingTableError, isAccessError } from './lib/supabase'
 import ProjectSidebar from './components/ProjectSidebar'
+import FeedbackWidget from './components/FeedbackWidget'
 import ProjectHeader from './components/ProjectHeader'
 import TaskBoard from './components/TaskBoard'
 import DetailsPanel from './components/DetailsPanel'
@@ -130,14 +131,14 @@ function OnboardingGuide({
       title: 'Start with a board',
       body: (
         <>
-          A <strong>board</strong> is your studio workspace — one shared home for a game or team.
+          A <strong>board</strong> is your studio workspace, one shared home for a game or team.
           {boardName ? (
             <> You are currently working in <strong>{boardName}</strong>.</>
           ) : (
             <> We created your first board automatically so you can dive right in.</>
           )}
           {isExampleBoard ? (
-            <> It's pre-filled with an <strong>example board</strong> — sample projects and tasks you can freely edit or delete as you make it your own.</>
+            <> It's pre-filled with an <strong>example board</strong>: sample projects and tasks you can freely edit or delete as you make it your own.</>
           ) : null}
         </>
       ),
@@ -148,7 +149,7 @@ function OnboardingGuide({
       title: 'Organize work into projects',
       body: (
         <>
-          Inside a board, <strong>projects</strong> group related work — a feature area, a milestone,
+          Inside a board, <strong>projects</strong> group related work such as a feature area, a milestone,
           or a whole game. Add or switch projects from the left sidebar.
           {projectCount > 0 ? <> You already have {projectCount} to explore.</> : null}
         </>
@@ -160,7 +161,7 @@ function OnboardingGuide({
       title: 'Break projects into tasks',
       body: (
         <>
-          <strong>Tasks</strong> are the actual work — design, art, code, audio, polish. Create one from
+          <strong>Tasks</strong> are the actual work: design, art, code, audio, polish. Create one from
           the quick-create bar, then drag it across the pipeline from Backlog to Done.
           {taskCount > 0 ? <> {taskCount} tasks are already on the board.</> : null}
         </>
@@ -175,7 +176,7 @@ function OnboardingGuide({
       title: 'Talk it through in board chat',
       body: (
         <>
-          Use <strong>Team messages</strong> to keep decisions next to the work — no separate tool
+          Use <strong>Team messages</strong> to keep decisions next to the work, with no separate tool
           needed. Everyone on the board sees updates in real time.
         </>
       ),
@@ -205,7 +206,7 @@ function OnboardingGuide({
         <div>
           <p className="eyebrow">Getting started</p>
           <div className="onboarding-title-row">
-            <h2>Welcome to Inferno — here's how it works</h2>
+            <h2>Welcome to Inferno. Here's how it works</h2>
             {isExampleBoard ? (
               <span className="example-board-badge" data-testid="example-board-badge">
                 Example board
@@ -218,7 +219,7 @@ function OnboardingGuide({
           {isExampleBoard ? (
             <p className="onboarding-sample-callout" data-testid="onboarding-sample-callout">
               Everything you see right now is a <strong>sample board</strong> we set up so you can explore.
-              Rename it, edit the tasks, or delete them — nothing here is permanent.
+              Rename it, edit the tasks, or delete them. Nothing here is permanent.
             </p>
           ) : null}
         </div>
@@ -2890,7 +2891,7 @@ const addCampfireChannel = async (projectId, rawName) => {
     pushCelebration({
       kind: 'error',
       title: 'Channel not added',
-      detail: isMissingColumnError(error) ? 'Run the Campfire channels migration.' : 'Please try again.',
+      detail: (isMissingTableError(error) || isMissingColumnError(error)) ? 'Run the Campfire channels migration.' : 'Please try again.',
     })
     return
   }
@@ -3607,7 +3608,7 @@ const submitPasswordRecovery = async (event) => {
   }
 
   setRecoveryStatus('done')
-  setRecoveryMessage('Your password has been updated. You can keep working — you are signed in.')
+  setRecoveryMessage('Your password has been updated. You can keep working; you are signed in.')
   setRecoveryForm({ password: '', confirmPassword: '' })
 }
 
@@ -3691,8 +3692,9 @@ if (recoveryMode) {
 
 if (loading) {
   return (
-    <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
-      Loading your board…
+    <div className="app-loading" role="status" data-testid="app-loading">
+      <span className="app-loading-spinner" aria-hidden="true" />
+      <p>Loading your board…</p>
     </div>
   )
 }
@@ -3731,8 +3733,9 @@ if (!loading && session && loadError) {
 // Guard: if auth is done but projects haven't resolved yet
 if (!loading && session && !currentProject) {
   return (
-    <div style={{ display: 'grid', placeItems: 'center', minHeight: '100vh', color: '#aeb8dd' }}>
-      Setting up your board…
+    <div className="app-loading" role="status" data-testid="app-setup">
+      <span className="app-loading-spinner" aria-hidden="true" />
+      <p>Setting up your board…</p>
     </div>
   )
 }
@@ -5677,6 +5680,8 @@ return (
       </main>
     </div>
     </div>
+
+    <FeedbackWidget activeSection={activeSection} />
 
     <TaskModal
       editingTask={editingTask}

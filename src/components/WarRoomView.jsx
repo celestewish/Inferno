@@ -296,13 +296,14 @@ export default function WarRoomView({
           </div>
 
           {migrationMissing ? (
-            <p className="warroom-note" role="status" data-testid="warroom-migration-note">
-              Apply the War Room migration (supabase db push) to save meeting notes for this board.
+            <p className="app-data-note is-setup" role="status" data-testid="warroom-migration-note">
+              War Room needs its database migration. Run <code className="chat-code">supabase db push</code> to
+              save meeting notes for this board. Voice huddles still work.
             </p>
           ) : null}
 
           {accessError ? (
-            <p className="warroom-note" role="status" data-testid="warroom-access-note">
+            <p className="app-data-note is-access" role="status" data-testid="warroom-access-note">
               Meeting notes could not load. Sign in again, or check that you have access to this
               board. Voice huddles still work.
             </p>

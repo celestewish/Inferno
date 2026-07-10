@@ -1,5 +1,7 @@
 // Lightweight reporting dashboard derived entirely from existing board data:
 // totals, completion, and breakdowns by status, priority, and discipline.
+import { ReportsIcon } from './Icons'
+
 const pct = (part, whole) => (whole ? Math.round((part / whole) * 100) : 0)
 
 function Breakdown({ title, rows, total, testid }) {
@@ -81,6 +83,17 @@ export default function ReportsView({ tasks, projects, sections, priorities, dis
         </div>
       </header>
 
+      {total === 0 ? (
+        <div className="panel report-empty" data-testid="report-empty">
+          <span className="report-empty-icon" aria-hidden="true"><ReportsIcon size={26} /></span>
+          <h2>No report data yet</h2>
+          <p className="muted-copy">
+            Add tasks to your board and Reports will chart completion, priority, and discipline as
+            your production picks up.
+          </p>
+        </div>
+      ) : (
+      <>
       <div className="report-kpis">
         <div className="panel report-kpi" data-testid="kpi-total">
           <span>{total}</span>
@@ -129,6 +142,8 @@ export default function ReportsView({ tasks, projects, sections, priorities, dis
           ))}
         </ul>
       </div>
+      </>
+      )}
     </section>
   )
 }
