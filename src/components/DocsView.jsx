@@ -132,14 +132,14 @@ export default function DocsView({
       </header>
 
       {migrationMissing ? (
-        <div className="docs-migration-note" role="status" data-testid="docs-migration-note">
+        <div className="app-data-note is-setup" role="status" data-testid="docs-migration-note">
           Docs Hub needs its database migration. Run <code className="chat-code">supabase db push</code> to
           start linking docs. The rest of Inferno keeps working.
         </div>
       ) : null}
 
       {accessError ? (
-        <div className="docs-migration-note" role="status" data-testid="docs-access-note">
+        <div className="app-data-note is-access" role="status" data-testid="docs-access-note">
           Docs Hub could not load. You may need to sign in again, or you do not have access to this
           board's docs. The rest of Inferno keeps working.
         </div>

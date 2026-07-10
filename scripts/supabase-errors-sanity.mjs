@@ -108,6 +108,21 @@ assert(
 )
 assert(isAccessError(meetingMissing) === false, 'a missing meeting_notes table is NOT an access error')
 
+// Campfire channels guard: a genuinely missing campfire_channels table (not just
+// a missing column) must be recognized as the migration case so the "Run the
+// Campfire channels migration." hint fires. Both classifiers are OR-ed at the
+// call site; here we confirm a missing-table code is detected.
+const campfireMissingTable = { code: 'PGRST205', message: 'Could not find the table public.campfire_channels in the schema cache' }
+assert(
+  (isMissingTableError(campfireMissingTable) || isMissingColumnError(campfireMissingTable)) === true,
+  'a missing campfire_channels table drives the Campfire migration hint',
+)
+const campfireMissingColumn = { code: 'PGRST204', message: 'column "channel_key" does not exist' }
+assert(
+  (isMissingTableError(campfireMissingColumn) || isMissingColumnError(campfireMissingColumn)) === true,
+  'a missing campfire_channels column also drives the Campfire migration hint',
+)
+
 if (failures) {
   console.error(`\n${failures} check(s) failed.`)
   process.exit(1)
