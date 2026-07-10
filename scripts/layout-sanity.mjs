@@ -132,20 +132,29 @@ assert(
 
 // ---------------------------------------------------------------------------
 // Condensed desktop sidebar rail (>= 901px, .sidebar.app-nav.is-collapsed)
-// Root cause of the regression: the base .sidebar sets overflow-y: auto, which
-// forces overflow-x to compute to auto; combined with wide children (search
-// label, kbd hint, board switcher) that were never hidden in the 76px rail,
-// this produced an ugly horizontal scrollbar and clipped content. The collapsed
-// rail must clip horizontally, hide its native scrollbar, hide the wide
-// children, and center the search icon.
+// Regressions guarded here:
+//  - the rail scrolled off the top of the page when the main area scrolled, so
+//    it must stay pinned (position: sticky, top: 0, full viewport height);
+//  - the lower INSIGHTS icons were unreachable, so the nav menu must own an
+//    internal vertical scroll region (flex: 1 + min-height: 0 + overflow-y);
+//  - un-hidden wide children (search label, kbd hint, board switcher) plus the
+//    base overflow-y: auto produced a horizontal scrollbar and clipped content,
+//    so the rail clips its own overflow and hides those children.
 // ---------------------------------------------------------------------------
-assert(has('.sidebar.app-nav.is-collapsed', 'overflow-x: hidden'), 'collapsed rail clips horizontal overflow (no horizontal scrollbar)')
-assert(has('.sidebar.app-nav.is-collapsed', 'scrollbar-width: none'), 'collapsed rail hides the native scrollbar (Firefox)')
-assert(
-  has('.sidebar.app-nav.is-collapsed::-webkit-scrollbar', 'width: 0'),
-  'collapsed rail zeroes the WebKit scrollbar so no native bar paints over icons',
-)
-for (const child of ['.app-nav-search-label', '.app-nav-kbd', '.board-switcher', '.project-switcher', '.stats-panel', '.app-nav-account']) {
+const collapsedRail = ruleBody('.sidebar.app-nav.is-collapsed')
+assert(collapsedRail !== null, '.sidebar.app-nav.is-collapsed rule exists')
+assert(has('.sidebar.app-nav.is-collapsed', 'position: sticky'), 'collapsed rail is pinned (position: sticky) so it cannot scroll off screen')
+assert(has('.sidebar.app-nav.is-collapsed', 'top: 0'), 'collapsed rail sticks to the top of the viewport')
+assert(has('.sidebar.app-nav.is-collapsed', 'height: 100dvh'), 'collapsed rail spans the full viewport height')
+assert(has('.sidebar.app-nav.is-collapsed', 'overflow: hidden'), 'collapsed rail clips its own overflow (no horizontal scrollbar, no native bar over icons)')
+
+// The nav menu is the single internal scroll region so every icon stays reachable.
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'overflow-y: auto'), 'collapsed nav menu scrolls internally so all icons are reachable')
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'min-height: 0'), 'collapsed nav menu can shrink to enable its scroll (min-height: 0)')
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'flex: 1'), 'collapsed nav menu takes the remaining rail height')
+assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'overflow-x: hidden'), 'collapsed nav menu never scrolls horizontally')
+
+for (const child of ['.app-nav-label', '.app-nav-search-label', '.app-nav-kbd', '.board-switcher', '.project-switcher', '.stats-panel', '.app-nav-account']) {
   assert(
     css.includes(`.sidebar.app-nav.is-collapsed ${child}`),
     `collapsed rail hides wide child ${child}`,
@@ -153,6 +162,17 @@ for (const child of ['.app-nav-search-label', '.app-nav-kbd', '.board-switcher',
 }
 assert(has('.sidebar.app-nav.is-collapsed .app-nav-search', 'justify-content: center'), 'collapsed rail centers the search icon')
 assert(has('.sidebar.app-nav.is-collapsed .app-nav-item', 'justify-content: center'), 'collapsed rail centers nav item icons')
+
+// ---------------------------------------------------------------------------
+// Collapsed nav accessibility: the visible text label is hidden in the rail, so
+// each nav/search button must carry an accessible name (aria-label) and a
+// tooltip (title) that survives the hidden text.
+// ---------------------------------------------------------------------------
+const sidebarJsx = readFileSync(join(here, '..', 'src', 'components', 'ProjectSidebar.jsx'), 'utf8')
+assert(sidebarJsx.includes('aria-label={item.label}'), 'each nav button has an accessible name (aria-label) even when text is hidden')
+assert(sidebarJsx.includes('title={item.label}'), 'each nav button has a tooltip (title) in the collapsed rail')
+assert(/className="app-nav-search"[\s\S]*?aria-label="Search"/.test(sidebarJsx), 'the search button has an accessible name when its label is hidden')
+assert(/className="app-nav-search"[\s\S]*?title="Search"/.test(sidebarJsx), 'the search button has a tooltip in the collapsed rail')
 
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)

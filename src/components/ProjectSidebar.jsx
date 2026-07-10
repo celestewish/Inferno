@@ -89,6 +89,8 @@ export default function ProjectSidebar({
           type="button"
           className={activeSection === item.id ? 'app-nav-item active' : 'app-nav-item'}
           aria-current={activeSection === item.id ? 'page' : undefined}
+          aria-label={item.label}
+          title={item.label}
           data-testid={`nav-${item.id}`}
           onClick={() => { onSelectSection?.(item.id); closeDrawer() }}
         >
@@ -149,6 +151,8 @@ export default function ProjectSidebar({
         type="button"
         className="app-nav-search"
         data-testid="sidebar-search"
+        aria-label="Search"
+        title="Search"
         onClick={() => { onOpenSearch?.(); closeDrawer() }}
       >
         <span className="app-nav-icon" aria-hidden="true"><SearchIcon size={16} /></span>

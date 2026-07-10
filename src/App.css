@@ -670,14 +670,17 @@ textarea:hover {
   .sidebar.app-nav.is-collapsed {
     padding: 1.5rem 0.75rem;
     align-items: stretch;
-    /* The rail is a fixed-width icon column: never let a stray-wide child
-       (search label, kbd hint, board switcher) force a horizontal scrollbar,
-       and keep vertical scroll clean instead of painting native bars over the
-       icons. */
-    overflow-x: hidden;
-    scrollbar-width: none;
+    /* Pin the rail to the viewport so it can never scroll out of reach, even if
+       an ancestor scroll container regresses. The grid column still reserves its
+       width, so sticky does not overlap the board area. */
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    /* The aside itself never scrolls: wide children are hidden and the nav menu
+       owns the only scroll region (below). This kills the horizontal scrollbar
+       and stops native bars from painting over the icons. */
+    overflow: hidden;
   }
-  .sidebar.app-nav.is-collapsed::-webkit-scrollbar { width: 0; height: 0; }
   .sidebar.app-nav.is-collapsed .brand { justify-content: center; }
   .sidebar.app-nav.is-collapsed .brand-copy,
   .sidebar.app-nav.is-collapsed .app-nav-heading,
@@ -694,6 +697,21 @@ textarea:hover {
     gap: 0;
     padding-left: 0;
     padding-right: 0;
+  }
+  /* The icon list (16 items) can exceed a short viewport, so it scrolls inside
+     the rail with a slim, clean scrollbar. brand + search stay pinned above it.
+     min-height: 0 lets the flex item actually shrink to enable the scroll. */
+  .sidebar.app-nav.is-collapsed .app-nav-menu {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+  }
+  .sidebar.app-nav.is-collapsed .app-nav-menu::-webkit-scrollbar { width: 6px; }
+  .sidebar.app-nav.is-collapsed .app-nav-menu::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--accent) 40%, transparent);
+    border-radius: 999px;
   }
 }
 
