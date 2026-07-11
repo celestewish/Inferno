@@ -198,6 +198,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
   const [started, setStarted] = useState(false)
   const [shipped, setShipped] = useState(false)
   const boardRef = useRef(null)
+  const demoRef = useRef(null)
 
   const meters = useMemo(
     () => computeMeters({ tasks, assignments, roomActions: rooms }),
@@ -337,6 +338,10 @@ export default function QuestLanding({ openLogin, openSignup }) {
     boardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
+  const scrollToDemo = () => {
+    demoRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   const resetJam = () => {
     setTasks(initialTasks())
     setAssignments({})
@@ -376,8 +381,38 @@ export default function QuestLanding({ openLogin, openSignup }) {
         </div>
       </header>
 
+      {/* Brief: what Inferno is, before the interactive demo */}
+      <section className="landing-brief" data-testid="landing-brief">
+        <p className="quest-eyebrow">Inferno</p>
+        <h1 className="landing-brief-title">
+          The creative command center for indie game teams
+        </h1>
+        <p className="landing-brief-copy">
+          Inferno pulls your whole production into one place: boards, tasks, docs,
+          code links, team chat, planning, and launch rituals. It is where a tiny
+          crew turns a big idea into a shipped game, together.
+        </p>
+        <div className="quest-cta-row landing-brief-cta">
+          <button type="button" className="quest-primary-btn quest-start-btn" onClick={scrollToDemo}>
+            Explore the Game Jam Studio demo
+          </button>
+          <button type="button" className="quest-ghost-btn" onClick={openSignup}>
+            Sign up free
+          </button>
+        </div>
+        <button
+          type="button"
+          className="landing-scroll-cue"
+          onClick={scrollToDemo}
+          aria-label="Scroll down to the Game Jam Studio demo"
+        >
+          <span>Scroll into the studio</span>
+          <span className="landing-scroll-arrow" aria-hidden="true">&#8595;</span>
+        </button>
+      </section>
+
       {/* HUD: strategy meters, XP, deadline */}
-      <div className="studio-hud" id="studio-top" data-testid="studio-hud">
+      <div className="studio-hud" id="studio-top" data-testid="studio-hud" ref={demoRef}>
         <div className="studio-hud-meters">
           {['time', 'morale', 'stability'].map((key) => (
             <MeterBar key={key} meterKey={key} value={meters[key]} />
@@ -405,7 +440,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
       <section className="studio-intro">
         <div className="studio-intro-copy">
           <p className="quest-eyebrow">Game Jam Studio Simulator</p>
-          <h1 className="quest-title">Run Dante's jam studio</h1>
+          <h2 className="quest-title">Run Dante's jam studio</h2>
           <p className="quest-subtitle">
             This is not a tour. Move the work, staff your crew, and manage the meters to beat the
             deadline. It is Inferno, played.
