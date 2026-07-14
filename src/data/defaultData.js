@@ -1,6 +1,6 @@
 export const defaultTheme = {
-  accent: '#7c5cff',
-  accentSecondary: '#39d0c4',
+  accent: '#ff6a3d',
+  accentSecondary: '#ffb454',
   surface: '#12192d',
   background: '#0f1220',
 }
