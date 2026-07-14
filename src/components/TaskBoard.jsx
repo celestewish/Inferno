@@ -18,6 +18,11 @@ export default function TaskBoard({
   onRemoveSection,
 }) {
   const [newSection, setNewSection] = useState('')
+  // Transient completion feedback: which card just got marked done (drives the
+  // celebratory glow pop) and where to spawn the pulse. Both are cosmetic and
+  // self-clear, so they never touch the real completed state in `tasks`.
+  const [justCompletedId, setJustCompletedId] = useState(null)
+  const [pulse, setPulse] = useState(null)
 
   const submitSection = (event) => {
     event.preventDefault()
@@ -25,6 +30,18 @@ export default function TaskBoard({
     if (!label) return
     onAddSection?.(label)
     setNewSection('')
+  }
+
+  const handleComplete = (task, event) => {
+    if (!task.completed) {
+      setJustCompletedId(task.id)
+      setTimeout(() => setJustCompletedId((current) => (current === task.id ? null : current)), 650)
+    }
+    const rect = event.currentTarget.getBoundingClientRect()
+    setPulse({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, key: Date.now() })
+    clearTimeout(handleComplete._t)
+    handleComplete._t = setTimeout(() => setPulse(null), 500)
+    toggleComplete(task)
   }
 
   const isEmpty = tasks.length === 0
@@ -111,10 +128,15 @@ export default function TaskBoard({
                 const totalSubtasks = task.subtasks?.length ?? 0
                 const doneSubtasks = task.subtasks?.filter((item) => item.done).length ?? 0
                 const hasDueDate = task.due && task.due !== 'TBD'
+                const cardClass = [
+                  'task-card compact',
+                  task.completed ? 'completed' : '',
+                  justCompletedId === task.id ? 'is-complete-pop' : '',
+                ].filter(Boolean).join(' ')
                 return (
                   <article
                     key={task.id}
-                    className={task.completed ? 'task-card compact completed' : 'task-card compact'}
+                    className={cardClass}
                     data-testid="task-card"
                     role="button"
                     tabIndex={0}
@@ -187,7 +209,7 @@ export default function TaskBoard({
                       <button
                         type="button"
                         className="primary-btn"
-                        onClick={(event) => { event.stopPropagation(); toggleComplete(task) }}
+                        onClick={(event) => { event.stopPropagation(); handleComplete(task, event) }}
                       >
                         {task.completed ? 'Reopen' : 'Complete'}
                       </button>
@@ -229,6 +251,14 @@ export default function TaskBoard({
             Sections are shared across this board's projects and saved automatically.
           </p>
         </div>
+      ) : null}
+
+      {pulse ? (
+        <div
+          className="action-pulse"
+          aria-hidden="true"
+          style={{ left: pulse.x, top: pulse.y }}
+        />
       ) : null}
     </section>
   )
