@@ -309,6 +309,11 @@ textarea:hover {
 .primary-btn:hover:not(:disabled) { box-shadow: 0 14px 30px color-mix(in srgb, var(--accent) 36%, transparent); }
 .secondary-btn, .icon-btn, .chip-action { border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.045); color: #dce3ff; padding: 0.8rem 1.05rem; border-radius: var(--radius-md); }
 .secondary-btn:hover:not(:disabled), .icon-btn:hover:not(:disabled), .chip-action:hover:not(:disabled) { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+/* Tertiary "ghost" actions (e.g. the Studio Home card links). Rounded and
+   accent-tinted so they read as Inferno controls, never a bare gray button.
+   Form-scoped .ghost-btn rules below stay muted for Cancel-style actions. */
+.ghost-btn { border: 1px solid color-mix(in srgb, var(--accent) 36%, var(--card-border)); background: color-mix(in srgb, var(--accent) 12%, transparent); color: color-mix(in srgb, var(--accent) 82%, white 18%); padding: 0.45rem 0.9rem; border-radius: var(--radius-pill); font-weight: 600; font-size: 0.82rem; }
+.ghost-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 22%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, var(--card-border)); }
 .danger-btn { border: 1px solid rgba(255,124,147,0.22); background: rgba(255,93,122,0.12); color: #ffafbb; padding: 0.8rem 1.05rem; border-radius: var(--radius-md); }
 .danger-btn:hover:not(:disabled) { background: rgba(255,93,122,0.2); border-color: rgba(255,124,147,0.4); }
 .icon-btn { width: 42px; height: 42px; padding: 0; border-radius: var(--radius-pill); }
@@ -424,7 +429,13 @@ textarea:hover {
 .column-header, .section-heading, .member-chip-row { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; }
 .column-header { margin-bottom: 0.9rem; }
 .column-header h3 { font-size: 0.98rem; letter-spacing: 0.01em; }
-.column-header span, .section-heading span { width: 2rem; height: 2rem; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.06); color: #b9c3ef; }
+/* Let the heading text absorb the slack and ellipsize so it can never push the
+   count badge out of the panel. */
+.section-heading h2 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Count badge: a circle for single digits, a pill for 2+ digits. flex: none and
+   the min-width/padding pairing stop the number from being clipped or squeezed
+   when it sits beside a heading in a flex row. */
+.column-header span, .section-heading span { flex: none; box-sizing: border-box; min-width: 2rem; height: 2rem; padding: 0 0.5rem; border-radius: 999px; display: grid; place-items: center; background: rgba(255,255,255,0.06); color: #b9c3ef; font-size: 0.85rem; font-weight: 600; line-height: 1; }
 .column-header-actions { display: flex; align-items: center; gap: 0.4rem; }
 .section-remove-btn {
   width: 1.9rem; height: 1.9rem; border-radius: 999px; border: 1px solid rgba(255,255,255,0.08);
@@ -4637,9 +4648,14 @@ textarea:hover {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
-  align-items: start;
+  /* Stretch so every card in a row matches the tallest sibling, evening out the
+     Today's Quests / Boss Fight / Deadlines row. */
+  align-items: stretch;
 }
 .studio-card { display: flex; flex-direction: column; gap: 10px; }
+/* Scoped to the Studio Home grid so it never touches the game board's task
+   cards, which reuse the .studio-card class inside .studio-card-list. */
+.studio-grid > .studio-card { height: 100%; }
 .studio-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .studio-card-head h2 {
   display: flex;
@@ -4684,7 +4700,7 @@ textarea:hover {
   border: 2px solid var(--text-muted);
 }
 .studio-check.is-done { border-color: var(--accent-secondary); background: var(--accent-secondary); }
-.studio-due { font-size: 0.72rem; color: var(--text-muted); flex: 0 0 auto; }
+.studio-due { font-size: 0.72rem; color: var(--text-muted); flex: 0 0 auto; white-space: nowrap; text-align: right; }
 .studio-due.is-overdue { color: var(--ember); font-weight: 700; }
 .studio-empty { margin: 0; font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; }
 .studio-message { display: flex; flex-direction: column; gap: 2px; padding: 6px 2px; }
