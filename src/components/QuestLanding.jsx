@@ -186,6 +186,21 @@ const StudioCountdown = memo(function StudioCountdown({ className, testId }) {
   )
 })
 
+// Decorative floating chrome/glass orbs behind the whole page. Purely
+// cosmetic (aria-hidden) and paused automatically via prefers-reduced-motion
+// in App.css, so it never needs to read component state.
+function StudioOrbs() {
+  return (
+    <div className="quest-orbs" aria-hidden="true">
+      <div className="quest-orb quest-orb--warm-a" />
+      <div className="quest-orb quest-orb--warm-b" />
+      <div className="quest-orb quest-orb--warm-c" />
+      <div className="quest-orb quest-orb--cool-a" />
+      <div className="quest-orb quest-orb--cool-b" />
+    </div>
+  )
+}
+
 export default function QuestLanding({ openLogin, openSignup }) {
   const [tasks, setTasks] = useState(initialTasks)
   const [assignments, setAssignments] = useState({})
@@ -199,6 +214,51 @@ export default function QuestLanding({ openLogin, openSignup }) {
   const [shipped, setShipped] = useState(false)
   const boardRef = useRef(null)
   const demoRef = useRef(null)
+  const pageRef = useRef(null)
+  const heroRef = useRef(null)
+
+  // Scroll-reveal: fade/rise each major section in once it enters the
+  // viewport. Purely presentational — toggles a class via direct DOM
+  // mutation instead of state so it never re-renders the game tree.
+  useEffect(() => {
+    const root = pageRef.current
+    if (!root) return
+    const els = root.querySelectorAll('.reveal')
+    const io = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible')
+            io.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.12 },
+    )
+    els.forEach((el) => io.observe(el))
+    return () => io.disconnect()
+  }, [])
+
+  // Cursor-reactive glass parallax on the hero panel: writes CSS custom
+  // properties straight to the DOM node (no setState) so mouse movement never
+  // triggers a re-render.
+  const handleHeroMove = useCallback((event) => {
+    const el = heroRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const px = (event.clientX - rect.left) / rect.width
+    const py = (event.clientY - rect.top) / rect.height
+    el.style.setProperty('--mx', `${(px * 100).toFixed(1)}%`)
+    el.style.setProperty('--my', `${(py * 100).toFixed(1)}%`)
+    el.style.setProperty('--rx', `${((py - 0.5) * -6).toFixed(2)}deg`)
+    el.style.setProperty('--ry', `${((px - 0.5) * 6).toFixed(2)}deg`)
+  }, [])
+  const handleHeroLeave = useCallback(() => {
+    const el = heroRef.current
+    if (!el) return
+    el.style.setProperty('--rx', '0deg')
+    el.style.setProperty('--ry', '0deg')
+  }, [])
 
   const meters = useMemo(
     () => computeMeters({ tasks, assignments, roomActions: rooms }),
@@ -365,7 +425,8 @@ export default function QuestLanding({ openLogin, openSignup }) {
           : 'Match each task to the crew member whose role fits. Good matches keep morale and stability high.'
 
   return (
-    <div className="studio-page">
+    <div className="studio-page" ref={pageRef}>
+      <StudioOrbs />
       <header className="quest-nav">
         <a className="quest-brand" href="#studio-top" aria-label="Inferno home">
           <InfernoLogo size={30} />
@@ -382,7 +443,13 @@ export default function QuestLanding({ openLogin, openSignup }) {
       </header>
 
       {/* Brief: what Inferno is, before the interactive demo */}
-      <section className="landing-brief" data-testid="landing-brief">
+      <section
+        className="landing-brief reveal"
+        data-testid="landing-brief"
+        ref={heroRef}
+        onMouseMove={handleHeroMove}
+        onMouseLeave={handleHeroLeave}
+      >
         <p className="quest-eyebrow">Inferno</p>
         <h1 className="landing-brief-title">
           The creative command center for indie game teams
@@ -412,7 +479,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
       </section>
 
       {/* HUD: strategy meters, XP, deadline */}
-      <div className="studio-hud" id="studio-top" data-testid="studio-hud" ref={demoRef}>
+      <div className="studio-hud reveal" id="studio-top" data-testid="studio-hud" ref={demoRef}>
         <div className="studio-hud-meters">
           {['time', 'morale', 'stability'].map((key) => (
             <MeterBar key={key} meterKey={key} value={meters[key]} />
@@ -437,7 +504,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
       </div>
 
       {/* Intro */}
-      <section className="studio-intro">
+      <section className="studio-intro reveal">
         <div className="studio-intro-copy">
           <p className="quest-eyebrow">Game Jam Studio Simulator</p>
           <h2 className="quest-title">Run Dante's jam studio</h2>
@@ -468,7 +535,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
       </section>
 
       {/* Studio scene */}
-      <section className="studio-scene" ref={boardRef}>
+      <section className="studio-scene reveal" ref={boardRef}>
         {/* Board workstation */}
         <div className="studio-station studio-board-station" data-testid="studio-board">
           <div className="studio-station-head">
@@ -617,7 +684,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
               {ROOM_ACTIONS.map((action) => {
                 const Icon = ROOM_ICONS[action.icon] || FlameIcon
                 const game = getRoomGame(action.id)
-                const done = rooms.includes(action.id)
+                const doneRoom = rooms.includes(action.id)
                 const isOpen = openRoom === action.id
                 const sel = roomSel[action.id] || {}
                 const score = roomGameScore(action.id, sel)
@@ -625,25 +692,25 @@ export default function QuestLanding({ openLogin, openSignup }) {
                   <li key={action.id} className={`studio-room-item${isOpen ? ' is-open' : ''}`}>
                     <button
                       type="button"
-                      className={`studio-room${done ? ' is-used' : ''}`}
+                      className={`studio-room${doneRoom ? ' is-used' : ''}`}
                       data-testid={`studio-room-${action.id}`}
-                      disabled={done}
+                      disabled={doneRoom}
                       aria-expanded={isOpen}
                       onClick={() => openRoomGame(action.id)}
                     >
                       <span className="studio-room-icon" aria-hidden="true"><Icon size={16} /></span>
                       <span className="studio-room-body">
                         <span className="studio-room-name">{action.label}</span>
-                        <span className="studio-room-hint">{done ? 'Solved' : action.hint}</span>
+                        <span className="studio-room-hint">{doneRoom ? 'Solved' : action.hint}</span>
                       </span>
-                      {done ? (
+                      {doneRoom ? (
                         <span className="studio-room-check"><CheckIcon size={13} /></span>
                       ) : (
                         <span className="studio-room-xp">{isOpen ? 'Close' : `+${action.xp}`}</span>
                       )}
                     </button>
 
-                    {isOpen && !done && game ? (
+                    {isOpen && !doneRoom && game ? (
                       <div className="studio-minigame" data-testid={`studio-minigame-${action.id}`}>
                         <p className="studio-minigame-title">{game.title}</p>
                         <p className="studio-minigame-hint">{game.hint}</p>
@@ -811,7 +878,7 @@ export default function QuestLanding({ openLogin, openSignup }) {
         </div>
       </section>
 
-      <footer className="quest-footer">
+      <footer className="quest-footer reveal">
         <span>Inferno</span>
         <span className="quest-footer-muted">Plan, staff, and ship games with your crew.</span>
         <nav className="quest-footer-links" aria-label="Legal and support">
