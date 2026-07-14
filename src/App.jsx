@@ -4526,35 +4526,64 @@ return (
             </header>
 
             <div className="projects-grid" data-testid="projects-grid">
-              {projects.map((item) => (
-                <article
-                  key={item.id}
-                  className={item.id === currentProject.id ? 'project-card active' : 'project-card'}
-                  data-testid={`project-card-${item.id}`}
-                >
-                  <button
-                    type="button"
-                    className="project-card-select"
-                    aria-current={item.id === currentProject.id ? 'true' : undefined}
-                    onClick={() => setCurrentProjectId(item.id)}
+              {projects.map((item) => {
+                const projectTasks = tasks.filter((t) => t.projectId === item.id)
+                const doneCount = projectTasks.filter(
+                  (t) => t.completed || t.status === 'done',
+                ).length
+                const openCount = projectTasks.length - doneCount
+                const pct = projectTasks.length
+                  ? Math.round((doneCount / projectTasks.length) * 100)
+                  : 0
+                const crew = new Set(
+                  projectTasks.map((t) => (t.assignee || '').trim()).filter(Boolean),
+                ).size
+                return (
+                  <article
+                    key={item.id}
+                    className={item.id === currentProject.id ? 'project-card active' : 'project-card'}
+                    data-testid={`project-card-${item.id}`}
                   >
-                    <strong>{item.name}</strong>
-                    <span className="project-card-tagline">{item.tagline}</span>
-                    <span className="project-card-meta">
-                      {item.methodology} · {item.phase}
-                    </span>
-                  </button>
-                  {projects.length > 1 ? (
                     <button
                       type="button"
-                      className="chip-action danger project-card-delete"
-                      onClick={() => deleteProject(item.id)}
+                      className="project-card-select"
+                      aria-current={item.id === currentProject.id ? 'true' : undefined}
+                      onClick={() => setCurrentProjectId(item.id)}
                     >
-                      Delete
+                      <span className="project-card-head">
+                        <strong>{item.name}</strong>
+                        <span className="project-card-phase">{item.phase}</span>
+                      </span>
+                      <span className="project-card-tagline">{item.tagline}</span>
+                      <span className="project-card-meta">{item.methodology}</span>
+                      <span
+                        className="project-card-progress"
+                        role="progressbar"
+                        aria-valuenow={pct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label={`${pct}% of tasks complete`}
+                      >
+                        <span className="project-card-progress-fill" style={{ width: `${pct}%` }} />
+                      </span>
+                      <span className="project-card-stats">
+                        <span>{doneCount}/{projectTasks.length} done</span>
+                        <span>{openCount} open</span>
+                        <span>{crew} {crew === 1 ? 'teammate' : 'crew'}</span>
+                      </span>
                     </button>
-                  ) : null}
-                </article>
-              ))}
+                    {projects.length > 1 ? (
+                      <button
+                        type="button"
+                        className="chip-action danger project-card-delete"
+                        onClick={() => deleteProject(item.id)}
+                      >
+                        Delete
+                      </button>
+                    ) : null}
+                  </article>
+                )
+              })}
             </div>
 
             <div className="panel new-project-panel">

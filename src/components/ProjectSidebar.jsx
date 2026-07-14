@@ -18,6 +18,7 @@ import {
   SearchIcon,
   SettingsIcon,
   CloseIcon,
+  MenuIcon,
 } from './Icons'
 import { safeImageUrl } from '../lib/url'
 
@@ -124,12 +125,11 @@ export default function ProjectSidebar({
       <div className="brand">
         <button
           type="button"
-          className="brand-toggle"
-          data-testid="sidebar-toggle"
-          aria-expanded={!collapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onClick={() => onToggleCollapsed?.()}
+          className="brand-logo"
+          data-testid="brand-home"
+          aria-label="Go to Studio Home"
+          title="Studio Home"
+          onClick={() => { onSelectSection?.('home'); closeDrawer() }}
         >
           <InfernoLogo size={30} />
         </button>
@@ -137,6 +137,18 @@ export default function ProjectSidebar({
           <h2>Inferno</h2>
           <p className="muted-copy">The game design task board</p>
         </div>
+        <button
+          type="button"
+          className="brand-menu-toggle"
+          data-testid="sidebar-toggle"
+          aria-expanded={!collapsed}
+          aria-controls="app-primary-nav"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onClick={() => onToggleCollapsed?.()}
+        >
+          <MenuIcon size={20} />
+        </button>
         <button
           type="button"
           className="app-nav-close"
