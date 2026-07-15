@@ -276,6 +276,49 @@ assert(
   '.quest-nav uses a 2-value padding so top and bottom stay equal (no top-heavy bias)',
 )
 
+// ---------------------------------------------------------------------------
+// Font system: Afacad Flux (body/UI) + Varela Round (nav/buttons), pixel kept
+// The three families must all be loaded in one import, the two role variables
+// must map to the right faces, and the pixel font must remain available so the
+// intentional pixel headings/wordmark do not regress to a fallback.
+// ---------------------------------------------------------------------------
+assert(/@import url\([^)]*fonts\.googleapis[^)]*\)/.test(css), 'a Google Fonts import exists')
+assert(css.includes('Afacad+Flux'), 'Afacad Flux is loaded')
+assert(css.includes('Varela+Round'), 'Varela Round is loaded')
+assert(css.includes('Press+Start+2P'), 'Press Start 2P (pixel font) is still loaded')
+assert(css.includes("--font-body: 'Afacad Flux'"), '--font-body maps to Afacad Flux (default body/UI text)')
+assert(css.includes("--font-ui: 'Varela Round'"), '--font-ui maps to Varela Round (nav/buttons)')
+assert(has(':root', 'font-family: var(--font-body)'), 'the app default font is var(--font-body)')
+assert(has('button', 'font-family: var(--font-ui)'), 'buttons use the Varela Round UI face')
+assert(/\.app-nav,\s*\.quest-nav\s*\{[^}]*font-family:\s*var\(--font-ui\)/.test(css), 'nav surfaces use the Varela Round UI face')
+// The pixel font variables must stay pointed at Press Start 2P.
+assert(css.includes("--q-pixel: 'Press Start 2P'"), '--q-pixel still resolves to Press Start 2P (pixel locations preserved)')
+assert(css.includes("--pixel-font: 'Press Start 2P'"), '--pixel-font still resolves to Press Start 2P (pixel locations preserved)')
+
+// ---------------------------------------------------------------------------
+// Mobile landing scroll: the draggable demo cards/tokens must not trap scroll
+// Root cause of the stuck landing scroll on mobile: .studio-card and
+// .studio-token set touch-action: none, so a vertical swipe starting on them
+// was swallowed instead of panning the page. They must allow vertical panning
+// (pan-y) so the landing page scrolls through the demo on touch.
+// ---------------------------------------------------------------------------
+// The .studio-card token appears twice (Studio Home cards + the draggable demo
+// card), so scan every block: the draggable one must declare pan-y and none of
+// them may set touch-action: none.
+for (const sel of ['.studio-card', '.studio-token']) {
+  const escaped = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const blocks = css.match(new RegExp(`(?:^|[,}])\\s*${escaped}\\s*\\{[^}]*\\}`, 'gm')) || []
+  assert(blocks.length > 0, `${sel} rule exists`)
+  assert(
+    blocks.some((block) => /touch-action:\s*pan-y/.test(block)),
+    `${sel} allows vertical page scroll on touch (touch-action: pan-y)`,
+  )
+  assert(
+    !blocks.some((block) => /touch-action:\s*none/.test(block)),
+    `${sel} does not block touch scrolling (no touch-action: none)`,
+  )
+}
+
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
   process.exit(1)
