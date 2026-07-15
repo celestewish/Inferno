@@ -174,6 +174,36 @@ assert(sidebarJsx.includes('title={item.label}'), 'each nav button has a tooltip
 assert(/className="app-nav-search"[\s\S]*?aria-label="Search"/.test(sidebarJsx), 'the search button has an accessible name when its label is hidden')
 assert(/className="app-nav-search"[\s\S]*?title="Search"/.test(sidebarJsx), 'the search button has a tooltip in the collapsed rail')
 
+// ---------------------------------------------------------------------------
+// Shared .panel must not clip its children (sidebar + board top sections)
+// Root cause of the persistent overflow: the liquid-glass pass appended
+// `.panel { overflow: hidden }`. `.panel` is shared by the sidebar Stats /
+// Boards / Projects switchers and the board's Today's Quests (.focus-quests)
+// and Boss Fights (.boss-panel) sections. Because there is no `.panel::before`
+// decoration to contain, that clip only cut off child :focus-visible outlines,
+// hover glows, and content flush to the rounded corners, which read as the
+// clipped/crowded pills and partly-hidden controls. `.panel` must never set
+// overflow: hidden. (Scans every `.panel {` block, not just the first rule.)
+// ---------------------------------------------------------------------------
+const panelBlocks = css.match(/(?:^|[,}])\s*\.panel\s*\{[^}]*\}/gm) || []
+assert(panelBlocks.length > 0, '.panel rule exists')
+assert(
+  !panelBlocks.some((block) => /overflow:\s*hidden/.test(block)),
+  '.panel never sets overflow: hidden (would clip sidebar/board panel content)',
+)
+
+// The count badge beside a section heading (Boards / Projects) must hold its
+// size and never be squeezed or clipped, and the heading absorbs slack via
+// ellipsis so it cannot push the badge out.
+assert(has('.column-header span, .section-heading span', 'flex: none'), 'section-heading count badge holds its size (flex: none)')
+assert(has('.column-header span, .section-heading span', 'min-width: 2rem'), 'section-heading count badge reserves a circle/pill min-width')
+assert(has('.section-heading h2', 'text-overflow: ellipsis'), 'section-heading title ellipsizes instead of pushing the badge out')
+
+// Studio Home cards even out to the tallest sibling without stretching the game
+// board task cards (scoped via the child combinator).
+assert(has('.studio-grid', 'align-items: stretch'), '.studio-grid rows stretch so cards match heights')
+assert(has('.studio-grid > .studio-card', 'height: 100%'), 'Studio Home cards fill row height (scoped to direct children)')
+
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
   process.exit(1)

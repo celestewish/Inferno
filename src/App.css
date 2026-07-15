@@ -7212,9 +7212,17 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
 }
 
 /* ── Panels: soft glass sheen ── */
+/* Keep the glass background/sheen, but do NOT clip. The glass pass originally set
+   `overflow: hidden` here, which had no decoration to contain (there is no
+   `.panel::before/::after`) and instead clipped legitimate content across every
+   shared `.panel`: the sidebar Stats/Boards/Projects switchers and the board's
+   `.focus-quests` / `.boss-panel`. That clipped child :focus-visible outlines,
+   hover glows, and anything flush to the rounded corners, which read as the
+   "crowded / cut-off pills" and "controls partly hidden" overflow bugs. Restoring
+   the pre-glass default (visible) fixes the clipping without touching the look. */
 .panel {
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), color-mix(in srgb, var(--surface-custom) 92%, white 3%) 60%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), var(--shadow-panel);
 }
