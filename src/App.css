@@ -723,8 +723,7 @@ textarea:hover {
   .sidebar.app-nav.is-collapsed .app-nav-search-label,
   .sidebar.app-nav.is-collapsed .app-nav-kbd,
   .sidebar.app-nav.is-collapsed .stats-panel,
-  .sidebar.app-nav.is-collapsed .board-switcher,
-  .sidebar.app-nav.is-collapsed .project-switcher,
+  .sidebar.app-nav.is-collapsed .board-project-panel,
   .sidebar.app-nav.is-collapsed .app-nav-account { display: none; }
   .sidebar.app-nav.is-collapsed .app-nav-item { justify-content: center; padding-left: 0; padding-right: 0; }
   .sidebar.app-nav.is-collapsed .app-nav-search {
@@ -7289,10 +7288,16 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
 }
 
 /* ── Stat tiles: glass ── */
-.mini-stat,
-.stats-panel > div {
+.mini-stat {
   background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
   backdrop-filter: blur(6px);
+}
+/* The .stats-panel columns sit inside the glass .stats-panel container, so they
+   need no tile of their own, so the numbers/labels read cleaner without an
+   individual gradient square behind each column. */
+.stats-panel > div {
+  background: none;
+  backdrop-filter: none;
 }
 
 /* ── Nav items (active state): gradient glass + glow ── */
