@@ -7179,9 +7179,14 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   }
   .reveal { opacity: 1; transform: none; transition: none; }
 }
+/* Only the full-page shells get a positioning + stacking context for their
+   decorative ::before glow below. The auth overlay is intentionally excluded:
+   it must keep its base `position: fixed` (see .auth-overlay above) so the modal
+   centers over the viewport. Including it here dropped it into normal document
+   flow at the bottom of the long landing page, so focusing the email input on
+   open scrolled the whole page to the bottom. */
 .app-viewport,
-.load-error-shell,
-.auth-overlay {
+.load-error-shell {
   position: relative;
   isolation: isolate;
 }
