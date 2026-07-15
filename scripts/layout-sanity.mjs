@@ -175,6 +175,29 @@ assert(/className="app-nav-search"[\s\S]*?aria-label="Search"/.test(sidebarJsx),
 assert(/className="app-nav-search"[\s\S]*?title="Search"/.test(sidebarJsx), 'the search button has a tooltip in the collapsed rail')
 
 // ---------------------------------------------------------------------------
+// Auth modal overlay must stay fixed over the viewport
+// Root cause of the scroll-to-bottom bug: the glass pass grouped .auth-overlay
+// into a `position: relative; isolation: isolate` rule meant only for the
+// full-page shells. That later rule overrode the overlay's base
+// `position: fixed`, so the modal fell into normal document flow at the bottom
+// of the long landing page; focusing the email input on open then scrolled the
+// whole page to the bottom. The overlay must never be positioned relative.
+// (Scans every `.auth-overlay {` block, including grouped selectors.)
+// ---------------------------------------------------------------------------
+const authOverlayBlocks = css.match(/(?:^|[,}])\s*\.auth-overlay\s*\{[^}]*\}/gm) || []
+assert(authOverlayBlocks.length > 0, '.auth-overlay rule exists')
+assert(
+  authOverlayBlocks.some((block) => /position:\s*fixed/.test(block)),
+  '.auth-overlay is fixed over the viewport (modal centers, no page scroll)',
+)
+assert(
+  !authOverlayBlocks.some((block) => /position:\s*relative/.test(block)),
+  '.auth-overlay never uses position: relative (would drop the modal into page flow)',
+)
+// Opening the modal must not scroll the page to the focused input.
+assert(jsx.includes('focus({ preventScroll: true })'), 'AuthModal focuses the email input with preventScroll')
+
+// ---------------------------------------------------------------------------
 // Shared .panel must not clip its children (sidebar + board top sections)
 // Root cause of the persistent overflow: the liquid-glass pass appended
 // `.panel { overflow: hidden }`. `.panel` is shared by the sidebar Stats /

@@ -290,7 +290,9 @@ function AuthModal({
 
   useEffect(() => {
     if (!mode) return
-    emailInputRef.current?.focus()
+    // preventScroll so opening the modal never scrolls the page to the focused
+    // input, regardless of the overlay's positioning.
+    emailInputRef.current?.focus({ preventScroll: true })
   }, [mode])
 
   if (!mode) return null
