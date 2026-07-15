@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Afacad+Flux:wght@100..1000&family=Press+Start+2P&family=Varela+Round&display=swap');
 
 :root {
   color-scheme: dark;
@@ -23,7 +23,13 @@
   --radius-pill: 999px;
   --shadow-panel: 0 20px 48px rgba(4, 6, 14, 0.28);
   --shadow-soft: 0 12px 30px rgba(4, 6, 14, 0.22);
-  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* Afacad Flux is the default body/UI text; Varela Round is the nav/button
+     face. Inter stays first in the fallback chain so a failed webfont load lands
+     on the previous metrics rather than a bare system font. The pixel font
+     (--pixel-font / --q-pixel, Press Start 2P) is intentionally left untouched. */
+  --font-body: 'Afacad Flux', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-ui: 'Varela Round', Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-body);
   background:
     radial-gradient(90% 60% at 50% -10%, color-mix(in srgb, var(--ember) 12%, transparent), transparent 60%),
     radial-gradient(circle at top left, color-mix(in srgb, var(--accent) 16%, transparent), transparent 34%),
@@ -36,7 +42,7 @@
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: transparent; }
 button, input, select, textarea { font: inherit; }
-button { cursor: pointer; transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease; }
+button { cursor: pointer; font-family: var(--font-ui); transition: transform 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease, opacity 180ms ease; }
 button:hover:not(:disabled) { transform: translateY(-1px); }
 button:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
 textarea { resize: vertical; }
@@ -771,6 +777,12 @@ textarea:hover {
   gap: 0.3rem;
 }
 
+/* Navigation surfaces use the Varela Round UI face. Text set directly on the
+   pixel wordmark (.quest-brand-word) keeps its own Press Start 2P rule. */
+.app-nav,
+.quest-nav {
+  font-family: var(--font-ui);
+}
 .app-nav-item {
   width: 100%;
   display: flex;
@@ -5450,7 +5462,7 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
 
 .quest-page button,
 .studio-page button {
-  font-family: inherit;
+  font-family: var(--font-ui);
   cursor: pointer;
 }
 
@@ -6524,7 +6536,10 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   padding: 0.55rem 0.6rem;
   color: var(--text-main);
   cursor: grab;
-  touch-action: none;
+  /* pan-y (not none) lets a vertical swipe that starts on a card still scroll
+     the landing page on touch devices, so the demo never traps mobile scroll.
+     Pointer-based drag (mouse/pen and horizontal touch) is unaffected. */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
@@ -6655,7 +6670,9 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   padding: 0.45rem 0.5rem;
   color: var(--text-main);
   cursor: grab;
-  touch-action: none;
+  /* pan-y keeps vertical page scrolling working when a swipe begins on a member
+     token, so the demo cannot trap mobile scroll. Drag interaction is preserved. */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
   transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
