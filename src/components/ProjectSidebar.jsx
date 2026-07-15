@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import InfernoLogo from './InfernoLogo'
 import {
   HomeIcon,
@@ -69,6 +70,12 @@ export default function ProjectSidebar({
   mobileOpen = false,
   onRequestClose,
 }) {
+  // Boards and Projects used to be two full stacked panels. They're now one
+  // unified panel with a segmented tab switcher — same data, less bulk. The
+  // active board/project keeps a left accent bar instead of a full solid
+  // fill, so the list reads calmer at a glance.
+  const [bpTab, setBpTab] = useState('boards')
+
   if (!project) return null
 
   // On mobile the sidebar is an off-canvas drawer; every navigation action also
@@ -200,65 +207,78 @@ export default function ProjectSidebar({
         </div>
       </div>
 
-      <div className="panel board-switcher" data-testid="board-switcher">
-        <div className="section-heading">
-          <h2>Boards</h2>
-          <span>{boards.length}</span>
+      <div className="panel board-project-panel" data-testid="board-project-panel">
+        <div className="bp-tab-row" role="tablist" aria-label="Boards or Projects">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={bpTab === 'boards'}
+            className={bpTab === 'boards' ? 'bp-tab active' : 'bp-tab'}
+            onClick={() => setBpTab('boards')}
+          >
+            Boards <span className="bp-tab-count">{boards.length}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={bpTab === 'projects'}
+            className={bpTab === 'projects' ? 'bp-tab active' : 'bp-tab'}
+            onClick={() => setBpTab('projects')}
+          >
+            Projects <span className="bp-tab-count">{projects.length}</span>
+          </button>
         </div>
-        <div className="project-list">
-          {boards.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={currentBoardId === item.id ? 'project-tab active' : 'project-tab'}
-              aria-current={currentBoardId === item.id ? 'true' : undefined}
-              data-testid={`board-tab-${item.id}`}
-              onClick={() => { onSelectBoard?.(item.id); closeDrawer() }}
-            >
-              <strong>{item.name || 'Untitled board'}</strong>
-              {item.description ? <small>{item.description}</small> : null}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="secondary-btn sidebar-manage-projects"
-          data-testid="sidebar-create-board"
-          disabled={creatingBoard}
-          onClick={() => { onCreateBoard?.(); closeDrawer() }}
-        >
-          {creatingBoard ? 'Creating…' : 'New board'}
-        </button>
-      </div>
 
-      <div className="panel project-switcher" data-testid="project-switcher">
-        <div className="section-heading">
-          <h2>Projects</h2>
-          <span>{projects.length}</span>
-        </div>
-        <div className="project-list">
-          {projects.map((item) => (
+        {bpTab === 'boards' ? (
+          <div className="bp-list" data-testid="board-switcher">
+            {boards.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={currentBoardId === item.id ? 'project-tab active' : 'project-tab'}
+                aria-current={currentBoardId === item.id ? 'true' : undefined}
+                data-testid={`board-tab-${item.id}`}
+                onClick={() => { onSelectBoard?.(item.id); closeDrawer() }}
+              >
+                <strong>{item.name || 'Untitled board'}</strong>
+                {item.description ? <small>{item.description}</small> : null}
+              </button>
+            ))}
             <button
-              key={item.id}
               type="button"
-              className={project.id === item.id ? 'project-tab active' : 'project-tab'}
-              aria-current={project.id === item.id ? 'true' : undefined}
-              data-testid={`project-tab-${item.id}`}
-              onClick={() => { setCurrentProjectId(item.id); closeDrawer() }}
+              className="bp-ghost-row"
+              data-testid="sidebar-create-board"
+              disabled={creatingBoard}
+              onClick={() => { onCreateBoard?.(); closeDrawer() }}
             >
-              <strong>{item.name}</strong>
-              <small>{item.methodology}</small>
+              <span aria-hidden="true">+</span> {creatingBoard ? 'Creating…' : 'New board'}
             </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          className="secondary-btn sidebar-manage-projects"
-          data-testid="sidebar-manage-projects"
-          onClick={() => { onSelectSection?.('projects'); closeDrawer() }}
-        >
-          Manage projects
-        </button>
+          </div>
+        ) : (
+          <div className="bp-list" data-testid="project-switcher">
+            {projects.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={project.id === item.id ? 'project-tab active' : 'project-tab'}
+                aria-current={project.id === item.id ? 'true' : undefined}
+                data-testid={`project-tab-${item.id}`}
+                onClick={() => { setCurrentProjectId(item.id); closeDrawer() }}
+              >
+                <strong>{item.name}</strong>
+                <small>{item.methodology}</small>
+              </button>
+            ))}
+            <button
+              type="button"
+              className="bp-ghost-row"
+              data-testid="sidebar-manage-projects"
+              onClick={() => { onSelectSection?.('projects'); closeDrawer() }}
+            >
+              Manage projects
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="app-nav-account" data-testid="account-block">
