@@ -5460,7 +5460,9 @@ a.recap-row-title:hover { color: var(--accent-secondary); }
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  padding: 0.35rem 0.25rem 0.9rem;
+  /* Equal top/bottom padding so the brand and auth groups center vertically in
+     the rounded glass bar instead of riding high against the top edge. */
+  padding: 0.65rem 0.25rem;
 }
 .quest-brand {
   display: inline-flex;

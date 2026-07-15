@@ -254,6 +254,28 @@ assert(
   '.stats-panel > div has no per-column backdrop-filter tile',
 )
 
+// ---------------------------------------------------------------------------
+// Landing top bar vertical centering
+// The .quest-nav glass bar centers its brand and auth groups via
+// align-items: center, but that only works if the bar's own top/bottom padding
+// is symmetric. A previous asymmetric shorthand (more bottom than top) pushed
+// the row up against the top edge. The base rule (the block that owns padding)
+// must keep align-items: center and use an even top/bottom vertical padding.
+// ---------------------------------------------------------------------------
+const questNavBlocks = css.match(/(?:^|[,}])\s*\.quest-nav\s*\{[^}]*\}/gm) || []
+const questNavPaddingBlock = questNavBlocks.find((block) => /padding:/.test(block))
+assert(questNavPaddingBlock !== undefined, '.quest-nav rule with padding exists')
+assert(
+  /align-items:\s*center/.test(questNavPaddingBlock || ''),
+  '.quest-nav centers its groups (align-items: center)',
+)
+const questNavPadding = (questNavPaddingBlock || '').match(/padding:\s*([^;]+);/)
+assert(questNavPadding !== null, '.quest-nav declares padding')
+assert(
+  questNavPadding !== null && questNavPadding[1].trim().split(/\s+/).length === 2,
+  '.quest-nav uses a 2-value padding so top and bottom stay equal (no top-heavy bias)',
+)
+
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
   process.exit(1)
