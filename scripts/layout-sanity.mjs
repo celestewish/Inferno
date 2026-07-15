@@ -154,7 +154,12 @@ assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'min-height: 0'), 'col
 assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'flex: 1'), 'collapsed nav menu takes the remaining rail height')
 assert(has('.sidebar.app-nav.is-collapsed .app-nav-menu', 'overflow-x: hidden'), 'collapsed nav menu never scrolls horizontally')
 
-for (const child of ['.app-nav-label', '.app-nav-search-label', '.app-nav-kbd', '.board-switcher', '.project-switcher', '.stats-panel', '.app-nav-account']) {
+// .board-project-panel is the unified Boards/Projects switcher (a later design
+// push merged the old .board-switcher and .project-switcher panels into it). If
+// the collapsed rail does not hide it, its tabs and the active board/project
+// row bleed out of the narrow rail, so the hidden list must name the CURRENT
+// panel class, not the retired ones.
+for (const child of ['.app-nav-label', '.app-nav-search-label', '.app-nav-kbd', '.board-project-panel', '.stats-panel', '.app-nav-account']) {
   assert(
     css.includes(`.sidebar.app-nav.is-collapsed ${child}`),
     `collapsed rail hides wide child ${child}`,
@@ -173,6 +178,11 @@ assert(sidebarJsx.includes('aria-label={item.label}'), 'each nav button has an a
 assert(sidebarJsx.includes('title={item.label}'), 'each nav button has a tooltip (title) in the collapsed rail')
 assert(/className="app-nav-search"[\s\S]*?aria-label="Search"/.test(sidebarJsx), 'the search button has an accessible name when its label is hidden')
 assert(/className="app-nav-search"[\s\S]*?title="Search"/.test(sidebarJsx), 'the search button has a tooltip in the collapsed rail')
+
+// The collapsed-rail hide list above targets .board-project-panel; assert the
+// sidebar actually renders that class so a future rename can't silently reopen
+// the bleed (the CSS check alone would stay green against a stale class name).
+assert(sidebarJsx.includes('board-project-panel'), 'sidebar renders the .board-project-panel switcher that the collapsed rail hides')
 
 // ---------------------------------------------------------------------------
 // Auth modal overlay must stay fixed over the viewport
@@ -226,6 +236,23 @@ assert(has('.section-heading h2', 'text-overflow: ellipsis'), 'section-heading t
 // board task cards (scoped via the child combinator).
 assert(has('.studio-grid', 'align-items: stretch'), '.studio-grid rows stretch so cards match heights')
 assert(has('.studio-grid > .studio-card', 'height: 100%'), 'Studio Home cards fill row height (scoped to direct children)')
+
+// ---------------------------------------------------------------------------
+// Stats block columns carry no individual gradient tile
+// The stat columns live inside the glass .stats-panel container, so each
+// column (.stats-panel > div) must not paint its own gradient square behind the
+// number/label. The glass tile treatment stays on the standalone .mini-stat.
+// ---------------------------------------------------------------------------
+const statColumnBlocks = css.match(/(?:^|[,}])\s*\.stats-panel > div\s*\{[^}]*\}/gm) || []
+assert(statColumnBlocks.length > 0, '.stats-panel > div rule exists')
+assert(
+  !statColumnBlocks.some((block) => /background:\s*linear-gradient/.test(block)),
+  '.stats-panel > div has no gradient tile behind the number/label',
+)
+assert(
+  !statColumnBlocks.some((block) => /backdrop-filter:\s*blur/.test(block)),
+  '.stats-panel > div has no per-column backdrop-filter tile',
+)
 
 if (failures) {
   console.error(`\n${failures} layout check(s) failed.`)
