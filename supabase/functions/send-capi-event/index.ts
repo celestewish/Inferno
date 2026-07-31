@@ -31,6 +31,7 @@ interface EventPayload {
   email?: string
   fbp?: string
   fbc?: string
+  test_event_code?: string
 }
 
 Deno.serve(async (req) => {
@@ -56,8 +57,18 @@ Deno.serve(async (req) => {
     return json({ error: 'Invalid JSON body' }, 400)
   }
 
-  const { event_name, event_id, event_source_url, event_time, action_source, client_user_agent, email, fbp, fbc } =
-    payload
+  const {
+    event_name,
+    event_id,
+    event_source_url,
+    event_time,
+    action_source,
+    client_user_agent,
+    email,
+    fbp,
+    fbc,
+    test_event_code,
+  } = payload
   if (!event_name || !event_id || !event_source_url || !event_time || !action_source || !client_user_agent) {
     return json(
       {
@@ -100,6 +111,7 @@ Deno.serve(async (req) => {
               user_data: userData,
             },
           ],
+          ...(test_event_code ? { test_event_code } : {}),
         }),
       },
     )

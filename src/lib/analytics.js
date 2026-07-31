@@ -41,6 +41,9 @@ function trackEvent(eventName, { email } = {}) {
         email: email || undefined,
         fbp: readCookie('_fbp'),
         fbc: readCookie('_fbc'),
+        // Set via the browser console (localStorage.setItem('fbTestEventCode', 'TEST1234'))
+        // to make live events show up instantly in Meta's Test Events tool.
+        test_event_code: localStorage.getItem('fbTestEventCode') || undefined,
       },
     })
     .catch((error) => console.error('CAPI event failed:', error))
