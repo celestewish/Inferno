@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { trackViewContent } from '../lib/analytics'
 import {
   BOARD_COLUMNS,
   STUDIO_TASKS,
@@ -216,6 +217,10 @@ export default function QuestLanding({ openLogin, openSignup }) {
   const demoRef = useRef(null)
   const pageRef = useRef(null)
   const heroRef = useRef(null)
+
+  useEffect(() => {
+    trackViewContent()
+  }, [])
 
   // Scroll-reveal: fade/rise each major section in once it enters the
   // viewport. Purely presentational — toggles a class via direct DOM

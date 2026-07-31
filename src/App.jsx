@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import { supabase, formatSupabaseError, isMissingColumnError, isMissingTableError, isAccessError } from './lib/supabase'
+import { trackCompleteRegistration } from './lib/analytics'
 import ProjectSidebar from './components/ProjectSidebar'
 import FeedbackWidget from './components/FeedbackWidget'
 import ProjectHeader from './components/ProjectHeader'
@@ -2692,6 +2693,7 @@ const handleAuthSubmit = async (event) => {
         options: { emailRedirectTo: `${siteUrl}/` },
       })
       if (error) throw error
+      trackCompleteRegistration(email)
       setAuthMessage('Account created. Check your email if confirmation is enabled.')
     }
   } catch (error) {

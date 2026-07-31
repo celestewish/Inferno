@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { trackContact } from '../lib/analytics'
 
 // Non-invasive feedback launcher. Renders a small floating
 // button in the authenticated app only (never on the signed-out landing). It
@@ -66,7 +67,10 @@ export default function FeedbackWidget({ activeSection }) {
             className="secondary-btn feedback-action"
             href={mailtoHref()}
             data-testid="feedback-email"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              trackContact()
+              setOpen(false)
+            }}
           >
             Send feedback by email
           </a>
