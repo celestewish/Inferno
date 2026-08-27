@@ -455,6 +455,12 @@ function App() {
   const [inviteRole, setInviteRole] = useState('member')
   const [invites, setInvites] = useState([])
   const [sendingInvite, setSendingInvite] = useState(false)
+  const [showFirstInvitePrompt, setShowFirstInvitePrompt] = useState(false)
+  const [showMemberInvitePopover, setShowMemberInvitePopover] = useState(false)
+  const [showTestimonialPrompt, setShowTestimonialPrompt] = useState(false)
+  const [testimonialText, setTestimonialText] = useState('')
+  const [submittingTestimonial, setSubmittingTestimonial] = useState(false)
+  const testimonialCheckedBoardsRef = useRef(new Set())
   const [authMode, setAuthMode] = useState(null) // null | 'login' | 'signup'
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -711,6 +717,11 @@ useEffect(() => {
   if (!background) setLoading(true)
   setLoadError('')
 
+  // Set when this call auto-creates the user's very first board (signup path
+  // below), so the first-invite prompt can be shown for it once profile data
+  // (with first_invite_prompt_seen_at) has loaded further down.
+  let didAutoCreateFirstBoard = false
+
 let { data: membershipRows, error: membershipError } = await supabase
   .from('board_members')
   .select('board_id, role, boards(*)')
@@ -755,6 +766,9 @@ if (memberInsertError) {
   setLoading(false)
   return
 }
+
+await insertStarterCampfireMessage(createdBoard.id, userId)
+didAutoCreateFirstBoard = true
 
     membershipRows = [{
       board_id: createdBoard.id,
@@ -932,7 +946,7 @@ setCurrentProjectId((currentId) =>
   if (memberIds.length) {
     const { data: profileRows, error: profileLoadError } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at')
+      .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at, first_invite_prompt_seen_at, testimonial_prompt_seen_at')
       .in('id', memberIds)
 
     if (profileLoadError) {
@@ -953,6 +967,9 @@ setCurrentProjectId((currentId) =>
           avatar_url: ownProfile?.avatar_url ?? '',
         })
         setShowOnboarding(!ownProfile?.onboarding_seen_at)
+        if (didAutoCreateFirstBoard && !ownProfile?.first_invite_prompt_seen_at) {
+          setShowFirstInvitePrompt(true)
+        }
       }
     }
   } else {
@@ -1394,7 +1411,24 @@ function dbToTask(row) {
     reactions: normalizeReactions(row.reactions),
     createdAt: row.created_at,
     editedAt: row.updated_at ?? null,
+    isSystem: Boolean(row.is_system),
   }
+}
+
+// Starter message dropped into a board's default Campfire room right after it
+// is created, so an invited teammate never lands in a channel that looks
+// abandoned. Non-blocking: failure here should never stop board creation.
+const STARTER_CAMPFIRE_MESSAGE = 'This is where your team can talk shop — say hi when someone joins.'
+
+const insertStarterCampfireMessage = async (boardId, ownerId) => {
+  const { error } = await supabase.from('board_messages').insert({
+    board_id: boardId,
+    user_id: ownerId,
+    message: STARTER_CAMPFIRE_MESSAGE,
+    channel_key: BOARD_CHANNEL_KEY,
+    is_system: true,
+  })
+  if (error) console.error('Starter Campfire message error:', error)
 }
 
 function dbToChannel(row) {
@@ -1674,6 +1708,27 @@ function dbToInvite(row) {
     return applyReadState(feed, notificationReads)
   }, [projects, meetingNotes, messages, boardMembers, profiles, invites, dailyFocusActive, todayKey, notificationReads])
   const unreadNotifications = countUnread(notifications)
+
+  // Testimonial request popup (Feature 4): checked once per board per session,
+  // right after that board's data has settled, not on every background
+  // refresh. Qualifies only for boards with 2+ members and real (non-system)
+  // chat activity in the last 14 days; never shown twice once dismissed.
+  useEffect(() => {
+    if (loading || !currentBoardId) return
+    if (testimonialCheckedBoardsRef.current.has(currentBoardId)) return
+    testimonialCheckedBoardsRef.current.add(currentBoardId)
+
+    if (myProfile?.testimonial_prompt_seen_at) return
+    if (boardMembers.length < 2) return
+
+    const fourteenDaysAgo = Date.now() - 14 * 24 * 60 * 60 * 1000
+    const hasRecentRealActivity = messages.some(
+      (m) => !m.isSystem && new Date(m.createdAt).getTime() >= fourteenDaysAgo
+    )
+    if (!hasRecentRealActivity) return
+
+    setShowTestimonialPrompt(true)
+  }, [loading, currentBoardId, boardMembers, messages, myProfile])
   const momentumStreak = gamification?.settings?.momentum_streak ?? null
   const todayLabel = new Date().toLocaleDateString(undefined, {
     weekday: 'short',
@@ -2414,10 +2469,14 @@ function dbToInvite(row) {
       setCreatingBoard(false)
       return
     }
+    await insertStarterCampfireMessage(created.id, userId)
     // Award the First Spark badge + first-board XP once. Guarded on the badge so
     // additional boards never re-award. extraStats forces boardCount:1 because
-    // loadAllData has not refreshed currentBoardId yet.
-    if (!hasBadge(gamificationRef.current?.badges, 'first_spark')) {
+    // loadAllData has not refreshed currentBoardId yet. The same "no badge yet"
+    // signal doubles as "this is genuinely the user's first board", which also
+    // gates the first-invite prompt below.
+    const isFirstBoardEver = !hasBadge(gamificationRef.current?.badges, 'first_spark')
+    if (isFirstBoardEver) {
       awardGamification({
         xpDelta: XP_REWARDS.FIRST_BOARD,
         reason: 'First Spark',
@@ -2426,6 +2485,9 @@ function dbToInvite(row) {
     }
     await loadAllData(userId, created.id)
     setActiveSection('board')
+    if (isFirstBoardEver && !myProfile?.first_invite_prompt_seen_at) {
+      setShowFirstInvitePrompt(true)
+    }
     setCreatingBoard(false)
   }
 
@@ -3337,7 +3399,7 @@ const createInvite = async (event) => {
   event.preventDefault()
 
   const email = inviteEmail.trim().toLowerCase()
-  if (!email || !currentBoardId || !userId || sendingInvite) return
+  if (!email || !currentBoardId || !userId || sendingInvite) return false
 
   setSendingInvite(true)
 
@@ -3355,7 +3417,7 @@ const createInvite = async (event) => {
 
     if (error) {
       console.error('Invite error:', error)
-      return
+      return false
     }
 
     const invite = dbToInvite(data)
@@ -3397,6 +3459,8 @@ const createInvite = async (event) => {
     } catch (functionError) {
       console.error('Function invoke error:', functionError)
     }
+
+    return true
   } finally {
     setSendingInvite(false)
   }
@@ -3451,6 +3515,75 @@ const dismissMobileBoardHint = async () => {
     .upsert({ id: userId, mobile_board_hint_seen_at: seenAt }, { onConflict: 'id' })
 
   if (error) console.error('Dismiss mobile board hint error:', formatSupabaseError(error), error)
+}
+
+// Dismiss the post-creation invite prompt permanently (skip, close, or a
+// successful send all funnel through here), matching dismissMobileBoardHint.
+const dismissFirstInvitePrompt = async () => {
+  setShowFirstInvitePrompt(false)
+  if (!userId) return
+
+  const seenAt = new Date().toISOString()
+  setMyProfile((current) => ({ ...(current ?? { id: userId }), first_invite_prompt_seen_at: seenAt }))
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, first_invite_prompt_seen_at: seenAt }, { onConflict: 'id' })
+
+  if (error) console.error('Dismiss first invite prompt error:', formatSupabaseError(error), error)
+}
+
+// The prompt's own submit handler: reuses createInvite() (now returning a
+// success boolean) rather than duplicating the insert/email logic, then
+// closes the prompt and marks it seen only once the invite actually sent.
+const submitFirstInvitePrompt = async (event) => {
+  const sent = await createInvite(event)
+  if (sent) await dismissFirstInvitePrompt()
+}
+
+// Invite popover opened from the solo-state member cluster in ProjectHeader.
+// Same createInvite() reuse as the first-invite prompt, just closing a small
+// popover instead of the full modal on success.
+const submitMemberInvitePopover = async (event) => {
+  const sent = await createInvite(event)
+  if (sent) setShowMemberInvitePopover(false)
+}
+
+// Dismiss the testimonial request popup permanently ("Not now" or a
+// successful submit both funnel through here), matching dismissFirstInvitePrompt.
+const dismissTestimonialPrompt = async () => {
+  setShowTestimonialPrompt(false)
+  setTestimonialText('')
+  if (!userId) return
+
+  const seenAt = new Date().toISOString()
+  setMyProfile((current) => ({ ...(current ?? { id: userId }), testimonial_prompt_seen_at: seenAt }))
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, testimonial_prompt_seen_at: seenAt }, { onConflict: 'id' })
+
+  if (error) console.error('Dismiss testimonial prompt error:', formatSupabaseError(error), error)
+}
+
+const submitTestimonialPrompt = async (event) => {
+  event.preventDefault()
+  const text = testimonialText.trim()
+  if (!text || !currentBoardId || !userId || submittingTestimonial) return
+
+  setSubmittingTestimonial(true)
+  const { error } = await supabase
+    .from('testimonials')
+    .insert({ user_id: userId, board_id: currentBoardId, text })
+  setSubmittingTestimonial(false)
+
+  if (error) {
+    console.error('Submit testimonial error:', formatSupabaseError(error), error)
+    window.alert('We could not send that. Please try again.')
+    return
+  }
+
+  await dismissTestimonialPrompt()
 }
 
 const updateProfileField = (field, value) => {
@@ -4631,6 +4764,16 @@ return (
               methodologies={methodologies}
               gameCategories={availableCategories}
               deleteProject={deleteProject}
+              boardMembers={boardMembers}
+              profiles={profiles}
+              userId={userId}
+              onGoToTeam={goToTeam}
+              invitePopoverOpen={showMemberInvitePopover}
+              onToggleInvitePopover={() => setShowMemberInvitePopover((open) => !open)}
+              inviteEmail={inviteEmail}
+              onInviteEmailChange={setInviteEmail}
+              sendingInvite={sendingInvite}
+              onSubmitInvite={submitMemberInvitePopover}
             />
             <DetailsPanel project={currentProject} tasks={tasks} labelPool={availableTags} />
           </section>
@@ -5272,7 +5415,10 @@ return (
       <h3>Campfire</h3>
     </div>
     <span className="chat-count">
-      {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+      {(() => {
+        const realMessageCount = messages.filter((m) => !m.isSystem).length
+        return `${realMessageCount} ${realMessageCount === 1 ? 'message' : 'messages'}`
+      })()}
     </span>
   </div>
   <p className="muted-copy">
@@ -5516,6 +5662,21 @@ return (
                       {campfireMessages.map((message) => {
                         const isSelf = message.userId === userId
                         const isEditing = editingMessageId === message.id
+                        if (message.isSystem) {
+                          return (
+                            <article
+                              key={message.id}
+                              className="chat-message campfire-message campfire-message-system"
+                              data-testid="campfire-message-system"
+                            >
+                              <div className="campfire-system-row">
+                                <FlameIcon size={14} />
+                                <span className="campfire-system-label">Inferno · system message</span>
+                              </div>
+                              <p className="campfire-message-body">{message.text}</p>
+                            </article>
+                          )
+                        }
                         return (
                           <article
                             key={message.id}
@@ -5739,6 +5900,97 @@ return (
       onOpenTask={openTaskById}
       onQuickAction={runQuickAction}
     />
+
+    {showFirstInvitePrompt ? (
+      <div
+        className="modal-backdrop invite-prompt-backdrop"
+        onClick={dismissFirstInvitePrompt}
+        role="presentation"
+      >
+        <div
+          className="modal-card invite-prompt-card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Working with a team?"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow">Collaboration</p>
+              <h2>Working with a team?</h2>
+            </div>
+            <button type="button" className="icon-btn" aria-label="Close" onClick={dismissFirstInvitePrompt}>✕</button>
+          </div>
+          <p className="muted-copy">
+            Invite them now and this board turns into shared production space — tasks, chat, and due dates, all in one place.
+          </p>
+          <form className="invite-prompt-form" onSubmit={submitFirstInvitePrompt}>
+            <input
+              type="email"
+              required
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="teammate@studio.com"
+              aria-label="Teammate email"
+            />
+            <button type="submit" className="primary-btn" disabled={sendingInvite || !inviteEmail.trim()}>
+              {sendingInvite ? 'Sending…' : 'Send invite'}
+            </button>
+          </form>
+          <button type="button" className="link-btn muted invite-prompt-skip" onClick={dismissFirstInvitePrompt}>
+            Skip for now
+          </button>
+          <p className="muted-copy invite-prompt-footnote">
+            You can always invite people later from the Team page.
+          </p>
+        </div>
+      </div>
+    ) : null}
+
+    {showTestimonialPrompt ? (
+      <div
+        className="modal-backdrop testimonial-modal-backdrop"
+        onClick={dismissTestimonialPrompt}
+        role="presentation"
+      >
+        <div
+          className="modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Quick favor?"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <div className="testimonial-modal-title">
+              <FlameIcon size={20} />
+              <h2>Quick favor?</h2>
+            </div>
+          </div>
+          <p className="muted-copy">
+            Hey! Loving seeing how your team's using Inferno — would you be up for sharing a
+            quick quote for us to share? No pressure at all, just think it'd be great to show
+            real teams using it. Whatever's easiest for you 🙂
+          </p>
+          <form className="testimonial-form" onSubmit={submitTestimonialPrompt}>
+            <textarea
+              rows={4}
+              value={testimonialText}
+              onChange={(e) => setTestimonialText(e.target.value)}
+              placeholder="Type your quote here…"
+              aria-label="Your quote"
+            />
+            <div className="testimonial-form-actions">
+              <button type="button" className="link-btn muted" onClick={dismissTestimonialPrompt}>
+                Not now
+              </button>
+              <button type="submit" className="primary-btn" disabled={submittingTestimonial || !testimonialText.trim()}>
+                {submittingTestimonial ? 'Sending…' : 'Send it over'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    ) : null}
   </>
 )
 }
