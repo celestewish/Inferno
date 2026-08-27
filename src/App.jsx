@@ -53,6 +53,7 @@ import {
   normalizeBadges,
   hasBadge,
   newlyEarnedBadges,
+  makeBadge,
   DAILY_FOCUS_COMPLETE_XP,
   MAX_DAILY_FOCUS,
   getTodayKey,
@@ -501,6 +502,10 @@ function App() {
   // read current XP/badges without stale closures and without re-creating its
   // callbacks on every progress change.
   const gamificationRef = useRef(null)
+  // Tracks which user id the speculative first-invite-reward check has already
+  // run for this session, so switching users (sign out/in) re-checks but a
+  // re-render never re-fires it for the same session.
+  const firstInviteRewardCheckedRef = useRef(null)
   const [profileForm, setProfileForm] = useState({
     display_name: '',
     gamer_tag: '',
@@ -596,6 +601,18 @@ useEffect(() => {
 
   return () => subscription.unsubscribe()
 }, [])
+
+// Inviter path for the first-invite-loop reward: there's no notifications
+// table to push this, so check once per session on load instead. Cheap and
+// idempotent server-side, so a plain per-user-id guard is enough here.
+// (Reads session.user.id directly, not the userId const below, which isn't
+// declared yet at this point in the component body.)
+useEffect(() => {
+  const currentUserId = session?.user?.id
+  if (!currentUserId || firstInviteRewardCheckedRef.current === currentUserId) return
+  firstInviteRewardCheckedRef.current = currentUserId
+  claimFirstInviteReward()
+}, [session?.user?.id])
 
   // ── Theme CSS vars ──
   useEffect(() => {
@@ -1199,6 +1216,7 @@ useEffect(() => {
     window.history.replaceState({}, '', url.toString())
 
     loadAllData(session.user.id, joinedBoardId)
+    claimFirstInviteReward()
   }
 
   acceptInviteFromUrl()
@@ -1264,6 +1282,7 @@ const acceptInvite = async (invite) => {
 
   setMyInvites((current) => current.filter((item) => item.id !== invite.id))
   await loadAllData(session.user.id, joinedBoardId ?? invite.boardId)
+  claimFirstInviteReward()
   setAcceptingInviteId(null)
 }
 
@@ -1939,7 +1958,7 @@ function dbToInvite(row) {
   // Core award routine: apply an XP delta, mark a task rewarded (for idempotent
   // per-task awarding), re-evaluate badges, update state + ref, fire toasts, and
   // persist. Reads the latest snapshot from the ref to avoid stale closures.
-  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {}, mutateSettings } = {}) => {
+  const awardGamification = ({ xpDelta = 0, reason, rewardTaskId, extraStats = {}, mutateSettings, grantBadgeId } = {}) => {
     if (!userId) return
     const base = gamificationRef.current ?? {
       xp: 0,
@@ -1971,7 +1990,20 @@ function dbToInvite(row) {
       buildBadgeStats({ ...extraStats, level: nextLevel }),
       base.badges,
     )
-    const nextBadges = fresh.length ? [...normalizeBadges(base.badges), ...fresh] : base.badges
+    let nextBadges = fresh.length ? [...normalizeBadges(base.badges), ...fresh] : base.badges
+    const celebrationBadges = [...fresh]
+
+    // A server-verified, one-time grant (e.g. the first-invite-loop reward)
+    // bypasses the rule evaluator above entirely — eligibility and
+    // idempotency were already decided server-side; this just persists
+    // whichever badge the caller was told to grant, once.
+    if (grantBadgeId && !hasBadge(nextBadges, grantBadgeId)) {
+      const granted = makeBadge(grantBadgeId)
+      if (granted) {
+        nextBadges = [...normalizeBadges(nextBadges), granted]
+        celebrationBadges.push(granted)
+      }
+    }
 
     const snapshot = {
       xp: nextXp,
@@ -1990,7 +2022,7 @@ function dbToInvite(row) {
     if (nextLevel > prevLevel) {
       pushCelebration({ kind: 'level', title: `Level ${nextLevel}`, detail: 'Level up!' })
     }
-    for (const badge of fresh) {
+    for (const badge of celebrationBadges) {
       pushCelebration({
         kind: 'badge',
         title: badge.name,
@@ -2000,6 +2032,26 @@ function dbToInvite(row) {
     }
 
     persistGamification(snapshot)
+  }
+
+  // First-invite-loop reward: safe to call speculatively and repeatedly (the
+  // RPC is idempotent — eligible: false with no side effects once claimed or
+  // if the user has no qualifying invite yet), so callers never need to guard
+  // beyond "don't call it in a tight loop."
+  const claimFirstInviteReward = async () => {
+    if (!userId) return
+    const { data, error } = await supabase.rpc('claim_first_invite_reward')
+    if (error) {
+      console.error('Claim first-invite reward error:', formatSupabaseError(error), error)
+      return
+    }
+    if (!data?.eligible) return
+
+    awardGamification({
+      xpDelta: data.xp_awarded ?? 0,
+      reason: 'Team grew',
+      grantBadgeId: data.badge?.id,
+    })
   }
 
   // Award XP + badges for a task reaching Done for the first time.
