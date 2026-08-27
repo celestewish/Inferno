@@ -348,6 +348,58 @@ textarea:hover {
 }
 .hero-copy, .hero-metadata, .detail-panel, .activity-panel { position: relative; z-index: 1; }
 
+/* ── Member cluster ── */
+.hero-copy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+}
+.hero-member-cluster-wrap { display: flex; flex-direction: column; align-items: flex-end; gap: 0.5rem; }
+.member-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--card-border);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.4rem 0.3rem 0.3rem;
+}
+.member-cluster-multi { cursor: pointer; color: inherit; font: inherit; }
+.member-cluster-avatar {
+  width: 1.9rem;
+  height: 1.9rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+}
+.member-cluster-label { color: var(--text-muted); font-size: 0.82rem; padding-right: 0.15rem; }
+.member-cluster-invite-btn { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.3rem 0.7rem 0.3rem 0.55rem; }
+/* Normal-flow row (not absolutely positioned) so it can never overlap or
+   overflow neighboring content regardless of viewport width — it simply
+   pushes the title down while open. */
+.member-invite-popover {
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem;
+  background: var(--surface-custom);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+}
+.member-cluster-stack { display: flex; align-items: center; }
+.member-cluster-stack .member-cluster-avatar { margin-left: -8px; border: 2px solid var(--surface-custom); }
+.member-cluster-stack .member-cluster-avatar:first-child { margin-left: 0; }
+.member-cluster-extra { background: var(--card-border); color: var(--text-main); }
+
 /* ── Hero metadata ── */
 .hero-metadata {
   display: grid;

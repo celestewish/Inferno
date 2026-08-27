@@ -456,6 +456,7 @@ function App() {
   const [invites, setInvites] = useState([])
   const [sendingInvite, setSendingInvite] = useState(false)
   const [showFirstInvitePrompt, setShowFirstInvitePrompt] = useState(false)
+  const [showMemberInvitePopover, setShowMemberInvitePopover] = useState(false)
   const [authMode, setAuthMode] = useState(null) // null | 'login' | 'signup'
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -3515,6 +3516,14 @@ const submitFirstInvitePrompt = async (event) => {
   if (sent) await dismissFirstInvitePrompt()
 }
 
+// Invite popover opened from the solo-state member cluster in ProjectHeader.
+// Same createInvite() reuse as the first-invite prompt, just closing a small
+// popover instead of the full modal on success.
+const submitMemberInvitePopover = async (event) => {
+  const sent = await createInvite(event)
+  if (sent) setShowMemberInvitePopover(false)
+}
+
 const updateProfileField = (field, value) => {
   setProfileSaved(false)
   setProfileError('')
@@ -4693,6 +4702,16 @@ return (
               methodologies={methodologies}
               gameCategories={availableCategories}
               deleteProject={deleteProject}
+              boardMembers={boardMembers}
+              profiles={profiles}
+              userId={userId}
+              onGoToTeam={goToTeam}
+              invitePopoverOpen={showMemberInvitePopover}
+              onToggleInvitePopover={() => setShowMemberInvitePopover((open) => !open)}
+              inviteEmail={inviteEmail}
+              onInviteEmailChange={setInviteEmail}
+              sendingInvite={sendingInvite}
+              onSubmitInvite={submitMemberInvitePopover}
             />
             <DetailsPanel project={currentProject} tasks={tasks} labelPool={availableTags} />
           </section>
