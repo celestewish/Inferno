@@ -455,6 +455,7 @@ function App() {
   const [inviteRole, setInviteRole] = useState('member')
   const [invites, setInvites] = useState([])
   const [sendingInvite, setSendingInvite] = useState(false)
+  const [showFirstInvitePrompt, setShowFirstInvitePrompt] = useState(false)
   const [authMode, setAuthMode] = useState(null) // null | 'login' | 'signup'
   const [authForm, setAuthForm] = useState({
     email: '',
@@ -711,6 +712,11 @@ useEffect(() => {
   if (!background) setLoading(true)
   setLoadError('')
 
+  // Set when this call auto-creates the user's very first board (signup path
+  // below), so the first-invite prompt can be shown for it once profile data
+  // (with first_invite_prompt_seen_at) has loaded further down.
+  let didAutoCreateFirstBoard = false
+
 let { data: membershipRows, error: membershipError } = await supabase
   .from('board_members')
   .select('board_id, role, boards(*)')
@@ -757,6 +763,7 @@ if (memberInsertError) {
 }
 
 await insertStarterCampfireMessage(createdBoard.id, userId)
+didAutoCreateFirstBoard = true
 
     membershipRows = [{
       board_id: createdBoard.id,
@@ -934,7 +941,7 @@ setCurrentProjectId((currentId) =>
   if (memberIds.length) {
     const { data: profileRows, error: profileLoadError } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at')
+      .select('id, display_name, avatar_url, gamer_tag, pronouns, onboarding_seen_at, first_invite_prompt_seen_at')
       .in('id', memberIds)
 
     if (profileLoadError) {
@@ -955,6 +962,9 @@ setCurrentProjectId((currentId) =>
           avatar_url: ownProfile?.avatar_url ?? '',
         })
         setShowOnboarding(!ownProfile?.onboarding_seen_at)
+        if (didAutoCreateFirstBoard && !ownProfile?.first_invite_prompt_seen_at) {
+          setShowFirstInvitePrompt(true)
+        }
       }
     }
   } else {
@@ -2436,8 +2446,11 @@ function dbToInvite(row) {
     await insertStarterCampfireMessage(created.id, userId)
     // Award the First Spark badge + first-board XP once. Guarded on the badge so
     // additional boards never re-award. extraStats forces boardCount:1 because
-    // loadAllData has not refreshed currentBoardId yet.
-    if (!hasBadge(gamificationRef.current?.badges, 'first_spark')) {
+    // loadAllData has not refreshed currentBoardId yet. The same "no badge yet"
+    // signal doubles as "this is genuinely the user's first board", which also
+    // gates the first-invite prompt below.
+    const isFirstBoardEver = !hasBadge(gamificationRef.current?.badges, 'first_spark')
+    if (isFirstBoardEver) {
       awardGamification({
         xpDelta: XP_REWARDS.FIRST_BOARD,
         reason: 'First Spark',
@@ -2446,6 +2459,9 @@ function dbToInvite(row) {
     }
     await loadAllData(userId, created.id)
     setActiveSection('board')
+    if (isFirstBoardEver && !myProfile?.first_invite_prompt_seen_at) {
+      setShowFirstInvitePrompt(true)
+    }
     setCreatingBoard(false)
   }
 
@@ -3357,7 +3373,7 @@ const createInvite = async (event) => {
   event.preventDefault()
 
   const email = inviteEmail.trim().toLowerCase()
-  if (!email || !currentBoardId || !userId || sendingInvite) return
+  if (!email || !currentBoardId || !userId || sendingInvite) return false
 
   setSendingInvite(true)
 
@@ -3375,7 +3391,7 @@ const createInvite = async (event) => {
 
     if (error) {
       console.error('Invite error:', error)
-      return
+      return false
     }
 
     const invite = dbToInvite(data)
@@ -3417,6 +3433,8 @@ const createInvite = async (event) => {
     } catch (functionError) {
       console.error('Function invoke error:', functionError)
     }
+
+    return true
   } finally {
     setSendingInvite(false)
   }
@@ -3471,6 +3489,30 @@ const dismissMobileBoardHint = async () => {
     .upsert({ id: userId, mobile_board_hint_seen_at: seenAt }, { onConflict: 'id' })
 
   if (error) console.error('Dismiss mobile board hint error:', formatSupabaseError(error), error)
+}
+
+// Dismiss the post-creation invite prompt permanently (skip, close, or a
+// successful send all funnel through here), matching dismissMobileBoardHint.
+const dismissFirstInvitePrompt = async () => {
+  setShowFirstInvitePrompt(false)
+  if (!userId) return
+
+  const seenAt = new Date().toISOString()
+  setMyProfile((current) => ({ ...(current ?? { id: userId }), first_invite_prompt_seen_at: seenAt }))
+
+  const { error } = await supabase
+    .from('profiles')
+    .upsert({ id: userId, first_invite_prompt_seen_at: seenAt }, { onConflict: 'id' })
+
+  if (error) console.error('Dismiss first invite prompt error:', formatSupabaseError(error), error)
+}
+
+// The prompt's own submit handler: reuses createInvite() (now returning a
+// success boolean) rather than duplicating the insert/email logic, then
+// closes the prompt and marks it seen only once the invite actually sent.
+const submitFirstInvitePrompt = async (event) => {
+  const sent = await createInvite(event)
+  if (sent) await dismissFirstInvitePrompt()
 }
 
 const updateProfileField = (field, value) => {
@@ -5777,6 +5819,52 @@ return (
       onOpenTask={openTaskById}
       onQuickAction={runQuickAction}
     />
+
+    {showFirstInvitePrompt ? (
+      <div
+        className="modal-backdrop invite-prompt-backdrop"
+        onClick={dismissFirstInvitePrompt}
+        role="presentation"
+      >
+        <div
+          className="modal-card invite-prompt-card"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Working with a team?"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="modal-header">
+            <div>
+              <p className="eyebrow">Collaboration</p>
+              <h2>Working with a team?</h2>
+            </div>
+            <button type="button" className="icon-btn" aria-label="Close" onClick={dismissFirstInvitePrompt}>✕</button>
+          </div>
+          <p className="muted-copy">
+            Invite them now and this board turns into shared production space — tasks, chat, and due dates, all in one place.
+          </p>
+          <form className="invite-prompt-form" onSubmit={submitFirstInvitePrompt}>
+            <input
+              type="email"
+              required
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="teammate@studio.com"
+              aria-label="Teammate email"
+            />
+            <button type="submit" className="primary-btn" disabled={sendingInvite || !inviteEmail.trim()}>
+              {sendingInvite ? 'Sending…' : 'Send invite'}
+            </button>
+          </form>
+          <button type="button" className="link-btn muted invite-prompt-skip" onClick={dismissFirstInvitePrompt}>
+            Skip for now
+          </button>
+          <p className="muted-copy invite-prompt-footnote">
+            You can always invite people later from the Team page.
+          </p>
+        </div>
+      </div>
+    ) : null}
   </>
 )
 }
