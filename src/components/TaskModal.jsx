@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import DatePicker from './DatePicker.jsx'
+import AssignmentNudge from './AssignmentNudge.jsx'
 import { ExternalLinkIcon, LinkIcon, CloseIcon } from './Icons.jsx'
 import {
   buildCodeRef,
@@ -11,7 +12,25 @@ import {
   DOC_REF_MAX,
 } from '../lib/tasklinks.js'
 
-export default function TaskModal({ editingTask, setEditingTask, handleEditSave, teamMembers, columns, disciplines, priorities, labelPool, projects = [], deleteTask, addSubtaskToEditing }) {
+export default function TaskModal({
+  editingTask,
+  setEditingTask,
+  handleEditSave,
+  teamMembers,
+  columns,
+  disciplines,
+  priorities,
+  labelPool,
+  projects = [],
+  deleteTask,
+  addSubtaskToEditing,
+  assignmentNudgeVisible,
+  onAssigneeFocus,
+  onAssignmentNudgeInvite,
+  onAssignmentNudgeGuestLink,
+  onAssignmentNudgeDismissForever,
+  onAssignmentNudgeClose,
+}) {
   const [codeUrl, setCodeUrl] = useState('')
   const [codeLabel, setCodeLabel] = useState('')
   const [docUrl, setDocUrl] = useState('')
@@ -78,13 +97,25 @@ export default function TaskModal({ editingTask, setEditingTask, handleEditSave,
             </select>
           </div>
           <div className="form-row">
-            <select value={editingTask.assignee} onChange={(e) => setEditingTask((c) => ({ ...c, assignee: e.target.value }))}>
+            <select
+              value={editingTask.assignee}
+              onFocus={onAssigneeFocus}
+              onChange={(e) => setEditingTask((c) => ({ ...c, assignee: e.target.value }))}
+            >
               {teamMembers.map((member) => <option key={member}>{member}</option>)}
             </select>
             <select value={editingTask.status} onChange={(e) => setEditingTask((c) => ({ ...c, status: e.target.value }))}>
               {columns.map((column) => <option key={column.id} value={column.id}>{column.label}</option>)}
             </select>
           </div>
+          {assignmentNudgeVisible ? (
+            <AssignmentNudge
+              onInvite={onAssignmentNudgeInvite}
+              onGuestLink={onAssignmentNudgeGuestLink}
+              onDismissForever={onAssignmentNudgeDismissForever}
+              onClose={onAssignmentNudgeClose}
+            />
+          ) : null}
           {projects.length > 1 ? (
             <label className="form-field">
               <span className="form-field-label">Project</span>

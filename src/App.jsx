@@ -23,7 +23,7 @@ import RecapView from './components/RecapView'
 import PortfolioView from './components/PortfolioView'
 import DatePicker from './components/DatePicker.jsx'
 import QuestLanding from './components/QuestLanding'
-import { FlameIcon, PlusIcon, CloseIcon, MenuIcon } from './components/Icons'
+import { FlameIcon, PlusIcon, CloseIcon, MenuIcon, LinkIcon, CopyIcon, CheckIcon } from './components/Icons'
 import InfernoLogo from './components/InfernoLogo'
 import {
   createActivity,
@@ -44,7 +44,7 @@ import {
   sanitizeTheme,
   slugifySection,
 } from './data/defaultData'
-import { buildInviteUrl, siteUrl } from './lib/site'
+import { buildInviteUrl, buildGuestLinkUrl, siteUrl } from './lib/site'
 import {
   XP_REWARDS,
   BADGES,
@@ -455,6 +455,13 @@ function App() {
   const [inviteRole, setInviteRole] = useState('member')
   const [invites, setInvites] = useState([])
   const [sendingInvite, setSendingInvite] = useState(false)
+  const [guestLink, setGuestLink] = useState(null) // null = none, else { token, expiresAt, revokedAt }
+  const [guestLinkLoading, setGuestLinkLoading] = useState(false)
+  const [guestLinkSaving, setGuestLinkSaving] = useState(false)
+  const [guestLinkRevoking, setGuestLinkRevoking] = useState(false)
+  const [guestLinkCopied, setGuestLinkCopied] = useState(false)
+  const [assignmentNudgeVisible, setAssignmentNudgeVisible] = useState(false)
+  const [assignmentNudgeCheckedFor, setAssignmentNudgeCheckedFor] = useState(null)
   const [showFirstInvitePrompt, setShowFirstInvitePrompt] = useState(false)
   const [showMemberInvitePopover, setShowMemberInvitePopover] = useState(false)
   const [showTestimonialPrompt, setShowTestimonialPrompt] = useState(false)
@@ -1520,6 +1527,10 @@ function dbToInvite(row) {
   const myBoardRole =
     boardMembers.find((row) => row.user_id === userId)?.role ??
     (isBoardOwner ? 'owner' : null)
+  const hasActiveGuestLink = Boolean(guestLink && !guestLink.revoked_at)
+  const guestLinkDaysLeft = guestLink?.expires_at
+    ? Math.max(0, Math.ceil((new Date(guestLink.expires_at).getTime() - Date.now()) / 86_400_000))
+    : null
 
   // Heuristic: the seeded starter board still contains its original sample
   // projects. Used to clearly label seeded data as an example board.
@@ -3485,6 +3496,159 @@ const deleteInvite = async (invite) => {
     window.alert('We could not cancel that invite. Please try again.')
   }
 }
+
+// The guest-link row is owner-only readable under RLS, so only load it for
+// the board owner (the panel that shows it is also owner-only).
+useEffect(() => {
+  if (!isBoardOwner || !currentBoardId) {
+    setGuestLink(null)
+    return
+  }
+
+  let cancelled = false
+  setGuestLinkLoading(true)
+
+  supabase
+    .from('board_guest_links')
+    .select('token, expires_at, revoked_at')
+    .eq('board_id', currentBoardId)
+    .maybeSingle()
+    .then(({ data, error }) => {
+      if (cancelled) return
+      if (error) {
+        console.error('Load guest link error:', formatSupabaseError(error), error)
+        setGuestLink(null)
+      } else {
+        setGuestLink(data)
+      }
+      setGuestLinkLoading(false)
+    })
+
+  return () => { cancelled = true }
+}, [currentBoardId, isBoardOwner])
+
+const enableOrRegenerateGuestLink = async () => {
+  if (!currentBoardId || guestLinkSaving) return
+
+  setGuestLinkSaving(true)
+  try {
+    const { data, error } = await supabase.rpc('create_or_regenerate_guest_link', {
+      p_board_id: currentBoardId,
+    })
+
+    if (error) {
+      console.error('Create guest link error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not create a guest link. Please try again.')
+      return
+    }
+
+    setGuestLink({ token: data.token, expires_at: data.expires_at, revoked_at: null })
+    setGuestLinkCopied(false)
+  } finally {
+    setGuestLinkSaving(false)
+  }
+}
+
+const regenerateGuestLink = async () => {
+  if (!window.confirm('This invalidates the current link — anyone using it will lose access. Continue?')) return
+  await enableOrRegenerateGuestLink()
+}
+
+const revokeGuestLink = async () => {
+  if (!currentBoardId || guestLinkRevoking) return
+  if (!window.confirm('This revokes the guest link — anyone using it will lose access immediately. Continue?')) return
+
+  setGuestLinkRevoking(true)
+  try {
+    const { error } = await supabase.rpc('revoke_guest_link', { p_board_id: currentBoardId })
+
+    if (error) {
+      console.error('Revoke guest link error:', formatSupabaseError(error), error)
+      window.alert(error.message || 'We could not revoke that link. Please try again.')
+      return
+    }
+
+    setGuestLink((current) => (current ? { ...current, revoked_at: new Date().toISOString() } : current))
+  } finally {
+    setGuestLinkRevoking(false)
+  }
+}
+
+const copyGuestLink = async () => {
+  if (!guestLink?.token) return
+  try {
+    await navigator.clipboard.writeText(buildGuestLinkUrl(guestLink.token))
+    setGuestLinkCopied(true)
+    window.setTimeout(() => setGuestLinkCopied(false), 2000)
+  } catch (clipboardError) {
+    console.error('Clipboard error:', clipboardError)
+  }
+}
+
+// Assignment-moment nudge: a fresh check per task-edit session (reset whenever
+// a different task is opened), so a stale "already checked" flag from one task
+// never suppresses the hint on the next.
+useEffect(() => {
+  setAssignmentNudgeVisible(false)
+  setAssignmentNudgeCheckedFor(null)
+}, [editingTask?.id])
+
+const checkAssignmentNudge = async () => {
+  if (!currentBoardId || !editingTask) return
+  if (assignmentNudgeCheckedFor === editingTask.id) return
+  setAssignmentNudgeCheckedFor(editingTask.id)
+
+  const { data, error } = await supabase.rpc('should_show_assignment_nudge', {
+    p_board_id: currentBoardId,
+  })
+
+  if (error) {
+    console.error('Assignment nudge check error:', formatSupabaseError(error), error)
+    return
+  }
+  if (!data) return
+
+  setAssignmentNudgeVisible(true)
+
+  const { error: shownError } = await supabase.rpc('record_assignment_nudge_shown', {
+    p_board_id: currentBoardId,
+  })
+  if (shownError) console.error('Record nudge shown error:', formatSupabaseError(shownError), shownError)
+}
+
+const recordAssignmentNudgeCta = async (cta) => {
+  const { error } = await supabase.rpc('record_assignment_nudge_cta', {
+    p_board_id: currentBoardId,
+    p_cta: cta,
+  })
+  if (error) console.error('Record nudge CTA error:', formatSupabaseError(error), error)
+}
+
+const assignmentNudgeInvite = async () => {
+  setAssignmentNudgeVisible(false)
+  await recordAssignmentNudgeCta('invite')
+  setEditingTask(null)
+  setShowMemberInvitePopover(true)
+}
+
+const assignmentNudgeGuestLink = async () => {
+  setAssignmentNudgeVisible(false)
+  await recordAssignmentNudgeCta('guest_link')
+  setEditingTask(null)
+  goToTeam()
+}
+
+// Explicit "don't show again" only — closing the hint any other way (the ×,
+// clicking away, saving the task) must never trip the permanent opt-out.
+const assignmentNudgeDismissForever = async () => {
+  setAssignmentNudgeVisible(false)
+  const { error } = await supabase.rpc('dismiss_assignment_nudge_permanently', {
+    p_board_id: currentBoardId,
+  })
+  if (error) console.error('Dismiss assignment nudge error:', formatSupabaseError(error), error)
+}
+
+const closeAssignmentNudge = () => setAssignmentNudgeVisible(false)
 
 const dismissOnboarding = async () => {
   setShowOnboarding(false)
@@ -5489,6 +5653,67 @@ return (
     )}
   </div>
 </section>
+
+{isBoardOwner ? (
+  <section className="panel guest-link-panel" aria-label="Guest board link" data-testid="guest-link-panel">
+    <div className="guest-link-panel-header">
+      <p className="eyebrow">Guest access</p>
+      <h3>Share a view-only link</h3>
+    </div>
+
+    {guestLinkLoading ? (
+      <p className="muted-copy">Loading…</p>
+    ) : hasActiveGuestLink ? (
+      <div className="guest-link-active">
+        <div className="guest-link-url-row">
+          <LinkIcon size={16} />
+          <span className="guest-link-url" data-testid="guest-link-url">{buildGuestLinkUrl(guestLink.token)}</span>
+          <button type="button" className="secondary-btn" onClick={copyGuestLink}>
+            {guestLinkCopied ? <><CheckIcon size={14} /> Copied</> : <><CopyIcon size={14} /> Copy</>}
+          </button>
+        </div>
+
+        <p className="guest-link-meta">
+          Expires in {guestLinkDaysLeft} day{guestLinkDaysLeft === 1 ? '' : 's'}
+        </p>
+
+        <div className="guest-link-actions">
+          <button
+            type="button"
+            className="secondary-btn"
+            disabled={guestLinkSaving}
+            onClick={regenerateGuestLink}
+          >
+            {guestLinkSaving ? 'Regenerating…' : 'Regenerate'}
+          </button>
+          <button
+            type="button"
+            className="danger-btn"
+            disabled={guestLinkRevoking}
+            onClick={revokeGuestLink}
+          >
+            {guestLinkRevoking ? 'Revoking…' : 'Revoke'}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <>
+        <p className="muted-copy">
+          Anyone with this link can view the board without signing up. No editing, comments, or
+          private details are shared.
+        </p>
+        <button
+          type="button"
+          className="primary-btn"
+          disabled={guestLinkSaving}
+          onClick={enableOrRegenerateGuestLink}
+        >
+          {guestLinkSaving ? 'Enabling…' : 'Enable guest link'}
+        </button>
+      </>
+    )}
+  </section>
+) : null}
           </section>
         ) : null}
 
@@ -5890,6 +6115,12 @@ return (
       projects={projects}
       deleteTask={deleteTask}
       addSubtaskToEditing={addSubtaskToEditing}
+      assignmentNudgeVisible={assignmentNudgeVisible}
+      onAssigneeFocus={checkAssignmentNudge}
+      onAssignmentNudgeInvite={assignmentNudgeInvite}
+      onAssignmentNudgeGuestLink={assignmentNudgeGuestLink}
+      onAssignmentNudgeDismissForever={assignmentNudgeDismissForever}
+      onAssignmentNudgeClose={closeAssignmentNudge}
     />
 
     <CommandPalette

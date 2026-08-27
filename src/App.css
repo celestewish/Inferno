@@ -671,6 +671,36 @@ textarea:hover {
 .modal-form { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-bottom: 0.25rem; }
 .modal-description { min-height: 8.5rem; line-height: 1.5; resize: vertical; }
 .checkbox-row { display: flex; align-items: center; gap: 0.75rem; color: #d7dfff; }
+
+/* ── Assignment nudge (inline, solo-board hint) ── */
+.assignment-nudge {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  background: rgba(124, 92, 255, 0.1);
+  border: 1px solid rgba(124, 92, 255, 0.22);
+  animation: riseIn 220ms ease;
+}
+.assignment-nudge-body { display: grid; gap: 0.6rem; min-width: 0; }
+.assignment-nudge-body p { margin: 0; color: #edf2ff; font-size: 0.9rem; }
+.assignment-nudge-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.assignment-nudge-actions .secondary-btn { padding: 0.45rem 0.85rem; font-size: 0.85rem; }
+.assignment-nudge-dismiss { font-size: 0.82rem; }
+.assignment-nudge-close {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #aeb8dd;
+  display: grid;
+  place-items: center;
+}
+.assignment-nudge-close:hover:not(:disabled) { background: rgba(255,255,255,0.08); color: #edf2ff; }
 .member-chip-row { padding: 0.25rem 0; flex-wrap: wrap; }
 .member-chip-row .discipline-pill { margin-right: auto; }
 
@@ -1185,6 +1215,111 @@ textarea:hover {
 
 @media (max-width: 600px) {
   .invite-form { grid-template-columns: 1fr; }
+}
+
+/* Guest link management (owner-facing) */
+
+.guest-link-panel { margin-top: 16px; display: grid; gap: 14px; }
+.guest-link-panel-header h3 { margin: 4px 0 0; }
+
+.guest-link-active {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(174, 184, 221, 0.12);
+}
+
+.guest-link-url-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.guest-link-url {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(174, 184, 221, 0.14);
+  color: #cfd6f6;
+  font-size: 0.85rem;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.guest-link-meta { margin: 0; color: #aeb8dd; font-size: 0.85rem; }
+.guest-link-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+/* Guest board view (public, read-only) */
+
+.guest-shell {
+  min-height: 100dvh;
+  width: 100%;
+  padding: 0 1.5rem 3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.guest-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 0 0.5rem;
+}
+
+.guest-topbar-brand { display: flex; align-items: center; gap: 0.6rem; }
+.guest-topbar-mark { font-family: var(--font-ui); font-weight: 600; letter-spacing: 0.02em; }
+
+.guest-badge {
+  padding: 0.35rem 0.85rem;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: var(--text-main);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.guest-board-header { display: grid; gap: 0.35rem; max-width: 720px; }
+.guest-board-header h1 { margin: 0; }
+
+.guest-board-main { flex: 1 1 auto; min-width: 0; }
+
+.guest-board-empty { display: grid; gap: 0.5rem; justify-items: start; max-width: 480px; }
+
+.guest-signup-banner {
+  position: sticky;
+  bottom: 1rem;
+  margin: 0 auto;
+  width: min(640px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-custom) 92%, white 4%);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--shadow-panel);
+  animation: riseIn 320ms ease;
+}
+
+.guest-signup-banner p { margin: 0; color: var(--text-main); font-size: 0.92rem; }
+.guest-signup-banner-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; flex: none; }
+
+@media (max-width: 600px) {
+  .guest-signup-banner { flex-direction: column; align-items: stretch; }
+  .guest-signup-banner-actions { justify-content: stretch; }
+  .guest-signup-banner-actions .primary-btn,
+  .guest-signup-banner-actions .secondary-btn { flex: 1 1 auto; text-align: center; }
 }
 
 /* Authentication */
