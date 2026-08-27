@@ -1857,6 +1857,16 @@ textarea:hover {
   .invite-prompt-form { grid-template-columns: 1fr; }
 }
 
+/* Testimonial request popup: this exact darker backdrop is deliberately
+   scoped to this one moment per the design spec — do not reuse #0b0710
+   elsewhere. */
+.testimonial-modal-backdrop { background: #0b0710; }
+.testimonial-modal-title { display: flex; align-items: center; gap: 0.5rem; color: var(--ember); }
+.testimonial-modal-title h2 { margin: 0; }
+.testimonial-form { display: grid; gap: 0.75rem; margin-top: 1rem; }
+.testimonial-form textarea { resize: vertical; min-height: 6rem; }
+.testimonial-form-actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+
 .settings-security { display: grid; gap: 0.6rem; justify-items: start; width: 100%; }
 .settings-security h3 { margin: 0; font-size: 0.98rem; }
 .settings-security .muted-copy { margin: 0; }
