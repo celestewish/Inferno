@@ -4000,6 +4000,23 @@ textarea:hover {
   word-break: break-word;
 }
 .campfire-message-body a { color: var(--accent-secondary); }
+
+.campfire-message-system {
+  border: 1px dashed rgba(174, 184, 221, 0.18);
+  background: rgba(255, 255, 255, 0.03);
+}
+.campfire-system-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--accent);
+}
+.campfire-system-label {
+  font-style: italic;
+  font-size: 0.8rem;
+  color: #aeb8dd;
+}
 .chat-code {
   font-family: 'Press Start 2P', monospace;
   font-size: 0.72rem;

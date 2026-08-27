@@ -756,6 +756,8 @@ if (memberInsertError) {
   return
 }
 
+await insertStarterCampfireMessage(createdBoard.id, userId)
+
     membershipRows = [{
       board_id: createdBoard.id,
       role: 'owner',
@@ -1394,7 +1396,24 @@ function dbToTask(row) {
     reactions: normalizeReactions(row.reactions),
     createdAt: row.created_at,
     editedAt: row.updated_at ?? null,
+    isSystem: Boolean(row.is_system),
   }
+}
+
+// Starter message dropped into a board's default Campfire room right after it
+// is created, so an invited teammate never lands in a channel that looks
+// abandoned. Non-blocking: failure here should never stop board creation.
+const STARTER_CAMPFIRE_MESSAGE = 'This is where your team can talk shop — say hi when someone joins.'
+
+const insertStarterCampfireMessage = async (boardId, ownerId) => {
+  const { error } = await supabase.from('board_messages').insert({
+    board_id: boardId,
+    user_id: ownerId,
+    message: STARTER_CAMPFIRE_MESSAGE,
+    channel_key: BOARD_CHANNEL_KEY,
+    is_system: true,
+  })
+  if (error) console.error('Starter Campfire message error:', error)
 }
 
 function dbToChannel(row) {
@@ -2414,6 +2433,7 @@ function dbToInvite(row) {
       setCreatingBoard(false)
       return
     }
+    await insertStarterCampfireMessage(created.id, userId)
     // Award the First Spark badge + first-board XP once. Guarded on the badge so
     // additional boards never re-award. extraStats forces boardCount:1 because
     // loadAllData has not refreshed currentBoardId yet.
@@ -5272,7 +5292,10 @@ return (
       <h3>Campfire</h3>
     </div>
     <span className="chat-count">
-      {messages.length} {messages.length === 1 ? 'message' : 'messages'}
+      {(() => {
+        const realMessageCount = messages.filter((m) => !m.isSystem).length
+        return `${realMessageCount} ${realMessageCount === 1 ? 'message' : 'messages'}`
+      })()}
     </span>
   </div>
   <p className="muted-copy">
@@ -5516,6 +5539,21 @@ return (
                       {campfireMessages.map((message) => {
                         const isSelf = message.userId === userId
                         const isEditing = editingMessageId === message.id
+                        if (message.isSystem) {
+                          return (
+                            <article
+                              key={message.id}
+                              className="chat-message campfire-message campfire-message-system"
+                              data-testid="campfire-message-system"
+                            >
+                              <div className="campfire-system-row">
+                                <FlameIcon size={14} />
+                                <span className="campfire-system-label">Inferno · system message</span>
+                              </div>
+                              <p className="campfire-message-body">{message.text}</p>
+                            </article>
+                          )
+                        }
                         return (
                           <article
                             key={message.id}
