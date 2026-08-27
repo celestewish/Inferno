@@ -101,6 +101,13 @@ export const BADGES = [
     icon: '\u{1F3C6}',
     rarity: 'epic',
   },
+  {
+    id: 'not_alone_anymore',
+    name: 'Not Alone Anymore',
+    description: 'Grow a board beyond just you.',
+    icon: '\u{1F91D}',
+    rarity: 'uncommon',
+  },
 ]
 
 const BADGE_BY_ID = Object.fromEntries(BADGES.map((badge) => [badge.id, badge]))
@@ -155,6 +162,12 @@ export function isBugTask(task) {
 // Given a snapshot of the player's state, return the ids of every badge that is
 // currently satisfied. Idempotent by nature: callers diff against already-earned
 // ids before awarding, and re-evaluating never removes a badge.
+//
+// Deliberately excludes 'not_alone_anymore': its eligibility (an invite that
+// completed the full sent-and-accepted loop, from either role) isn't
+// reconstructable from client-visible state, and is decided + made idempotent
+// server-side by claim_first_invite_reward(). It's granted directly via
+// awardGamification's grantBadgeId, not through this evaluator.
 //
 // stats: {
 //   completedTasks: Task[]   // tasks the player has completed (completed === true)
