@@ -3594,7 +3594,10 @@ const enableOrRegenerateGuestLink = async () => {
       return
     }
 
-    setGuestLink({ token: data.token, expires_at: data.expires_at, revoked_at: null })
+    // create_or_regenerate_guest_link is a RETURNS TABLE function, so
+    // supabase-js returns an array of rows here, not a single object.
+    const row = data?.[0]
+    setGuestLink({ token: row?.token, expires_at: row?.expires_at, revoked_at: null })
     setGuestLinkCopied(false)
   } finally {
     setGuestLinkSaving(false)
